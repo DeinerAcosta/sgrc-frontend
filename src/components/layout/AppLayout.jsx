@@ -18,6 +18,7 @@ const NAV_ITEMS = {
     { to: '/app/ausencias-coord',    icon: '⚠️',  label: 'Ausencias' },
     { to: '/app/ejecucion',          icon: '✅', label: 'Ejecución' },
     { to: '/app/recursos-coord',     icon: '👥', label: 'Recursos' },
+    { to: '/app/backoffice-coord',   icon: '🗂️', label: 'Backoffice' },
     { to: '/app/informes/ocupacion', icon: '📊', label: 'Informe ocupación' },
     { to: '/app/perfil',             icon: '👤', label: 'Mi perfil' },
   ],

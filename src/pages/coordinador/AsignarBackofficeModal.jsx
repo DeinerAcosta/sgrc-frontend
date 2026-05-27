@@ -48,6 +48,7 @@ export default function AsignarBackofficeModal({ auxiliar, onClose }) {
       toast.success(`${auxiliar.nombre} asignada a backoffice`)
       qc.invalidateQueries(['recursos-sede'])
       qc.invalidateQueries(['recursos-sede-full'])
+      qc.invalidateQueries(['backoffice-coord'])
       onClose()
     },
     onError: (err) => toast.error(err?.message ?? 'Error al asignar'),

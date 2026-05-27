@@ -582,6 +582,7 @@ export const backofficeService = {
     if (!DEMO_MODE) return api.get('/asignaciones-backoffice', { params })
     let list = _asignaciones_backoffice
     if (params.auxiliar_id) list = list.filter((a) => a.auxiliar_id === params.auxiliar_id)
+    if (params.sede_id) list = list.filter((a) => a.sede_id === params.sede_id)
     if (params.dia) list = list.filter((a) => a.dia === params.dia)
     return ok(list)
   },

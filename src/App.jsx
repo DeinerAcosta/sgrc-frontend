@@ -16,6 +16,7 @@ import ProgramadorPage        from '@/pages/coordinador/ProgramadorPage'
 import AusenciasCoordPage     from '@/pages/coordinador/AusenciasCoordPage'
 import EjecucionPage          from '@/pages/coordinador/EjecucionPage'
 import RecursosCoordPage      from '@/pages/coordinador/RecursosCoordPage'
+import BackofficeCoordPage    from '@/pages/coordinador/BackofficeCoordPage'
 
 // Directivo
 import DashboardDirectivoPage from '@/pages/directivo/DashboardDirectivoPage'
@@ -72,6 +73,7 @@ export default function App() {
         <Route path="ausencias-coord" element={<RequireAuth roles={['coordinador']}><AusenciasCoordPage /></RequireAuth>} />
         <Route path="ejecucion" element={<RequireAuth roles={['coordinador', 'supervisor']}><EjecucionPage /></RequireAuth>} />
         <Route path="recursos-coord" element={<RequireAuth roles={['coordinador', 'supervisor']}><RecursosCoordPage /></RequireAuth>} />
+        <Route path="backoffice-coord" element={<RequireAuth roles={['coordinador']}><BackofficeCoordPage /></RequireAuth>} />
 
         {/* DIRECTIVO */}
         <Route path="dashboard" element={<RequireAuth roles={['directivo']}><DashboardDirectivoPage /></RequireAuth>} />
