@@ -146,6 +146,31 @@ export default function AusenciasCoordPage() {
                   <Row label="Pacientes impactados" value={sel.pacientes_impactados} />
                   {sel.costo_oportunidad && <Row label="Costo de oportunidad" value={formatCOP(sel.costo_oportunidad)} />}
                   {sel.costo_personal_inactivo && <Row label="Costo personal inactivo" value={formatCOP(sel.costo_personal_inactivo)} />}
+
+                  {/* Desglose día a día: qué y cuánto afecta a los pacientes durante la ausencia (RN-18) */}
+                  {Array.isArray(sel.impacto_por_dia) && sel.impacto_por_dia.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-red-200">
+                      <div className="font-medium text-red-700 mb-1">Pacientes afectados por día</div>
+                      <table className="w-full">
+                        <thead>
+                          <tr className="text-red-400 text-left">
+                            <th className="font-medium">Día</th>
+                            <th className="font-medium text-right">Pacientes</th>
+                            <th className="font-medium text-right">Costo</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sel.impacto_por_dia.map((d, i) => (
+                            <tr key={i} className="text-red-800">
+                              <td className="capitalize">{d.dia}{d.fecha ? ` ${d.fecha.slice(5)}` : ''}{d.parcial ? ' (parcial)' : ''}</td>
+                              <td className="text-right">{d.pacientes}</td>
+                              <td className="text-right">{formatCOP(d.costo)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               )}
 

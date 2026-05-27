@@ -12,6 +12,7 @@ const INFORMES = [
   { to: '/app/informes/ausentismo-impacto', icon: '🚨', label: 'Ausentismo e impacto económico' },
   { to: '/app/informes/subutilizacion',     icon: '⏰', label: 'Tiempos ociosos' },
   { to: '/app/informes/ocupacion',          icon: '🏥', label: 'Ocupación consultorios' },
+  { to: '/app/informes/cierre-semanas',     icon: '🔒', label: 'Cumplimiento de cierre' },
   { to: '/app/comparativo',                 icon: '↔️',  label: 'Comparativo semanal' },
 ]
 

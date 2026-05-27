@@ -29,6 +29,7 @@ const NAV_ITEMS = {
     { to: '/app/informes/ausentismo-impacto', icon: '🚨', label: 'Ausentismo e impacto' },
     { to: '/app/informes/subutilizacion',  icon: '⏰', label: 'Tiempos ociosos' },
     { to: '/app/informes/horas-prog-ejec', icon: '⏱️', label: 'Prog. vs ejecutado' },
+    { to: '/app/informes/cierre-semanas',  icon: '🔒', label: 'Cierre de semanas' },
     { to: '/app/comparativo',              icon: '↔️',  label: 'Comparativo' },
     { to: '/app/perfil',                   icon: '👤', label: 'Mi perfil' },
   ],

@@ -58,6 +58,13 @@ const CONFIG = {
     meta: 85,
     fn: informeService.horasProgEjec,
   },
+  'cierre-semanas': {
+    titulo: 'Cumplimiento de cierre de semanas',
+    desc: 'Quién cerró cada semana, cuándo y si fue a tiempo (cerrada en o antes del inicio de la semana).',
+    cols: ['Semana', 'Coordinador', 'Fecha de cierre', 'Días anticipación', 'Estado'],
+    meta: null,
+    fn: informeService.cierreSemanas,
+  },
 }
 
 /**

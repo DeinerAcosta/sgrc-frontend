@@ -692,6 +692,11 @@ export const informeService = {
     if (!DEMO_MODE) return api.get('/informes/horas-prog-ejec', { params })
     return ok(INFORME_HORAS_PROG_EJEC)
   },
+  /** Cumplimiento de cierre de semanas por coordinador (quién/cuándo/a tiempo) */
+  cierreSemanas: async (params = {}) => {
+    if (!DEMO_MODE) return api.get('/informes/cierre-semanas', { params })
+    return ok([])
+  },
   /** Comparativo semana actual vs cualquiera de las últimas 52 (HU-D-06) */
   comparativo: async (semanaB) => {
     if (!DEMO_MODE) return api.get('/informes/comparativo', { params: { semana_b: semanaB } })
