@@ -1,11 +1,18 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { recursoService } from '@/services/api'
-import { KpiCard, Spinner, SectionHeader, EmptyState } from '@/components/ui'
-import { formatCOP, TIPOS_RECURSO } from '@/utils/helpers'
+import { recursoService, ausenciaService } from '@/services/api'
+import { KpiCard, Spinner, SectionHeader, EmptyState, Badge } from '@/components/ui'
+import { formatCOP, TIPOS_RECURSO, TIPOS_AUSENCIA } from '@/utils/helpers'
 
 const tipoLabel = (tipo) => TIPOS_RECURSO.find((t) => t.value === tipo)?.label ?? tipo
+const ausenciaLabel = (tipo) => TIPOS_AUSENCIA.find((t) => t.value === tipo)?.label ?? tipo
+const estadoVariant = (e) => (e === 'confirmada' ? 'red' : e === 'rechazada' ? 'gray' : 'amber')
+const fmtRango = (ini, fin) => {
+  const i = (ini ?? '').slice(0, 10)
+  const f = (fin ?? '').slice(0, 10)
+  return !f || i === f ? i : `${i} → ${f}`
+}
 
 /**
  * Productividad por recurso (HU-R-08 reubicada a gestión).
@@ -29,6 +36,13 @@ export default function ProductividadRecursoPage() {
     enabled: !!recursoId,
   })
 
+  // Ausencias del recurso seleccionado (historial completo)
+  const { data: ausencias = [] } = useQuery({
+    queryKey: ['ausencias-de-recurso', recursoId],
+    queryFn: () => ausenciaService.list({ recurso_id: recursoId }),
+    enabled: !!recursoId,
+  })
+
   const recursoSel = recursos.find((r) => r.id === recursoId)
   const filtrados = recursos.filter((r) =>
     (!tipoFiltro || r.tipo === tipoFiltro) &&
@@ -44,8 +58,8 @@ export default function ProductividadRecursoPage() {
   return (
     <div className="p-4 max-w-4xl mx-auto">
       <div className="mb-4">
-        <h1 className="text-base font-semibold text-gray-900">Productividad por recurso</h1>
-        <p className="text-xs text-gray-500">Filtra por tipo o busca por nombre, y elige un recurso para ver su desempeño</p>
+        <h1 className="text-base font-semibold text-gray-900">Ficha del recurso</h1>
+        <p className="text-xs text-gray-500">Elige un recurso (filtra por tipo o busca por nombre) para ver su productividad y sus ausencias</p>
       </div>
 
       {/* Filtro por tipo + buscador con desplegable (compacto, no ocupa espacio fijo) */}
@@ -107,14 +121,14 @@ export default function ProductividadRecursoPage() {
       ) : isLoading || !data ? (
         <div className="p-6 flex justify-center"><Spinner size="lg" /></div>
       ) : (
-        <Detalle data={data} recurso={recursoSel} />
+        <Detalle data={data} recurso={recursoSel} ausencias={ausencias} />
       )}
     </div>
   )
 }
 
-/** Vista detallada de KPIs + gráficos para el recurso seleccionado. */
-function Detalle({ data, recurso }) {
+/** Vista detallada de KPIs + gráficos + ausencias para el recurso seleccionado. */
+function Detalle({ data, recurso, ausencias = [] }) {
   // Guards defensivos: si el recurso aún no tiene ejecuciones registradas, el
   // backend podría no traer estos campos → evitamos el crash (pantalla en blanco).
   const promedio = data.promedio_4_semanas ?? { horas: 0, pacientes: 0 }
@@ -199,8 +213,41 @@ function Detalle({ data, recurso }) {
         </div>
       </div>
 
+      {/* Ausencias del recurso — historial completo */}
+      <div className="card mt-4">
+        <SectionHeader title={`Ausencias del recurso (${ausencias.length})`} />
+        {ausencias.length === 0 ? (
+          <div className="py-4 text-center text-xs text-gray-400">Sin ausencias registradas ✓</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="px-3 py-2 text-left font-medium text-gray-500">Fecha</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500">Tipo</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500">Estado</th>
+                  <th className="px-3 py-2 text-right font-medium text-gray-500">Pac. impactados</th>
+                  <th className="px-3 py-2 text-right font-medium text-gray-500">Costo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ausencias.map((a) => (
+                  <tr key={a.id} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{fmtRango(a.fecha_inicio, a.fecha_fin)}</td>
+                    <td className="px-3 py-2 text-gray-700">{ausenciaLabel(a.tipo)}</td>
+                    <td className="px-3 py-2"><Badge variant={estadoVariant(a.estado)}>{a.estado}</Badge></td>
+                    <td className="px-3 py-2 text-right text-gray-700">{a.pacientes_impactados ?? '—'}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{a.costo_oportunidad ? formatCOP(a.costo_oportunidad) : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       <div className="text-xs text-gray-400 mt-3">
-        * Los datos provienen del registro de ejecución confirmado por el coordinador.
+        * Productividad: registro de ejecución confirmado. Ausencias: historial completo del recurso.
       </div>
     </>
   )
