@@ -9,6 +9,7 @@ const ICONOS = {
   asignacion_cambiada: '📅',
   recurso_ocioso: '⚠️',
   ausencia_sin_cubrir: '🔴',
+  solicitud_tarea_backoffice: '🗂️',
   default: '🔔',
 }
 

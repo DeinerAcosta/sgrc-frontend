@@ -6,6 +6,7 @@ import { backofficeService, recursoService } from '@/services/api'
 import { useAuthStore } from '@/store/authStore'
 import { Badge, Spinner, EmptyState, SectionHeader, Avatar } from '@/components/ui'
 import AsignarBackofficeModal from '@/pages/coordinador/AsignarBackofficeModal'
+import SolicitarTareaBackofficeModal from '@/pages/coordinador/SolicitarTareaBackofficeModal'
 
 /**
  * Módulo de Backoffice del coordinador (HU-C-17, RN-36/37).
@@ -16,6 +17,7 @@ export default function BackofficeCoordPage() {
   const { user } = useAuthStore()
   const sedeId = user?.sedes?.[0]
   const [boAux, setBoAux] = useState(null)
+  const [showSolicitar, setShowSolicitar] = useState(false)
 
   // Auxiliares de la sede que quedaron liberadas por ausencia → candidatas a backoffice
   const { data: recursos = [] } = useQuery({
@@ -39,11 +41,20 @@ export default function BackofficeCoordPage() {
 
   return (
     <div className="p-4">
-      <div className="mb-4">
-        <h1 className="text-base font-semibold text-gray-900">Backoffice</h1>
-        <p className="text-xs text-gray-500">
-          Tareas administrativas asignadas a auxiliares liberadas por ausencia · seguimiento de tu sede
-        </p>
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <h1 className="text-base font-semibold text-gray-900">Backoffice</h1>
+          <p className="text-xs text-gray-500">
+            Tareas administrativas asignadas a auxiliares liberadas por ausencia · seguimiento de tu sede
+          </p>
+        </div>
+        <button
+          className="btn whitespace-nowrap"
+          onClick={() => setShowSolicitar(true)}
+          title="Pedir al supervisor que cree una tarea de backoffice que no está en el catálogo"
+        >
+          ＋ Solicitar nueva tarea
+        </button>
       </div>
 
       {/* Auxiliares liberadas disponibles para asignar */}
@@ -140,6 +151,7 @@ export default function BackofficeCoordPage() {
       </div>
 
       {boAux && <AsignarBackofficeModal auxiliar={boAux} onClose={() => setBoAux(null)} />}
+      {showSolicitar && <SolicitarTareaBackofficeModal onClose={() => setShowSolicitar(false)} />}
     </div>
   )
 }

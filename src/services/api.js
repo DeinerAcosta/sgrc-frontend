@@ -577,6 +577,19 @@ export const backofficeService = {
     _tareas_backoffice[i] = { ..._tareas_backoffice[i], ...data }
     return ok(_tareas_backoffice[i])
   },
+  /** El coordinador solicita al supervisor crear una tarea que no existe (notifica al supervisor) */
+  solicitarTarea: async (data) => {
+    if (!DEMO_MODE) return api.post('/tareas-backoffice/solicitar', data)
+    _notificaciones = [{
+      id: uid(),
+      tipo: 'solicitud_tarea_backoffice',
+      titulo: 'Solicitud de nueva tarea de backoffice',
+      mensaje: `Se solicita crear la tarea de backoffice "${data.nombre}".${data.justificacion ? ` Justificación: ${data.justificacion}` : ''}`,
+      leida: false,
+      creada_en: new Date().toISOString(),
+    }, ..._notificaciones]
+    return ok({ ok: true, notificados: 1 })
+  },
   /** Lista asignaciones backoffice */
   asignacionesList: async (params = {}) => {
     if (!DEMO_MODE) return api.get('/asignaciones-backoffice', { params })
