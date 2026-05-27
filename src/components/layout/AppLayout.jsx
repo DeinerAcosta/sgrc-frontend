@@ -34,11 +34,6 @@ const NAV_ITEMS = {
     { to: '/app/perfil',                   icon: '👤', label: 'Mi perfil' },
   ],
   supervisor: [
-    { to: '/app/dashboard',                icon: '📊', label: 'Dashboard' },
-    { to: '/app/programador',              icon: '📅', label: 'Programador' },
-    { to: '/app/ausencias-coord',          icon: '⚠️',  label: 'Ausencias' },
-    { to: '/app/comparativo',              icon: '↔️',  label: 'Comparativo' },
-    { to: '/app/productividad-recurso',    icon: '🧑‍⚕️', label: 'Productividad individual' },
     { to: '/app/admin/sedes',              icon: '🏢', label: 'Sedes y consultorios' },
     { to: '/app/admin/recursos',           icon: '🩺', label: 'Recursos (catálogo)' },
     { to: '/app/admin/usuarios',           icon: '👥', label: 'Usuarios' },
@@ -47,6 +42,7 @@ const NAV_ITEMS = {
     { to: '/app/admin/tareas-backoffice',  icon: '🗂️', label: 'Tareas backoffice' },
     { to: '/app/admin/festivos',           icon: '📆', label: 'Festivos' },
     { to: '/app/admin/auditoria',          icon: '🔍', label: 'Auditoría' },
+    { to: '/app/programador',              icon: '🔓', label: 'Editar semana cerrada' },
     { to: '/app/perfil',                   icon: '👤', label: 'Mi perfil' },
   ],
 }
