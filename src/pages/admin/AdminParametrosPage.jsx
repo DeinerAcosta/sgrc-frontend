@@ -28,7 +28,7 @@ export default function AdminParametrosPage() {
   })
 
   const vigentes = TIPOS.map((t) => {
-    const lista = parametros.filter((p) => p.tipo_consulta === t.value).sort((a, b) => b.vigente_desde.localeCompare(a.vigente_desde))
+    const lista = parametros.filter((p) => p.tipo_consulta === t.value).sort((a, b) => (b.vigente_desde ?? '').localeCompare(a.vigente_desde ?? ''))
     return { tipo: t, vigente: lista[0], historial: lista.slice(1) }
   })
 

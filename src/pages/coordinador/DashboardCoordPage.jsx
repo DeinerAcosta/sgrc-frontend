@@ -21,7 +21,7 @@ export default function DashboardCoordPage() {
     queryFn: () => recursoService.list({ sede_id: sedeId, tipo: 'auxiliar' }),
   })
 
-  const ociosas = recursos.filter((r) => (r.horas_asignadas ?? 0) < r.horas_max_semana * 0.6)
+  const ociosas = recursos.filter((r) => (r.horas_asignadas ?? 0) < (r.horas_max_semana ?? 42) * 0.6)
   const conExtras = recursos.filter((r) => r.es_horas_extras)
   const liberadas = recursos.filter((r) => r.estado_badge === 'liberada')
 
@@ -67,7 +67,7 @@ export default function DashboardCoordPage() {
                 <AlertRow
                   key={r.id}
                   tipo="amarillo"
-                  titulo={`${r.nombre} · ${formatHoras(r.horas_asignadas ?? 0)} / ${formatHoras(r.horas_max_semana)}`}
+                  titulo={`${r.nombre} · ${formatHoras(r.horas_asignadas ?? 0)} / ${formatHoras((r.horas_max_semana ?? 42))}`}
                   subtitulo="Costo fijo sin utilizar"
                   actionLabel="Asignar"
                   onAction={() => navigate('/app/programador')}
@@ -98,7 +98,7 @@ export default function DashboardCoordPage() {
           ) : (
             <div className="space-y-2.5">
               {recursos.slice(0, 8).map((r) => {
-                const pct = Math.min(100, Math.round(((r.horas_asignadas ?? 0) / r.horas_max_semana) * 100))
+                const pct = Math.min(100, Math.round(((r.horas_asignadas ?? 0) / (r.horas_max_semana ?? 42)) * 100))
                 const isOciosa = pct < 60
                 const isExtra = r.es_horas_extras
                 const isLib = r.estado_badge === 'liberada'
@@ -110,10 +110,10 @@ export default function DashboardCoordPage() {
                       {isOciosa && <Badge variant="amber" className="text-xs py-0">ociosa</Badge>}
                       {isExtra && <Badge variant="red" className="text-xs py-0">extras</Badge>}
                       <span className={`text-xs ${isExtra ? 'text-red-600' : isOciosa ? 'text-amber-600' : 'text-green-700'}`}>
-                        {formatHoras(r.horas_asignadas ?? 0)} / {formatHoras(r.horas_max_semana)}
+                        {formatHoras(r.horas_asignadas ?? 0)} / {formatHoras((r.horas_max_semana ?? 42))}
                       </span>
                     </div>
-                    <BarProgress value={r.horas_asignadas ?? 0} max={r.horas_max_semana} />
+                    <BarProgress value={r.horas_asignadas ?? 0} max={(r.horas_max_semana ?? 42)} />
                   </div>
                 )
               })}

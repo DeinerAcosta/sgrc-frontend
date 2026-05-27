@@ -98,7 +98,7 @@ export default function ComparativoPage() {
       <div className="card">
         <SectionHeader title="Tendencia · últimas 12 semanas" subtitle="Pacientes y ocupación" />
         <ResponsiveContainer width="100%" height={260}>
-          <LineChart data={data.ultimas_12}>
+          <LineChart data={data.ultimas_12 ?? []}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis dataKey="semana" tick={{ fontSize: 10 }} />
             <YAxis yAxisId="left" tick={{ fontSize: 10 }} />

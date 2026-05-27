@@ -82,7 +82,7 @@ export default function AdminUsuariosPage() {
                       </div>
                     </td>
                     <td className="px-3 py-2"><Badge variant={rolInfo?.color ?? 'gray'}>{rolInfo?.label ?? u.rol}</Badge></td>
-                    <td className="px-3 py-2 text-xs text-gray-600">{u.sedes.length === 0 ? 'todas' : `${u.sedes.length} sede(s)`}</td>
+                    <td className="px-3 py-2 text-xs text-gray-600">{(u.sedes?.length ?? 0) === 0 ? 'todas' : `${(u.sedes?.length ?? 0)} sede(s)`}</td>
                     <td className="px-3 py-2 text-xs text-gray-500">
                       {u.ultimo_login ? format(parseISO(u.ultimo_login.replace(' ', 'T')), 'd MMM HH:mm', { locale: es }) : '—'}
                     </td>

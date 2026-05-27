@@ -115,9 +115,12 @@ export default function ProductividadRecursoPage() {
 
 /** Vista detallada de KPIs + gráficos para el recurso seleccionado. */
 function Detalle({ data, recurso }) {
-  const promedio = data.promedio_4_semanas
-  const variacionHoras = data.horas_semana_actual - promedio.horas
-  const variacionPac = data.pacientes_semana - promedio.pacientes
+  // Guards defensivos: si el recurso aún no tiene ejecuciones registradas, el
+  // backend podría no traer estos campos → evitamos el crash (pantalla en blanco).
+  const promedio = data.promedio_4_semanas ?? { horas: 0, pacientes: 0 }
+  const ultimas = data.ultimas_4_semanas ?? []
+  const variacionHoras = (data.horas_semana_actual ?? 0) - promedio.horas
+  const variacionPac = (data.pacientes_semana ?? 0) - promedio.pacientes
 
   return (
     <>
@@ -157,7 +160,7 @@ function Detalle({ data, recurso }) {
         <div className="card">
           <SectionHeader title="Horas por semana — últimas 4" />
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={data.ultimas_4_semanas}>
+            <BarChart data={ultimas}>
               <XAxis dataKey="semana" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 10 }} />
               <Tooltip />
@@ -168,12 +171,12 @@ function Detalle({ data, recurso }) {
         <div className="card">
           <SectionHeader title="Pacientes por semana — últimas 4" />
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={data.ultimas_4_semanas}>
+            <BarChart data={ultimas}>
               <XAxis dataKey="semana" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 10 }} />
               <Tooltip />
               <Bar dataKey="pacientes" radius={[4, 4, 0, 0]}>
-                {data.ultimas_4_semanas.map((d, i) => (
+                {ultimas.map((d, i) => (
                   <Cell key={i} fill={d.pacientes >= promedio.pacientes ? '#22c55e' : '#f59e0b'} />
                 ))}
               </Bar>
