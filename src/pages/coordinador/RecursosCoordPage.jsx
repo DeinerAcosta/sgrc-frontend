@@ -4,11 +4,13 @@ import { recursoService } from '@/services/api'
 import { useAuthStore } from '@/store/authStore'
 import { Badge, BarProgress, Spinner, EmptyState, SectionHeader, Avatar } from '@/components/ui'
 import { TIPOS_RECURSO, formatHoras } from '@/utils/helpers'
+import AsignarBackofficeModal from '@/pages/coordinador/AsignarBackofficeModal'
 
 export default function RecursosCoordPage() {
   const { user } = useAuthStore()
   const sedeId = user?.sedes?.[0]
   const [filtroTipo, setFiltroTipo] = useState('')
+  const [boAux, setBoAux] = useState(null)
 
   const { data: recursos = [], isLoading } = useQuery({
     queryKey: ['recursos-sede-full', sedeId, filtroTipo],
@@ -86,6 +88,15 @@ export default function RecursosCoordPage() {
                         {formatHoras(horas)} / {formatHoras(max)} · {pct}%
                       </div>
                     </div>
+                    {r.estado_badge === 'liberada' && (
+                      <button
+                        className="btn text-xs whitespace-nowrap"
+                        onClick={() => setBoAux(r)}
+                        title="Asignar a esta auxiliar liberada una tarea de backoffice"
+                      >
+                        🗂️ Asignar backoffice
+                      </button>
+                    )}
                   </div>
                   <BarProgress value={horas} max={max} color={r.es_horas_extras ? 'red' : ociosa ? 'amber' : 'green'} />
                 </div>
@@ -94,6 +105,8 @@ export default function RecursosCoordPage() {
           </div>
         )}
       </div>
+
+      {boAux && <AsignarBackofficeModal auxiliar={boAux} onClose={() => setBoAux(null)} />}
     </div>
   )
 }
