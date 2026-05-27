@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid } from 'recharts'
 import { informeService } from '@/services/api'
@@ -10,6 +11,7 @@ import { formatCOP, formatPct, formatHoras } from '@/utils/helpers'
  */
 export default function ComparativoPage() {
   const [semanaB, setSemanaB] = useState('sem-anterior')
+  const navigate = useNavigate()
 
   const { data, isLoading } = useQuery({
     queryKey: ['comparativo', semanaB],
@@ -30,6 +32,9 @@ export default function ComparativoPage() {
 
   return (
     <div className="p-4">
+      <button className="text-xs text-brand-600 hover:underline mb-2" onClick={() => navigate('/app/dashboard')}>
+        ← Volver al dashboard
+      </button>
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-base font-semibold text-gray-900">Comparativo semanal</h1>

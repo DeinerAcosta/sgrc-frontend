@@ -8,12 +8,11 @@ import { formatCOP } from '@/utils/helpers'
 import { useNavigate } from 'react-router-dom'
 
 const INFORMES = [
-  { to: '/app/informes/productividad',  icon: '📈', label: 'Productividad por recurso' },
-  { to: '/app/informes/ausentismo',     icon: '🚨', label: 'Ausentismo y ranking' },
-  { to: '/app/informes/subutilizacion', icon: '⏰', label: 'Tiempos ociosos' },
-  { to: '/app/informes/ocupacion',      icon: '🏥', label: 'Ocupación consultorios' },
-  { to: '/app/informes/impacto',        icon: '💰', label: 'Impacto económico' },
-  { to: '/app/informes/comparativo',    icon: '↔️',  label: 'Comparativo semanal' },
+  { to: '/app/informes/productividad',      icon: '📈', label: 'Productividad por recurso' },
+  { to: '/app/informes/ausentismo-impacto', icon: '🚨', label: 'Ausentismo e impacto económico' },
+  { to: '/app/informes/subutilizacion',     icon: '⏰', label: 'Tiempos ociosos' },
+  { to: '/app/informes/ocupacion',          icon: '🏥', label: 'Ocupación consultorios' },
+  { to: '/app/comparativo',                 icon: '↔️',  label: 'Comparativo semanal' },
 ]
 
 export default function DashboardDirectivoPage() {
@@ -171,7 +170,7 @@ export default function DashboardDirectivoPage() {
               </div>
             </>
           )}
-          <button className="btn w-full justify-center mt-2 text-xs" onClick={() => navigate('/app/informes/ausentismo')}>
+          <button className="btn w-full justify-center mt-2 text-xs" onClick={() => navigate('/app/informes/ausentismo-impacto')}>
             Ver informe completo →
           </button>
         </div>

@@ -678,6 +678,11 @@ export const informeService = {
     if (!DEMO_MODE) return api.get('/informes/impacto', { params })
     return ok(INFORME_IMPACTO)
   },
+  /** Informe fusionado: ausentismo + ranking + impacto económico por recurso */
+  ausentismoImpacto: async (params = {}) => {
+    if (!DEMO_MODE) return api.get('/informes/ausentismo-impacto', { params })
+    return ok(INFORME_AUSENTISMO)
+  },
   dashboard: async () => {
     if (!DEMO_MODE) return api.get('/informes/dashboard')
     return ok(DASH_DIRECTIVO)

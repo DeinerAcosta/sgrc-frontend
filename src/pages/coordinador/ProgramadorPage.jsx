@@ -21,11 +21,22 @@ const SLOT_COLOR = {
 export default function ProgramadorPage() {
   const { user } = useAuthStore()
   const qc = useQueryClient()
-  const sedeId = user?.sedes?.[0]
+  const sedePropia = user?.sedes?.[0]
 
+  const [sedeManual, setSedeManual] = useState('')
   const [semanaBase, setSemanaBase] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }))
   const [modalData, setModalData]   = useState(null)
   const [showCierre, setShowCierre] = useState(false)
+
+  // El coordinador trabaja sobre su sede; el supervisor (sin sede propia) la elige.
+  const sedeId = sedePropia || sedeManual
+
+  // Sedes para el selector del supervisor
+  const { data: sedesDisponibles = [] } = useQuery({
+    queryKey: ['sedes-programador'],
+    queryFn: () => sedeService.list(),
+    enabled: !sedePropia,
+  })
 
   const diasFecha = diasDeSemana(semanaBase)
   const fechasISO = diasFecha.map((d) => format(d, 'yyyy-MM-dd'))
@@ -113,6 +124,17 @@ export default function ProgramadorPage() {
         <div>
           <h1 className="text-base font-semibold text-gray-900">Programador semanal</h1>
           <p className="text-xs text-gray-500">{semanaLabel(semanaBase)} · Ocupación proyectada: <strong>{ocupacion}%</strong></p>
+          {!sedePropia && (
+            <select
+              className="input mt-2"
+              style={{ maxWidth: 280 }}
+              value={sedeManual}
+              onChange={(e) => setSedeManual(e.target.value)}
+            >
+              <option value="">Selecciona una sede…</option>
+              {sedesDisponibles.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+            </select>
+          )}
         </div>
         <div className="flex gap-2">
           {!semanaActual && (
@@ -147,7 +169,9 @@ export default function ProgramadorPage() {
       </div>
 
       {/* Grid */}
-      {loadCons || loadAsig ? (
+      {!sedeId ? (
+        <EmptyState icon="🏢" title="Selecciona una sede" description="Elige una sede arriba para ver y programar sus consultorios." />
+      ) : loadCons || loadAsig ? (
         <div className="flex justify-center py-12"><Spinner size="lg" /></div>
       ) : !semanaActual ? (
         <EmptyState icon="📅" title="No hay semana creada para este período" description="Crea la semana para comenzar a programar recursos." />

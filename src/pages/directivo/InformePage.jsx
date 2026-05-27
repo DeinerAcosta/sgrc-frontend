@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { informeService, sedeService } from '@/services/api'
 import { useAuthStore } from '@/store/authStore'
@@ -43,6 +43,13 @@ const CONFIG = {
     cols: ['Recurso', 'Fecha', 'Tipo', 'Pac. afectados', 'Costo oportunidad', 'Costo personal', 'Costo reprogramación', 'Total'],
     meta: null,
     fn: informeService.impacto,
+  },
+  'ausentismo-impacto': {
+    titulo: 'Ausentismo e impacto económico',
+    desc: 'Ranking de ausencias por recurso con su impacto económico: pacientes afectados y costos.',
+    cols: ['Recurso', 'Tipo', 'Sede', 'Ausencias', 'Días', 'Pac. afectados', 'Costo oportunidad', 'Costo personal', 'Costo total'],
+    meta: null,
+    fn: informeService.ausentismoImpacto,
   },
   'horas-prog-ejec': {
     titulo: 'Horas programadas vs ejecutadas',
@@ -114,6 +121,8 @@ export default function InformePage() {
   const { tipo = 'ocupacion' } = useParams()
   const cfg = CONFIG[tipo] ?? CONFIG.ocupacion
   const { user } = useAuthStore()
+  const navigate = useNavigate()
+  const dashboardPath = user?.rol === 'coordinador' ? '/app/dashboard-coord' : '/app/dashboard'
 
   const hoy = new Date()
   const [desde, setDesde] = useState(format(subWeeks(startOfWeek(hoy, { weekStartsOn: 1 }), 4), 'yyyy-MM-dd'))
@@ -166,6 +175,9 @@ export default function InformePage() {
 
   return (
     <div className="p-4">
+      <button className="text-xs text-brand-600 hover:underline mb-2" onClick={() => navigate(dashboardPath)}>
+        ← Volver al dashboard
+      </button>
       <div className="flex items-center justify-between mb-1">
         <h1 className="text-base font-semibold text-gray-900">{cfg.titulo}</h1>
         <div className="flex gap-2">

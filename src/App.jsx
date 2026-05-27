@@ -7,7 +7,6 @@ import AppLayout              from '@/components/layout/AppLayout'
 // Recurso
 import HorarioPage            from '@/pages/recurso/HorarioPage'
 import AusenciasRecursoPage   from '@/pages/recurso/AusenciasRecursoPage'
-import ProductividadRecursoPage from '@/pages/recurso/ProductividadRecursoPage'
 import PerfilPage             from '@/pages/recurso/PerfilPage'
 import BackofficeRecursoPage  from '@/pages/recurso/BackofficeRecursoPage'
 
@@ -22,6 +21,7 @@ import RecursosCoordPage      from '@/pages/coordinador/RecursosCoordPage'
 import DashboardDirectivoPage from '@/pages/directivo/DashboardDirectivoPage'
 import InformePage            from '@/pages/directivo/InformePage'
 import ComparativoPage        from '@/pages/directivo/ComparativoPage'
+import ProductividadRecursoPage from '@/pages/directivo/ProductividadRecursoPage'
 
 // Admin / Supervisor
 import AdminSedesPage         from '@/pages/admin/AdminSedesPage'
@@ -63,7 +63,6 @@ export default function App() {
         {/* RECURSO */}
         <Route path="horario" element={<RequireAuth roles={['recurso', 'coordinador', 'supervisor']}><HorarioPage /></RequireAuth>} />
         <Route path="ausencias" element={<RequireAuth roles={['recurso']}><AusenciasRecursoPage /></RequireAuth>} />
-        <Route path="productividad" element={<RequireAuth roles={['recurso']}><ProductividadRecursoPage /></RequireAuth>} />
         <Route path="perfil" element={<RequireAuth><PerfilPage /></RequireAuth>} />
         <Route path="backoffice" element={<RequireAuth roles={['recurso']}><BackofficeRecursoPage /></RequireAuth>} />
 
@@ -78,6 +77,7 @@ export default function App() {
         <Route path="dashboard" element={<RequireAuth roles={['directivo', 'supervisor']}><DashboardDirectivoPage /></RequireAuth>} />
         <Route path="informes/:tipo" element={<RequireAuth roles={['coordinador', 'directivo', 'supervisor']}><InformePage /></RequireAuth>} />
         <Route path="comparativo" element={<RequireAuth roles={['directivo', 'supervisor']}><ComparativoPage /></RequireAuth>} />
+        <Route path="productividad-recurso" element={<RequireAuth roles={['directivo', 'supervisor']}><ProductividadRecursoPage /></RequireAuth>} />
 
         {/* SUPERVISOR */}
         <Route path="admin/sedes" element={<RequireAuth roles={['supervisor']}><AdminSedesPage /></RequireAuth>} />
