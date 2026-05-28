@@ -124,12 +124,14 @@ function RecursoModal({ recurso, onClose, onSaved }) {
     esquema_pago: recurso.esquema_pago ?? 'fijo',
     horas_max_semana: recurso.horas_max_semana ?? 42,
     horas_max_dia: recurso.horas_max_dia ?? 10,
+    multi_consultorio: recurso.multi_consultorio ?? false,
     activo: recurso.activo ?? true,
     motivo_inactivacion: '',
   })
 
   const requiereIntervalo = ['oftalmologo', 'optometra', 'anestesiologo', 'tecnico'].includes(form.tipo)
   const requiereEspecialidad = ['oftalmologo', 'optometra', 'anestesiologo'].includes(form.tipo)
+  const puedeMultiConsultorio = ['oftalmologo', 'optometra', 'anestesiologo'].includes(form.tipo)
   const cambiaEstado = !isNew && form.activo !== recurso.activo
 
   const { mutate, isPending } = useMutation({
@@ -158,7 +160,15 @@ function RecursoModal({ recurso, onClose, onSaved }) {
           </div>
           <div>
             <label className="label">Tipo de recurso *</label>
-            <select className="input" value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}>
+            <select
+              className="input"
+              value={form.tipo}
+              onChange={(e) => {
+                const nuevoTipo = e.target.value
+                const sigueAplicandoMulti = ['oftalmologo', 'optometra', 'anestesiologo'].includes(nuevoTipo)
+                setForm({ ...form, tipo: nuevoTipo, multi_consultorio: sigueAplicandoMulti ? form.multi_consultorio : false })
+              }}
+            >
               {TIPOS_RECURSO.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
             <div className="text-xs text-gray-500 mt-1">
@@ -194,6 +204,24 @@ function RecursoModal({ recurso, onClose, onSaved }) {
               <input className="input" type="number" min="1" max="60" value={form.horas_max_semana} onChange={(e) => setForm({ ...form, horas_max_semana: parseInt(e.target.value) || 42 })} />
             </div>
           </div>
+          {puedeMultiConsultorio && (
+            <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.multi_consultorio}
+                  onChange={(e) => setForm({ ...form, multi_consultorio: e.target.checked })}
+                  className="mt-0.5"
+                />
+                <div>
+                  <div className="text-xs font-medium text-blue-900">Multi-consultorio (cubre varias salas en paralelo)</div>
+                  <div className="text-xs text-blue-700 mt-0.5">
+                    Para médicos que rotan entre 2-3 consultorios con auxiliares manejando cada sala. Al activarlo, el programador permite asignaciones simultáneas en distintos consultorios y las horas diarias se cuentan por <strong>unión de intervalos</strong> (no por suma), respetando el tope de {form.horas_max_dia ?? 10}h reales.
+                  </div>
+                </div>
+              </label>
+            </div>
+          )}
           {!isNew && (
             <div>
               <label className="label">Estado</label>
