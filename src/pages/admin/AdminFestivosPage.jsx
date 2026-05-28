@@ -25,6 +25,17 @@ export default function AdminFestivosPage() {
     onSuccess: () => { qc.invalidateQueries(['admin-festivos']); toast.success('Festivo eliminado') },
   })
 
+  const { mutate: sincronizar, isPending: sincronizando } = useMutation({
+    mutationFn: () => festivoService.sincronizarColombia(),
+    onSuccess: (res) => {
+      qc.invalidateQueries(['admin-festivos'])
+      const r = res?.data ?? res
+      const total = (r?.creados ?? 0) + (r?.omitidos ?? 0)
+      toast.success(`Sincronizado calendario de Colombia: ${r?.creados ?? 0} nuevos, ${r?.omitidos ?? 0} ya existían (de ${total})`)
+    },
+    onError: (err) => toast.error(err?.message ?? 'Error al sincronizar'),
+  })
+
   const ordenados = [...festivos].sort((a, b) => a.fecha.localeCompare(b.fecha))
   const futuros = ordenados.filter((f) => f.fecha >= format(new Date(), 'yyyy-MM-dd'))
   const pasados = ordenados.filter((f) => f.fecha < format(new Date(), 'yyyy-MM-dd'))
@@ -34,13 +45,23 @@ export default function AdminFestivosPage() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-base font-semibold text-gray-900">Calendario de festivos</h1>
-          <p className="text-xs text-gray-500">{futuros.length} festivos restantes este año</p>
+          <p className="text-xs text-gray-500">{futuros.length} festivos restantes · sincronizado con el calendario oficial de Colombia</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowAdd(true)}>+ Agregar festivo</button>
+        <div className="flex gap-2">
+          <button
+            className="btn whitespace-nowrap"
+            onClick={() => sincronizar()}
+            disabled={sincronizando}
+            title="Carga automáticamente los 18 festivos oficiales del año actual y el siguiente (Ley Emiliani + Pascua). Idempotente: no duplica."
+          >
+            {sincronizando ? <Spinner size="sm" /> : '🇨🇴 Sincronizar Colombia'}
+          </button>
+          <button className="btn-primary whitespace-nowrap" onClick={() => setShowAdd(true)}>+ Agregar festivo</button>
+        </div>
       </div>
 
       <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-800 mb-4">
-        ℹ️ Los días festivos aparecen resaltados en la grilla del programador. No bloquean asignaciones — solo informan al coordinador.
+        ℹ️ Los días festivos aparecen resaltados en la grilla del programador y en el resumen diario. El sistema sincroniza automáticamente el calendario oficial de Colombia el 1 de enero de cada año (18 fechas, Ley Emiliani + Pascua). Puedes agregar festivos locales o cierres adicionales con "+ Agregar festivo".
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">

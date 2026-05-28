@@ -898,6 +898,11 @@ export const festivoService = {
     _festivos = _festivos.filter((f) => f.fecha !== fecha)
     return ok({ ok: true })
   },
+  /** Sincroniza el calendario oficial de Colombia (año actual + siguiente) */
+  sincronizarColombia: async (body = {}) => {
+    if (!DEMO_MODE) return api.post('/festivos/sincronizar-colombia', body)
+    return ok({ ok: true, creados: 0, omitidos: 18 })
+  },
 }
 
 // ============ AUDITORÍA (HU-S-05) ============

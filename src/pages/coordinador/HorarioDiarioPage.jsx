@@ -76,6 +76,13 @@ export default function HorarioDiarioPage() {
         </div>
       </div>
 
+      {/* Banner de festivo si aplica */}
+      {data?.es_festivo && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-900 mb-3 flex items-center gap-2">
+          📆 <span><strong>Día festivo:</strong> {data.festivo_descripcion}. Verifica con el coordinador si hay atención programada.</span>
+        </div>
+      )}
+
       {/* Encabezado para impresión */}
       <div className="card mb-4 print:shadow-none print:border-0">
         <div className="flex items-center justify-between">
@@ -85,6 +92,7 @@ export default function HorarioDiarioPage() {
             </div>
             <div className="text-sm text-gray-600 capitalize">
               {format(dia, "EEEE d 'de' MMMM 'de' yyyy", { locale: es })}
+              {data?.es_festivo && <Badge variant="amber" className="ml-2">Festivo · {data.festivo_descripcion}</Badge>}
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3 text-center text-xs">
