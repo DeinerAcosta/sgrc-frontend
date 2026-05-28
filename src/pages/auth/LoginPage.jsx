@@ -29,6 +29,12 @@ export default function LoginPage() {
 
   const goAfterLogin = ({ user, token }) => {
     login(user, token)
+    // Cambio obligatorio al primer ingreso (HU-S-XX): si el usuario fue creado
+    // con contraseña provisional, lo enviamos a cambiarla antes de su panel.
+    if (user.debe_cambiar_password) {
+      navigate('/cambiar-password', { replace: true })
+      return
+    }
     navigate(ROUTES[user.rol] ?? '/app/horario', { replace: true })
   }
 
@@ -154,9 +160,17 @@ export default function LoginPage() {
           )}
 
           {!DEMO_MODE && (
-            <p className="text-xs text-center text-gray-400 mt-6">
-              ¿Problemas para acceder? Contacta al supervisor del sistema.
-            </p>
+            <>
+              <div className="text-center text-xs text-gray-500 mt-5">
+                ¿Aún no tienes cuenta?{' '}
+                <button onClick={() => navigate('/registro')} className="text-brand-600 hover:underline font-medium">
+                  Regístrate aquí
+                </button>
+              </div>
+              <p className="text-xs text-center text-gray-400 mt-3">
+                ¿Problemas para acceder? Contacta al supervisor del sistema.
+              </p>
+            </>
           )}
         </div>
       </div>

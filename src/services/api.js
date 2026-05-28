@@ -95,6 +95,29 @@ export const authService = {
     if (!DEMO_MODE) return api.post('/auth/forgot-password', { email })
     return ok({ message: 'Email enviado' }, 400)
   },
+  /** Registro público — queda pendiente de aprobación por el supervisor */
+  registro: async (data) => {
+    if (!DEMO_MODE) return api.post('/auth/registro', data)
+    return ok({ ok: true, message: 'Solicitud enviada (demo)' }, 300)
+  },
+  /** Cambia la contraseña del usuario autenticado (también limpia debeCambiarPassword) */
+  cambiarPassword: async (passwordActual, passwordNueva) => {
+    if (!DEMO_MODE) return api.post('/auth/cambiar-password', { password_actual: passwordActual, password_nueva: passwordNueva })
+    return ok({ ok: true })
+  },
+  // Supervisor: solicitudes de registro
+  listSolicitudes: async (params = {}) => {
+    if (!DEMO_MODE) return api.get('/usuarios/solicitudes', { params })
+    return ok([])
+  },
+  aprobarSolicitud: async (id) => {
+    if (!DEMO_MODE) return api.post(`/usuarios/solicitudes/${id}/aprobar`)
+    return ok({ ok: true })
+  },
+  rechazarSolicitud: async (id, motivo) => {
+    if (!DEMO_MODE) return api.post(`/usuarios/solicitudes/${id}/rechazar`, { motivo })
+    return ok({ ok: true })
+  },
   me: async () => {
     if (!DEMO_MODE) return api.get('/usuarios/me')
     const token = useAuthStore.getState().token
@@ -881,6 +904,13 @@ export const historialAusenciasService = {
     if (!DEMO_MODE) return api.get(`/recursos/${recursoId}/ausencias`)
     const propias = _ausencias.filter((a) => a.recurso_id === recursoId)
     return ok([...HISTORIAL_AUSENCIAS_RECURSO, ...propias])
+  },
+}
+
+export const horarioDiarioService = {
+  get: async (sedeId, fecha) => {
+    if (!DEMO_MODE) return api.get('/horario-diario', { params: { sede_id: sedeId, fecha } })
+    return ok({ sede: { nombre: 'Demo' }, fecha, items: [], resumen: { asignaciones_total: 0 } })
   },
 }
 

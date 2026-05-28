@@ -10,6 +10,16 @@ export const useAuthStore = create(
 
       login: (user, token) => set({ user, token, isAuthenticated: true }),
 
+      // Recarga el user actual desde el backend (GET /usuarios/me).
+      // Útil tras cambiar contraseña, actualizar perfil, etc.
+      refresh: async () => {
+        try {
+          const { authService } = await import('@/services/api')
+          const user = await authService.me()
+          set((s) => ({ user: { ...s.user, ...user } }))
+        } catch { /* no romper si falla */ }
+      },
+
       logout: () => {
         set({ user: null, token: null, isAuthenticated: false })
         // RequireAuth en App.jsx detecta isAuthenticated=false y redirige a /login.

@@ -2,6 +2,8 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 
 import LoginPage              from '@/pages/auth/LoginPage'
+import RegistroPage           from '@/pages/auth/RegistroPage'
+import CambiarPasswordPage    from '@/pages/auth/CambiarPasswordPage'
 import AppLayout              from '@/components/layout/AppLayout'
 
 // Recurso
@@ -17,6 +19,7 @@ import AusenciasCoordPage     from '@/pages/coordinador/AusenciasCoordPage'
 import EjecucionPage          from '@/pages/coordinador/EjecucionPage'
 import RecursosCoordPage      from '@/pages/coordinador/RecursosCoordPage'
 import BackofficeCoordPage    from '@/pages/coordinador/BackofficeCoordPage'
+import HorarioDiarioPage      from '@/pages/coordinador/HorarioDiarioPage'
 
 // Directivo
 import DashboardDirectivoPage from '@/pages/directivo/DashboardDirectivoPage'
@@ -33,6 +36,7 @@ import AdminAuditoriaPage     from '@/pages/admin/AdminAuditoriaPage'
 import AdminRecursosPage      from '@/pages/admin/AdminRecursosPage'
 import AdminFestivosPage      from '@/pages/admin/AdminFestivosPage'
 import AdminMetasPage         from '@/pages/admin/AdminMetasPage'
+import AdminSolicitudesPage   from '@/pages/admin/AdminSolicitudesPage'
 
 function RequireAuth({ children, roles }) {
   const { isAuthenticated, user } = useAuthStore()
@@ -56,6 +60,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/registro" element={<RegistroPage />} />
+      <Route path="/cambiar-password" element={<RequireAuth><CambiarPasswordPage /></RequireAuth>} />
       <Route path="/" element={<Navigate to="/app" replace />} />
 
       <Route path="/app" element={<RequireAuth><AppLayout /></RequireAuth>}>
@@ -74,6 +80,7 @@ export default function App() {
         <Route path="ejecucion" element={<RequireAuth roles={['coordinador', 'supervisor']}><EjecucionPage /></RequireAuth>} />
         <Route path="recursos-coord" element={<RequireAuth roles={['coordinador', 'supervisor']}><RecursosCoordPage /></RequireAuth>} />
         <Route path="backoffice-coord" element={<RequireAuth roles={['coordinador']}><BackofficeCoordPage /></RequireAuth>} />
+        <Route path="horario-diario" element={<RequireAuth roles={['coordinador', 'supervisor']}><HorarioDiarioPage /></RequireAuth>} />
 
         {/* DIRECTIVO */}
         <Route path="dashboard" element={<RequireAuth roles={['directivo']}><DashboardDirectivoPage /></RequireAuth>} />
@@ -90,6 +97,7 @@ export default function App() {
         <Route path="admin/recursos" element={<RequireAuth roles={['supervisor']}><AdminRecursosPage /></RequireAuth>} />
         <Route path="admin/festivos" element={<RequireAuth roles={['supervisor']}><AdminFestivosPage /></RequireAuth>} />
         <Route path="admin/metas" element={<RequireAuth roles={['supervisor']}><AdminMetasPage /></RequireAuth>} />
+        <Route path="admin/solicitudes" element={<RequireAuth roles={['supervisor']}><AdminSolicitudesPage /></RequireAuth>} />
 
         <Route path="*" element={<RoleRedirect />} />
       </Route>
