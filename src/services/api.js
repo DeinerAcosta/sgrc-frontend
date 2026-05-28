@@ -587,6 +587,21 @@ export const backofficeService = {
     if (!DEMO_MODE) return api.get('/tareas-backoffice', { params: { all: true } })
     return ok(_tareas_backoffice)
   },
+  /** Solicitudes pendientes (supervisor las ve para aprobar/rechazar) */
+  tareasPendientes: async () => {
+    if (!DEMO_MODE) return api.get('/tareas-backoffice', { params: { estado: 'pendiente' } })
+    return ok([])
+  },
+  /** Supervisor aprueba una solicitud pendiente (puede ajustar campos antes) */
+  aprobarSolicitudTarea: async (id, ajustes = {}) => {
+    if (!DEMO_MODE) return api.post(`/tareas-backoffice/${id}/aprobar`, ajustes)
+    return ok({ ok: true })
+  },
+  /** Supervisor rechaza una solicitud pendiente con motivo obligatorio */
+  rechazarSolicitudTarea: async (id, motivo) => {
+    if (!DEMO_MODE) return api.post(`/tareas-backoffice/${id}/rechazar`, { motivo })
+    return ok({ ok: true })
+  },
   tareaCreate: async (data) => {
     if (!DEMO_MODE) return api.post('/tareas-backoffice', data)
     const nueva = { id: uid(), ...data, activa: data.activa ?? true, creada_por: 'u4' }

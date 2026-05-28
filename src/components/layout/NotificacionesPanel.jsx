@@ -14,6 +14,8 @@ const ICONOS = {
   recurso_ocioso: '⚠️',
   solicitud_tarea_backoffice: '🗂️',
   solicitud_registro: '📨',
+  solicitud_aprobada: '✅',
+  solicitud_rechazada: '❌',
   resumen_diario: '📋',
   default: '🔔',
 }
@@ -54,6 +56,12 @@ function rutaDeNotificacion(n, rol) {
       return null
     case 'solicitud_registro':
       if (rol === 'supervisor') return '/app/admin/solicitudes'
+      return null
+    case 'solicitud_aprobada':
+    case 'solicitud_rechazada':
+      // Le llega al coordinador que solicitó — lo llevamos a Backoffice
+      // donde está la tarea aprobada (o la solicitud rechazada en el historial).
+      if (rol === 'coordinador') return '/app/backoffice-coord'
       return null
     case 'resumen_diario':
       if (rol === 'coordinador' || rol === 'supervisor') return '/app/horario-diario'
