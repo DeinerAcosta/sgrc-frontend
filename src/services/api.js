@@ -828,6 +828,11 @@ export const usuarioService = {
     })
     return ok(nuevo)
   },
+  /** Carga masiva — crea N usuarios en una sola request, cada uno con contraseña provisional por email */
+  bulkCreate: async (usuarios) => {
+    if (!DEMO_MODE) return api.post('/usuarios/bulk', { usuarios })
+    return ok({ totales: { ok: usuarios.length, fallidos: 0, total: usuarios.length }, resultados: usuarios.map((u) => ({ email: u.email, ok: true })) })
+  },
   update: async (id, data) => {
     if (!DEMO_MODE) return api.put(`/usuarios/${id}`, data)
     const i = _usuarios_lista.findIndex((u) => u.id === id)

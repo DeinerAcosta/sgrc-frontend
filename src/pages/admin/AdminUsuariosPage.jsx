@@ -6,6 +6,7 @@ import { es } from 'date-fns/locale'
 import { usuarioService, sedeService } from '@/services/api'
 import { Avatar, Badge, Spinner, EmptyState, SectionHeader } from '@/components/ui'
 import { ROLES } from '@/utils/helpers'
+import BulkUsuariosModal from '@/pages/admin/BulkUsuariosModal'
 
 /**
  * HU-S-02: Supervisor gestiona usuarios del sistema.
@@ -15,6 +16,7 @@ export default function AdminUsuariosPage() {
   const [filtroRol, setFiltroRol] = useState('')
   const [busqueda, setBusqueda] = useState('')
   const [editing, setEditing] = useState(null)
+  const [showBulk, setShowBulk] = useState(false)
 
   const { data: usuarios = [], isLoading } = useQuery({
     queryKey: ['admin-usuarios', filtroRol],
@@ -32,7 +34,12 @@ export default function AdminUsuariosPage() {
           <h1 className="text-base font-semibold text-gray-900">Gestión de usuarios</h1>
           <p className="text-xs text-gray-500">{usuarios.length} usuarios — {usuarios.filter((u) => u.activo).length} activos</p>
         </div>
-        <button className="btn-primary" onClick={() => setEditing({})}>+ Nuevo usuario</button>
+        <div className="flex gap-2">
+          <button className="btn whitespace-nowrap" onClick={() => setShowBulk(true)} title="Cargar múltiples usuarios en una sola operación; cada uno recibe contraseña provisional por email">
+            📥 Crear en lote
+          </button>
+          <button className="btn-primary" onClick={() => setEditing({})}>+ Nuevo usuario</button>
+        </div>
       </div>
 
       <div className="card mb-4">
@@ -108,6 +115,7 @@ export default function AdminUsuariosPage() {
       </div>
 
       {editing !== null && <UsuarioModal usuario={editing} onClose={() => setEditing(null)} onSaved={() => { qc.invalidateQueries(['admin-usuarios']); setEditing(null) }} />}
+      {showBulk && <BulkUsuariosModal onClose={() => setShowBulk(false)} onSaved={() => { qc.invalidateQueries(['admin-usuarios']); setShowBulk(false) }} />}
     </div>
   )
 }
