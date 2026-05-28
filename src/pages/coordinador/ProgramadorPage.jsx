@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { addWeeks, subWeeks, startOfWeek, format, parseISO } from 'date-fns'
@@ -9,6 +9,7 @@ import { Badge, Spinner, EmptyState } from '@/components/ui'
 import { DIAS_LABEL, DIAS, semanaLabel, diasDeSemana, calcularCapacidadPacientes } from '@/utils/helpers'
 import AsignacionModal from '@/pages/coordinador/AsignacionModal'
 import CerrarSemanaModal from '@/pages/coordinador/CerrarSemanaModal'
+import AsignarBackofficeModal from '@/pages/coordinador/AsignarBackofficeModal'
 
 const SLOT_COLOR = {
   oftalmologo:   'slot-teal',
@@ -27,6 +28,45 @@ export default function ProgramadorPage() {
   const [semanaBase, setSemanaBase] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }))
   const [modalData, setModalData]   = useState(null)
   const [showCierre, setShowCierre] = useState(false)
+  const [highlightCons, setHighlightCons] = useState(null)
+  const [boRecursoOcioso, setBoRecursoOcioso] = useState(null)
+  const rowRefs = useRef({})
+
+  // Llevar al usuario a la fila de un consultorio en la grilla y resaltarla
+  // unos segundos. Se usa desde el modal de cierre cuando hace click en un aviso.
+  const irAConsultorio = (consId) => {
+    setShowCierre(false)
+    setTimeout(() => {
+      const row = rowRefs.current[consId]
+      if (!row) return
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setHighlightCons(consId)
+      setTimeout(() => setHighlightCons(null), 3500)
+    }, 250)
+  }
+
+  // Acción contextual para un recurso ocioso: si es auxiliar abrimos el modal
+  // de backoffice (HU-C-17); si es médico/optómetra/etc. lo llevamos al primer
+  // consultorio de su especialidad para que el coordinador asigne ahí.
+  const asignarRecursoOcioso = (recurso) => {
+    setShowCierre(false)
+    setTimeout(() => {
+      if (recurso.tipo === 'auxiliar' || recurso.tipo === 'auxiliar_admin') {
+        setBoRecursoOcioso(recurso)
+        return
+      }
+      const cons = consultorios.find((c) => c.activo && c.especialidad === recurso.tipo)
+      if (cons) {
+        const row = rowRefs.current[cons.id]
+        row?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        setHighlightCons(cons.id)
+        setTimeout(() => setHighlightCons(null), 3500)
+        toast(`${recurso.nombre} tiene horas disponibles — asígnalo en ${cons.nombre}`, { icon: '👉' })
+      } else {
+        toast(`No hay consultorios activos de ${recurso.tipo} en esta sede`, { icon: 'ℹ️' })
+      }
+    }, 250)
+  }
 
   // El coordinador trabaja sobre su sede; el supervisor (sin sede propia) la elige.
   const sedeId = sedePropia || sedeManual
@@ -199,7 +239,11 @@ export default function ProgramadorPage() {
             </thead>
             <tbody>
               {consultorios.filter((c) => c.activo).map((cons) => (
-                <tr key={cons.id} className="border-b border-gray-50">
+                <tr
+                  key={cons.id}
+                  ref={(el) => { if (el) rowRefs.current[cons.id] = el; else delete rowRefs.current[cons.id] }}
+                  className={`border-b border-gray-50 transition-colors ${highlightCons === cons.id ? 'bg-amber-100/70 ring-2 ring-amber-300' : ''}`}
+                >
                   <td className="p-2 bg-gray-50 border-r border-gray-100 align-top">
                     <div className="flex items-center justify-between gap-1">
                       <div>
@@ -298,8 +342,23 @@ export default function ProgramadorPage() {
           consultorios_sin_asignar: consSinAsig,
           recursos_ociosos: ociososList,
         }
-        return <CerrarSemanaModal semana={semanaActual} resumen={resumen} onClose={() => setShowCierre(false)} />
+        return (
+          <CerrarSemanaModal
+            semana={semanaActual}
+            resumen={resumen}
+            onClose={() => setShowCierre(false)}
+            onIrAConsultorio={irAConsultorio}
+            onAsignarRecurso={asignarRecursoOcioso}
+          />
+        )
       })()}
+
+      {boRecursoOcioso && (
+        <AsignarBackofficeModal
+          auxiliar={boRecursoOcioso}
+          onClose={() => setBoRecursoOcioso(null)}
+        />
+      )}
     </div>
   )
 }

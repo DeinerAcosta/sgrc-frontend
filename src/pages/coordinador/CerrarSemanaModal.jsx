@@ -7,7 +7,7 @@ import { Spinner, Semaforo } from '@/components/ui'
  * HU-C-09 + RN-02: confirmar cierre de semana mostrando resumen previo.
  * Si la ocupación está por debajo de la meta (80%), muestra advertencia pero no bloquea.
  */
-export default function CerrarSemanaModal({ semana, resumen, onClose }) {
+export default function CerrarSemanaModal({ semana, resumen, onClose, onIrAConsultorio, onAsignarRecurso }) {
   const qc = useQueryClient()
 
   const { mutate, isPending } = useMutation({
@@ -64,10 +64,20 @@ export default function CerrarSemanaModal({ semana, resumen, onClose }) {
               <div className="font-medium text-amber-800 mb-1">
                 ⚠️ {resumen.consultorios_sin_asignar.length} consultorios activos sin asignación:
               </div>
-              <ul className="text-amber-700 list-disc list-inside">
-                {resumen.consultorios_sin_asignar.slice(0, 4).map((c) => <li key={c.id}>{c.nombre} · {c.especialidad}</li>)}
-                {resumen.consultorios_sin_asignar.length > 4 && (
-                  <li className="text-amber-600">...y {resumen.consultorios_sin_asignar.length - 4} más</li>
+              <ul className="space-y-0.5">
+                {resumen.consultorios_sin_asignar.slice(0, 6).map((c) => (
+                  <li key={c.id}>
+                    <button
+                      className="text-left text-amber-800 hover:text-amber-900 hover:underline"
+                      onClick={() => onIrAConsultorio?.(c.id)}
+                      title="Ir al consultorio en la grilla"
+                    >
+                      → {c.nombre}{c.especialidad ? ` · ${c.especialidad}` : ''}
+                    </button>
+                  </li>
+                ))}
+                {resumen.consultorios_sin_asignar.length > 6 && (
+                  <li className="text-amber-600">...y {resumen.consultorios_sin_asignar.length - 6} más</li>
                 )}
               </ul>
             </div>
@@ -78,10 +88,25 @@ export default function CerrarSemanaModal({ semana, resumen, onClose }) {
               <div className="font-medium text-amber-800 mb-1">
                 ⚠️ {resumen.recursos_ociosos.length} recursos con horas sin asignar:
               </div>
-              <div className="text-amber-700">
-                {resumen.recursos_ociosos.slice(0, 3).map((r) => r.nombre).join(', ')}
-                {resumen.recursos_ociosos.length > 3 && ` y ${resumen.recursos_ociosos.length - 3} más`}
-              </div>
+              <ul className="space-y-0.5">
+                {resumen.recursos_ociosos.slice(0, 6).map((r) => {
+                  const esAuxiliar = r.tipo === 'auxiliar' || r.tipo === 'auxiliar_admin'
+                  return (
+                    <li key={r.id}>
+                      <button
+                        className="text-left text-amber-800 hover:text-amber-900 hover:underline"
+                        onClick={() => onAsignarRecurso?.(r)}
+                        title={esAuxiliar ? 'Asignar a una tarea de backoffice' : 'Ir a su especialidad en la grilla'}
+                      >
+                        → {r.nombre} <span className="text-amber-600">({esAuxiliar ? 'asignar backoffice' : `buscar en ${r.tipo}`})</span>
+                      </button>
+                    </li>
+                  )
+                })}
+                {resumen.recursos_ociosos.length > 6 && (
+                  <li className="text-amber-600">...y {resumen.recursos_ociosos.length - 6} más</li>
+                )}
+              </ul>
             </div>
           )}
 
