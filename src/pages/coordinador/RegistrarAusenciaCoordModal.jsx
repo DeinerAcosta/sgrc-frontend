@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { differenceInDays, parseISO } from 'date-fns'
 import { recursoService, ausenciaService } from '@/services/api'
-import { TIPOS_AUSENCIA } from '@/utils/helpers'
+import { TIPOS_AUSENCIA, TIPOS_RECURSO } from '@/utils/helpers'
 import { Spinner } from '@/components/ui'
 
 const REQUIEREN_ANTICIPACION = ['academico', 'vacaciones', 'licencia_remunerada', 'licencia_no_remunerada']
@@ -15,6 +15,7 @@ const REQUIEREN_ANTICIPACION = ['academico', 'vacaciones', 'licencia_remunerada'
  */
 export default function RegistrarAusenciaCoordModal({ sedeId, onClose }) {
   const qc = useQueryClient()
+  const [categoria, setCategoria] = useState('')
   const [form, setForm] = useState({
     recurso_id: '',
     tipo: '',
@@ -27,6 +28,9 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose }) {
     queryKey: ['recursos-sede-list', sedeId],
     queryFn: () => recursoService.list({ sede_id: sedeId }),
   })
+
+  // Solo muestra el personal de la categoría elegida (RN-X: filtrar por tipo de recurso)
+  const recursosFiltrados = categoria ? recursos.filter((r) => r.tipo === categoria) : []
 
   const anticip = form.fecha_inicio ? differenceInDays(parseISO(form.fecha_inicio), new Date()) : null
   const alertaAnticip = REQUIEREN_ANTICIPACION.includes(form.tipo) && anticip !== null && anticip < 30
@@ -63,10 +67,33 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose }) {
 
         <div className="px-5 py-4 space-y-4">
           <div>
+            <label className="label">Categoría *</label>
+            <select
+              className="input"
+              value={categoria}
+              onChange={(e) => { setCategoria(e.target.value); set('recurso_id', '') }}
+            >
+              <option value="">Seleccionar categoría...</option>
+              {TIPOS_RECURSO.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+          </div>
+
+          <div>
             <label className="label">Recurso *</label>
-            <select className="input" value={form.recurso_id} onChange={(e) => set('recurso_id', e.target.value)}>
-              <option value="">Seleccionar recurso...</option>
-              {recursos.map((r) => <option key={r.id} value={r.id}>{r.nombre} — {r.tipo}</option>)}
+            <select
+              className="input"
+              value={form.recurso_id}
+              onChange={(e) => set('recurso_id', e.target.value)}
+              disabled={!categoria}
+            >
+              <option value="">
+                {!categoria ? 'Primero elige la categoría...' : recursosFiltrados.length === 0 ? 'Sin personal de esta categoría en la sede' : 'Seleccionar recurso...'}
+              </option>
+              {recursosFiltrados.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.nombre}{r.especialidad ? ` · ${r.especialidad}` : ''}
+                </option>
+              ))}
             </select>
           </div>
 
