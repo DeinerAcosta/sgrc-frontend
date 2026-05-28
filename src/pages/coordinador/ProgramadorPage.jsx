@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { addWeeks, subWeeks, startOfWeek, format, parseISO } from 'date-fns'
+import { addWeeks, subWeeks, startOfWeek, format, parseISO, differenceInDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { asignacionService, semanaService, sedeService, festivoService, recursoService, consultorioService } from '@/services/api'
 import { useAuthStore } from '@/store/authStore'
@@ -153,6 +153,12 @@ export default function ProgramadorPage() {
   const isSupervisor = user?.rol === 'supervisor'
   const canEdit = !isCerrada || isSupervisor
 
+  // RN-01: no se puede crear/copiar una semana con menos de 3 días de anticipación.
+  // Si la vista actual no cumple ese criterio, deshabilitamos los botones y
+  // ofrecemos un mensaje claro en lugar de dejar que el backend rebote.
+  const diasAlInicio = differenceInDays(semanaBase, new Date())
+  const cumpleAnticipacion = diasAlInicio >= 3
+
   const ocupacion = consultorios.length > 0
     ? Math.round((asignaciones.filter((a) => a.recurso_id).length / (consultorios.length * 6)) * 100)
     : 0
@@ -178,10 +184,24 @@ export default function ProgramadorPage() {
         </div>
         <div className="flex gap-2">
           {!semanaActual && (
-            <button className="btn-primary" onClick={() => crearSemana()}>+ Crear semana</button>
+            <button
+              className="btn-primary"
+              onClick={() => crearSemana()}
+              disabled={!cumpleAnticipacion}
+              title={!cumpleAnticipacion ? 'RN-01: la semana destino debe estar al menos a 3 días de hoy' : ''}
+            >
+              + Crear semana
+            </button>
           )}
           {semanaActual && !isCerrada && (
-            <button className="btn" onClick={() => copiarSemana()}>📋 Copiar semana anterior</button>
+            <button
+              className="btn"
+              onClick={() => copiarSemana()}
+              disabled={!cumpleAnticipacion}
+              title={!cumpleAnticipacion ? 'Solo puedes copiar a una semana al menos 3 días en el futuro — usa "Siguiente →"' : 'Copia las asignaciones de la semana anterior a la que estás viendo'}
+            >
+              📋 Copiar semana anterior
+            </button>
           )}
           {semanaActual && !isCerrada && (
             <button className="btn" style={{ borderColor: '#d1fae5', color: '#065f46' }} onClick={() => setShowCierre(true)}>
