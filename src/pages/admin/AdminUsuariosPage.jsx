@@ -74,7 +74,16 @@ export default function AdminUsuariosPage() {
                   <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50">
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
-                        <Avatar nombre={u.nombre} size="sm" color={rolInfo?.color ?? 'blue'} />
+                        <div className="relative">
+                          <Avatar nombre={u.nombre} size="sm" color={rolInfo?.color ?? 'blue'} />
+                          {/* Indicador de presencia (long-polling): verde si activo <60s, ámbar <5min, gris luego */}
+                          {(() => {
+                            if (!u.ultima_actividad) return null
+                            const ms = Date.now() - new Date(u.ultima_actividad).getTime()
+                            const cls = ms < 60_000 ? 'bg-green-500' : ms < 300_000 ? 'bg-amber-400' : 'bg-gray-300'
+                            return <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-white ${cls}`} title={ms < 60_000 ? 'En línea' : ms < 300_000 ? 'Hace poco' : 'Desconectado'} />
+                          })()}
+                        </div>
                         <div>
                           <div className="text-xs font-medium text-gray-900">{u.nombre}</div>
                           <div className="text-xs text-gray-400">{u.email}</div>

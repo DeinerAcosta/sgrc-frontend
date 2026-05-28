@@ -4,6 +4,7 @@ import { useAuthStore } from '@/store/authStore'
 import { Avatar, Badge } from '@/components/ui'
 import NotificacionesPanel from '@/components/layout/NotificacionesPanel'
 import { ROLES } from '@/utils/helpers'
+import { useHeartbeat } from '@/hooks/useHeartbeat'
 
 const NAV_ITEMS = {
   recurso: [
@@ -56,6 +57,7 @@ export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const navItems = NAV_ITEMS[user?.rol] ?? []
   const rol = ROLES[user?.rol]
+  useHeartbeat()
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">

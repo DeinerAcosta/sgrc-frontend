@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { recursoService } from '@/services/api'
+import { recursoService, backofficeService } from '@/services/api'
 import { useAuthStore } from '@/store/authStore'
 import { Badge, BarProgress, Spinner, EmptyState, SectionHeader, Avatar } from '@/components/ui'
 import { TIPOS_RECURSO, formatHoras } from '@/utils/helpers'
@@ -16,6 +16,14 @@ export default function RecursosCoordPage() {
     queryKey: ['recursos-sede-full', sedeId, filtroTipo],
     queryFn: () => recursoService.list({ sede_id: sedeId, tipo: filtroTipo || undefined }),
   })
+
+  // Tarea sugerida = primera tarea activa del catálogo (la que tenga menor tiempo
+  // estimado, así "rinde" varias unidades). Solo se muestra para auxiliares ociosas.
+  const { data: tareasActivas = [] } = useQuery({
+    queryKey: ['tareas-bo-activas-sugerencia'],
+    queryFn: () => backofficeService.tareas(),
+  })
+  const tareaSugerida = [...tareasActivas].sort((a, b) => (a.tiempo_estimado_minutos ?? 60) - (b.tiempo_estimado_minutos ?? 60))[0]
 
   const ociosos = recursos.filter((r) => ((r.horas_asignadas ?? 0) / (r.horas_max_semana ?? 42)) < 0.6).length
   const limite = recursos.filter((r) => ((r.horas_asignadas ?? 0) / (r.horas_max_semana ?? 42)) >= 0.9).length
@@ -87,12 +95,19 @@ export default function RecursosCoordPage() {
                       <div className="text-xs text-gray-400 mt-0.5">
                         {formatHoras(horas)} / {formatHoras(max)} · {pct}%
                       </div>
+                      {/* Sugerencia de backoffice para auxiliares ociosas o liberadas */}
+                      {(r.tipo === 'auxiliar' || r.tipo === 'auxiliar_admin') && (ociosa || r.estado_badge === 'liberada') && tareaSugerida && (
+                        <div className="text-xs text-blue-700 mt-1 italic">
+                          💡 Sugerencia: <strong>{tareaSugerida.nombre}</strong> ({tareaSugerida.tiempo_estimado_minutos} min/u)
+                        </div>
+                      )}
                     </div>
-                    {r.estado_badge === 'liberada' && (
+                    {(r.estado_badge === 'liberada' ||
+                      ((r.tipo === 'auxiliar' || r.tipo === 'auxiliar_admin') && ociosa)) && (
                       <button
                         className="btn text-xs whitespace-nowrap"
                         onClick={() => setBoAux(r)}
-                        title="Asignar a esta auxiliar liberada una tarea de backoffice"
+                        title={r.estado_badge === 'liberada' ? 'Auxiliar liberada por ausencia' : 'Auxiliar con horas libres'}
                       >
                         🗂️ Asignar backoffice
                       </button>
