@@ -21,6 +21,9 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose }) {
     tipo: '',
     fecha_inicio: '',
     fecha_fin: '',
+    es_parcial: false,
+    hora_inicio_ausencia: '',
+    hora_fin_ausencia: '',
     motivo: '',
   })
 
@@ -37,6 +40,17 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose }) {
   const diasAtras = form.fecha_inicio ? differenceInDays(new Date(), parseISO(form.fecha_inicio)) : 0
   const fechaInvalida = diasAtras > 7
 
+  // Duración calculada de la ausencia parcial (ej: el recurso llegó 2h tarde)
+  const minutosParcial = (() => {
+    if (!form.es_parcial || !form.hora_inicio_ausencia || !form.hora_fin_ausencia) return null
+    const [h1, m1] = form.hora_inicio_ausencia.split(':').map(Number)
+    const [h2, m2] = form.hora_fin_ausencia.split(':').map(Number)
+    const min = (h2 * 60 + m2) - (h1 * 60 + m1)
+    return min > 0 ? min : null
+  })()
+  const horasInvalidas = form.es_parcial && form.hora_inicio_ausencia && form.hora_fin_ausencia && minutosParcial === null
+  const horasOk = !form.es_parcial || (form.hora_inicio_ausencia && form.hora_fin_ausencia && minutosParcial !== null)
+
   const { mutate, isPending } = useMutation({
     mutationFn: () => ausenciaService.create({
       ...form,
@@ -52,7 +66,7 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose }) {
   })
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
-  const valid = form.recurso_id && form.tipo && form.fecha_inicio && !fechaInvalida
+  const valid = form.recurso_id && form.tipo && form.fecha_inicio && !fechaInvalida && horasOk
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -115,6 +129,45 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose }) {
               <input className="input" type="date" value={form.fecha_fin} min={form.fecha_inicio} onChange={(e) => set('fecha_fin', e.target.value)} />
             </div>
           </div>
+
+          <div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.es_parcial}
+                onChange={(e) => {
+                  const v = e.target.checked
+                  setForm((f) => ({ ...f, es_parcial: v, hora_inicio_ausencia: v ? f.hora_inicio_ausencia : '', hora_fin_ausencia: v ? f.hora_fin_ausencia : '' }))
+                }}
+                className="rounded"
+              />
+              <span className="text-xs text-gray-700">Ausencia parcial — solo unas horas dentro del día (ej. llegada tardía, salida anticipada)</span>
+            </label>
+          </div>
+
+          {form.es_parcial && (
+            <div className="bg-gray-50 border border-gray-100 rounded-lg p-3 space-y-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Hora inicio ausencia *</label>
+                  <input className="input" type="time" value={form.hora_inicio_ausencia} onChange={(e) => set('hora_inicio_ausencia', e.target.value)} />
+                </div>
+                <div>
+                  <label className="label">Hora fin ausencia *</label>
+                  <input className="input" type="time" value={form.hora_fin_ausencia} onChange={(e) => set('hora_fin_ausencia', e.target.value)} />
+                </div>
+              </div>
+              {minutosParcial !== null && (
+                <div className="text-xs text-gray-600">
+                  Duración: <strong>{Math.floor(minutosParcial / 60)}h {minutosParcial % 60 > 0 ? `${minutosParcial % 60}m` : ''}</strong>
+                  <span className="text-gray-400"> · el impacto se calculará proporcional a estas horas</span>
+                </div>
+              )}
+              {horasInvalidas && (
+                <div className="text-xs text-red-600">⛔ La hora fin debe ser posterior a la hora inicio.</div>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="label">Observaciones</label>
