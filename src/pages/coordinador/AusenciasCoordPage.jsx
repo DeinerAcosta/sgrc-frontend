@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { ausenciaService, sedeService, asignacionService } from '@/services/api'
@@ -18,6 +19,7 @@ export default function AusenciasCoordPage() {
   const sedeId = user?.sedes?.[0]
   const [tab, setTab] = useState('pendientes')
   const [selected, setSelected] = useState(null)
+  const [searchParams, setSearchParams] = useSearchParams()
   const [notaConfirm, setNotaConfirm] = useState('')
   const [showRegistrar, setShowRegistrar] = useState(false)
   const [showSugerir, setShowSugerir] = useState(null)
@@ -33,6 +35,22 @@ export default function AusenciasCoordPage() {
     queryKey: ['ausencias-coord', sedeId, tab],
     queryFn: () => ausenciaService.list({ sede_id: sedeId, estado: tab === 'pendientes' ? 'pendiente' : undefined }),
   })
+
+  // Enfocar una ausencia específica si llega ?selected=<id> en la URL (deep-link
+  // desde una notificación). Si la encuentra en otro tab, cambia a "Todas".
+  useEffect(() => {
+    const want = searchParams.get('selected')
+    if (!want || ausencias.length === 0) return
+    const existe = ausencias.find((a) => a.id === want)
+    if (existe) {
+      setSelected(want)
+    } else if (tab === 'pendientes') {
+      setTab('todas')
+    }
+    // Limpiar el param tras consumirlo para que no quede pegado en navegaciones
+    searchParams.delete('selected')
+    setSearchParams(searchParams, { replace: true })
+  }, [ausencias, searchParams, tab, setSearchParams])
 
   const { mutate: confirmar, isPending: confirmando } = useMutation({
     mutationFn: (id) => ausenciaService.confirmar(id, { nota_coordinador: notaConfirm }),
