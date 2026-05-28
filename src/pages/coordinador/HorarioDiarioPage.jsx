@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { horarioDiarioService } from '@/services/api'
+import { horarioDiarioService, sedeService } from '@/services/api'
 import { useAuthStore } from '@/store/authStore'
 import { Badge, Spinner, EmptyState, SectionHeader } from '@/components/ui'
 
@@ -14,8 +14,23 @@ import { Badge, Spinner, EmptyState, SectionHeader } from '@/components/ui'
  */
 export default function HorarioDiarioPage() {
   const { user } = useAuthStore()
-  const sedeId = user?.sedes?.[0]
+  const esSupervisor = user?.rol === 'supervisor'
+  const sedesPropias = user?.sedes ?? []
+  const [sedeId, setSedeId] = useState(sedesPropias[0] ?? '')
   const [fecha, setFecha] = useState(format(new Date(), 'yyyy-MM-dd'))
+
+  // Para supervisor (sin sedes propias) listamos todas las sedes;
+  // para coordinador con varias sedes listamos solo las suyas.
+  const { data: todasSedes = [] } = useQuery({
+    queryKey: ['sedes-resumen-diario'],
+    queryFn: () => sedeService.list(),
+    enabled: esSupervisor || sedesPropias.length > 1,
+  })
+  const opcionesSede = esSupervisor
+    ? todasSedes
+    : sedesPropias.length > 1
+    ? todasSedes.filter((s) => sedesPropias.includes(s.id))
+    : []
 
   const { data, isLoading } = useQuery({
     queryKey: ['horario-diario', sedeId, fecha],
@@ -37,13 +52,25 @@ export default function HorarioDiarioPage() {
           <p className="text-xs text-gray-500">Vista por sede para imprimir o compartir</p>
         </div>
         <div className="flex gap-2 items-center">
+          {opcionesSede.length > 0 && (
+            <select
+              className="input w-auto text-sm"
+              value={sedeId}
+              onChange={(e) => setSedeId(e.target.value)}
+            >
+              {opcionesSede.length > 1 && <option value="">Selecciona sede…</option>}
+              {opcionesSede.map((s) => (
+                <option key={s.id} value={s.id}>{s.nombre}{s.ciudad ? ` · ${s.ciudad}` : ''}</option>
+              ))}
+            </select>
+          )}
           <input
             className="input w-auto text-sm"
             type="date"
             value={fecha}
             onChange={(e) => setFecha(e.target.value)}
           />
-          <button className="btn-primary" onClick={() => window.print()}>
+          <button className="btn-primary" onClick={() => window.print()} disabled={!sedeId}>
             🖨️ Imprimir / Guardar PDF
           </button>
         </div>

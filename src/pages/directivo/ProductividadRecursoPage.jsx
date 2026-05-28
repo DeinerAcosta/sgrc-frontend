@@ -57,13 +57,20 @@ export default function ProductividadRecursoPage() {
 
   return (
     <div className="p-4 max-w-4xl mx-auto">
-      <div className="mb-4">
-        <h1 className="text-base font-semibold text-gray-900">Ficha del recurso</h1>
-        <p className="text-xs text-gray-500">Elige un recurso (filtra por tipo o busca por nombre) para ver su productividad y sus ausencias</p>
+      <div className="flex items-start justify-between mb-4 print:hidden">
+        <div>
+          <h1 className="text-base font-semibold text-gray-900">Ficha del recurso</h1>
+          <p className="text-xs text-gray-500">Elige un recurso (filtra por tipo o busca por nombre) para ver su productividad y sus ausencias</p>
+        </div>
+        {recursoSel && (
+          <button className="btn-primary whitespace-nowrap" onClick={() => window.print()}>
+            🖨️ Descargar informe (PDF)
+          </button>
+        )}
       </div>
 
       {/* Filtro por tipo + buscador con desplegable (compacto, no ocupa espacio fijo) */}
-      <div className="card mb-4">
+      <div className="card mb-4 print:hidden">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="label">Filtrar por tipo</label>

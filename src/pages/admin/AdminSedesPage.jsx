@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { sedeService, consultorioService } from '@/services/api'
+import { sedeService, consultorioService, usuarioService } from '@/services/api'
 import { Badge, Spinner, EmptyState, SectionHeader } from '@/components/ui'
 
 const ESPECIALIDADES = [
@@ -107,8 +107,20 @@ function SedeCard({ sede, expanded, onExpand, onEdit, onAddCons, onEditCons }) {
 }
 
 function SedeModal({ sede, onClose, onSaved }) {
-  const [form, setForm] = useState({ nombre: sede.nombre ?? '', ciudad: sede.ciudad ?? '', direccion: sede.direccion ?? '', activa: sede.activa ?? true })
+  const [form, setForm] = useState({
+    nombre: sede.nombre ?? '',
+    ciudad: sede.ciudad ?? '',
+    direccion: sede.direccion ?? '',
+    activa: sede.activa ?? true,
+    responsable_id: sede.responsable_id ?? sede.responsable?.id ?? '',
+  })
   const isNew = !sede.id
+
+  // Solo coordinadores y supervisores pueden ser responsables de sede
+  const { data: usuarios = [] } = useQuery({
+    queryKey: ['usuarios-para-responsable'],
+    queryFn: () => usuarioService.list({ rol: 'coordinador' }),
+  })
 
   const { mutate, isPending } = useMutation({
     mutationFn: () => isNew ? sedeService.create(form) : sedeService.update(sede.id, form),
@@ -121,6 +133,13 @@ function SedeModal({ sede, onClose, onSaved }) {
       <Field label="Nombre *"><input className="input" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} /></Field>
       <Field label="Ciudad *"><input className="input" value={form.ciudad} onChange={(e) => setForm({ ...form, ciudad: e.target.value })} placeholder="Ej: Barranquilla" /></Field>
       <Field label="Dirección"><input className="input" value={form.direccion} onChange={(e) => setForm({ ...form, direccion: e.target.value })} /></Field>
+      <Field label="Responsable de la sede">
+        <select className="input" value={form.responsable_id} onChange={(e) => setForm({ ...form, responsable_id: e.target.value || null })}>
+          <option value="">— Sin responsable —</option>
+          {usuarios.map((u) => <option key={u.id} value={u.id}>{u.nombre} · {u.email}</option>)}
+        </select>
+        <div className="text-xs text-gray-500 mt-1">Coordinador que responde por esta sede (aparece en informes y notificaciones).</div>
+      </Field>
       {!isNew && (
         <Field label="Estado">
           <label className="flex items-center gap-2 text-xs">
