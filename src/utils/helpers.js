@@ -18,11 +18,12 @@ export const TIPOS_AUSENCIA = [
 ]
 
 export const TIPOS_RECURSO = [
-  { value: 'oftalmologo',  label: 'Oftalmólogo',  color: 'teal' },
-  { value: 'optometra',    label: 'Optómetra',    color: 'purple' },
-  { value: 'anestesiologo',label: 'Anestesiólogo',color: 'blue' },
-  { value: 'auxiliar',     label: 'Auxiliar',     color: 'green' },
-  { value: 'tecnico',      label: 'Técnico',      color: 'gray' },
+  { value: 'oftalmologo',      label: 'Oftalmólogo',         color: 'teal' },
+  { value: 'optometra',        label: 'Optómetra',           color: 'purple' },
+  { value: 'anestesiologo',    label: 'Anestesiólogo',       color: 'blue' },
+  { value: 'asesor_servicios', label: 'Asesor de Servicios', color: 'amber' },
+  { value: 'auxiliar',         label: 'Auxiliar',            color: 'green' },
+  { value: 'tecnico',          label: 'Técnico',             color: 'gray' },
 ]
 
 export const ROLES = {

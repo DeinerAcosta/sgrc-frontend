@@ -20,7 +20,41 @@ import { Spinner } from '@/components/ui'
  */
 
 const ROLES = ['recurso', 'coordinador', 'directivo']
-const TIPOS = ['oftalmologo', 'optometra', 'anestesiologo', 'auxiliar', 'tecnico']
+const TIPOS = ['oftalmologo', 'optometra', 'anestesiologo', 'asesor_servicios', 'auxiliar', 'tecnico']
+
+// Normaliza un valor humano (con tildes, mayúsculas, espacios) al slug del enum.
+// "Oftalmólogo" → "oftalmologo", "Asesor de Servicios" → "asesor_servicios",
+// "Coordinador" → "coordinador", etc.
+function slugificar(v) {
+  return (v ?? '').toString().trim().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '') // remueve tildes
+    .replace(/\s+/g, '_')                              // espacios → _
+    .replace(/[^a-z0-9_]/g, '')                        // limpia otros caracteres
+}
+
+const ROLES_SLUG = new Set(ROLES)
+const TIPOS_SLUG = new Set(TIPOS)
+
+// Mapeo de aliases comunes para evitar errores de slugificación.
+const ALIAS_ROL = { recurso: 'recurso', coordinador: 'coordinador', directivo: 'directivo' }
+const ALIAS_TIPO = {
+  oftalmologo: 'oftalmologo', oftalmologa: 'oftalmologo',
+  optometra: 'optometra', optometro: 'optometra',
+  anestesiologo: 'anestesiologo', anestesiologa: 'anestesiologo',
+  asesor_de_servicios: 'asesor_servicios', asesor_servicios: 'asesor_servicios', asesor: 'asesor_servicios',
+  auxiliar: 'auxiliar',
+  tecnico: 'tecnico', tecnica: 'tecnico',
+}
+
+function normalizarRol(v) {
+  const s = slugificar(v)
+  return ALIAS_ROL[s] || (ROLES_SLUG.has(s) ? s : v) // si no matchea, conserva tal cual y deja que el backend de error
+}
+function normalizarTipo(v) {
+  if (!v) return ''
+  const s = slugificar(v)
+  return ALIAS_TIPO[s] || (TIPOS_SLUG.has(s) ? s : v)
+}
 
 const FILA_VACIA = { nombre: '', email: '', celular: '', rol: 'recurso', tipo: '', especialidad: '', sedes: '' }
 
@@ -81,12 +115,15 @@ function parseCSV(texto, sedesNombres) {
       if (!campo) return
       const val = cols[i] ?? ''
       if (campo === 'sedes') {
-        if (val) sedesCombinadas.push(val) // junta las 3 posibles columnas de sedes (recurso/coord/directivo)
+        if (val) sedesCombinadas.push(val)
       } else {
         fila[campo] = val
       }
     })
     fila.sedes = sedesCombinadas.join(',')
+    // Normalizar rol y tipo a los slugs que espera el backend
+    fila.rol = normalizarRol(fila.rol) || 'recurso'
+    fila.tipo = normalizarTipo(fila.tipo)
     return fila
   })
   void sedesNombres // reservado para resaltar sedes no encontradas en vivo
