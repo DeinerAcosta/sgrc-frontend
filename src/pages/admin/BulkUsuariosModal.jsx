@@ -24,25 +24,72 @@ const TIPOS = ['oftalmologo', 'optometra', 'anestesiologo', 'auxiliar', 'tecnico
 
 const FILA_VACIA = { nombre: '', email: '', celular: '', rol: 'recurso', tipo: '', especialidad: '', sedes: '' }
 
+// Mapeo flexible: cada encabezado del CSV se identifica por palabras clave para
+// soportar las columnas que genera Google Forms ("¿Cuál es tu rol?", "¿En qué
+// sede(s) trabajas?", "Marca temporal", etc.) además del CSV manual.
+function mapearColumna(header) {
+  const h = (header ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  if (h.includes('nombre')) return 'nombre'
+  if (h.includes('correo') || h.includes('email')) return 'email'
+  if (h.includes('celular') || h.includes('whatsapp') || h.includes('telefono') || h.includes('teléfono')) return 'celular'
+  if (h.includes('rol')) return 'rol'
+  if (h.includes('tipo')) return 'tipo'
+  if (h.includes('especial')) return 'especialidad'
+  if (h.includes('sede')) return 'sedes' // todas las columnas con "sede" se fusionan en sedes
+  return null // ignorar columnas desconocidas: marca temporal, puntuación, etc.
+}
+
+// Divide una línea CSV respetando comillas: una celda entre comillas conserva
+// las comas internas (Google Forms multi-select genera "Sede A, Sede B").
+// Soporta el escape estándar de comilla doble: "" → ".
+function splitCsvLine(line, sep) {
+  const out = []
+  let cur = ''
+  let dentro = false
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (ch === '"') {
+      if (dentro && line[i + 1] === '"') { cur += '"'; i++ }
+      else dentro = !dentro
+    } else if (ch === sep && !dentro) {
+      out.push(cur); cur = ''
+    } else {
+      cur += ch
+    }
+  }
+  out.push(cur)
+  return out.map((s) => s.trim())
+}
+
 function parseCSV(texto, sedesNombres) {
   const lineas = texto.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
   if (lineas.length === 0) return []
   // Detectar separador: tab tiene preferencia (excel paste)
   const sep = lineas[0].includes('\t') ? '\t' : ','
   // ¿La primera fila es encabezado?
-  const headerCandidates = ['nombre', 'email', 'rol']
   const primera = lineas[0].toLowerCase()
-  const tieneHeader = headerCandidates.some((h) => primera.includes(h))
-  const headers = tieneHeader ? lineas[0].split(sep).map((s) => s.trim().toLowerCase()) : ['nombre', 'email', 'celular', 'rol', 'tipo', 'especialidad', 'sedes']
+  const tieneHeader = ['nombre', 'email', 'correo', 'rol', 'marca temporal'].some((h) => primera.includes(h))
+  const headersRaw = tieneHeader
+    ? splitCsvLine(lineas[0], sep)
+    : ['nombre', 'email', 'celular', 'rol', 'tipo', 'especialidad', 'sedes']
   const filas = (tieneHeader ? lineas.slice(1) : lineas).map((l) => {
-    const cols = l.split(sep).map((s) => s.trim())
-    const obj = {}
-    headers.forEach((h, i) => { obj[h] = cols[i] ?? '' })
-    // Sede a UI: si el CSV trae nombres ya conocidos, los preservamos como string
-    return { ...FILA_VACIA, ...obj }
+    const cols = splitCsvLine(l, sep)
+    const fila = { ...FILA_VACIA }
+    const sedesCombinadas = []
+    headersRaw.forEach((h, i) => {
+      const campo = mapearColumna(h)
+      if (!campo) return
+      const val = cols[i] ?? ''
+      if (campo === 'sedes') {
+        if (val) sedesCombinadas.push(val) // junta las 3 posibles columnas de sedes (recurso/coord/directivo)
+      } else {
+        fila[campo] = val
+      }
+    })
+    fila.sedes = sedesCombinadas.join(',')
+    return fila
   })
-  // Validar nombres de sedes contra el catálogo (advertencia)
-  void sedesNombres // para uso futuro: highlight no-encontradas en vivo
+  void sedesNombres // reservado para resaltar sedes no encontradas en vivo
   return filas
 }
 
@@ -69,7 +116,8 @@ export default function BulkUsuariosModal({ onClose, onSaved }) {
           rol: f.rol,
           tipoRecurso: f.rol === 'recurso' ? (f.tipo || undefined) : undefined,
           especialidad: f.rol === 'recurso' && f.especialidad ? f.especialidad.trim() : undefined,
-          sedes: f.sedes ? f.sedes.split(/[|;]/).map((s) => s.trim()).filter(Boolean) : undefined,
+          // Sedes separadas por |, ; o , — Google Forms (multi-select) usa comas dentro de la celda.
+          sedes: f.sedes ? f.sedes.split(/[|;,]/).map((s) => s.trim()).filter(Boolean) : undefined,
         }))
       return usuarioService.bulkCreate(payload)
     },
