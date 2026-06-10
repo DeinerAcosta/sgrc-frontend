@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { sedeService, consultorioService, usuarioService } from '@/services/api'
 import { Badge, Spinner, EmptyState, SectionHeader } from '@/components/ui'
+import { useDirtyClose } from '@/hooks/useDirtyClose'
 
 const ESPECIALIDADES = [
   { value: 'oftalmologia',  label: 'Oftalmología' },
@@ -27,13 +28,15 @@ export default function AdminSedesPage() {
   })
 
   return (
-    <div className="p-4">
-      <div className="flex items-center justify-between mb-4">
+    <div className="p-3 sm:p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <div>
           <h1 className="text-base font-semibold text-gray-900">Sedes y consultorios</h1>
           <p className="text-xs text-gray-500">Gestiona la red física de la organización</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowSede({})}>+ Nueva sede</button>
+        <div className="flex gap-2 flex-wrap">
+          <button className="btn-primary" onClick={() => setShowSede({})}>+ Nueva sede</button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -83,25 +86,56 @@ function SedeCard({ sede, expanded, onExpand, onEdit, onAddCons, onEditCons }) {
         <button className="btn text-xs" onClick={onEdit}>Editar</button>
       </div>
 
-      {expanded && (
-        <div className="mt-4 pt-4 border-t border-gray-100">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-medium text-gray-700">Consultorios ({consultorios.length})</span>
-            <button className="btn text-xs" onClick={onAddCons}>+ Agregar consultorio</button>
+      {expanded && (() => {
+        // Ordena: activos arriba (Asesores primero + natural numérico), luego inactivos (igual).
+        // Al cambiar estado desde el modal, invalidateQueries refresca y se re-ordena solo.
+        const orden = (a, b) => {
+          const ae = a.especialidad === 'asesoria' ? 0 : 1
+          const be = b.especialidad === 'asesoria' ? 0 : 1
+          if (ae !== be) return ae - be
+          return a.nombre.localeCompare(b.nombre, 'es', { numeric: true, sensitivity: 'base' })
+        }
+        const activos = consultorios.filter((c) => c.activo).sort(orden)
+        const inactivos = consultorios.filter((c) => !c.activo).sort(orden)
+        const ordenados = [...activos, ...inactivos]
+        const idxPrimerInactivo = activos.length
+
+        return (
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <span className="text-xs font-medium text-gray-700">
+                Consultorios ({consultorios.length})
+                {consultorios.length > 0 && (
+                  <span className="text-gray-400 font-normal ml-1">
+                    · <span className="text-green-700">{activos.length} activos</span> · <span className="text-gray-500">{inactivos.length} inactivos</span>
+                  </span>
+                )}
+              </span>
+              <button className="btn text-xs" onClick={onAddCons}>+ Agregar consultorio</button>
+            </div>
+            <div className="space-y-1">
+              {ordenados.map((c, idx) => (
+                <div key={c.id}>
+                  {idx === idxPrimerInactivo && inactivos.length > 0 && activos.length > 0 && (
+                    <div className="flex items-center gap-2 mt-3 mb-1 text-xs text-gray-400">
+                      <div className="flex-1 h-px bg-gray-200" />
+                      <span>Inactivos ({inactivos.length})</span>
+                      <div className="flex-1 h-px bg-gray-200" />
+                    </div>
+                  )}
+                  <div className={`flex items-center gap-3 py-1.5 border-b border-gray-50 last:border-0 ${c.activo ? '' : 'opacity-60'}`}>
+                    <span className="text-xs text-gray-800 flex-1">{c.nombre}</span>
+                    <Badge variant="blue">{c.especialidad}</Badge>
+                    {c.requiere_auxiliar && <Badge variant="purple">requiere aux</Badge>}
+                    <Badge variant={c.activo ? 'green' : 'gray'}>{c.activo ? 'activo' : 'inactivo'}</Badge>
+                    <button className="btn text-xs" onClick={() => onEditCons(c)}>Editar</button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="space-y-1">
-            {consultorios.map((c) => (
-              <div key={c.id} className="flex items-center gap-3 py-1.5 border-b border-gray-50 last:border-0">
-                <span className="text-xs text-gray-800 flex-1">{c.nombre}</span>
-                <Badge variant="blue">{c.especialidad}</Badge>
-                {c.requiere_auxiliar && <Badge variant="purple">requiere aux</Badge>}
-                <Badge variant={c.activo ? 'green' : 'gray'}>{c.activo ? 'activo' : 'inactivo'}</Badge>
-                <button className="btn text-xs" onClick={() => onEditCons(c)}>Editar</button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
@@ -114,6 +148,7 @@ function SedeModal({ sede, onClose, onSaved }) {
     activa: sede.activa ?? true,
     responsable_id: sede.responsable_id ?? sede.responsable?.id ?? '',
   })
+  const { tryClose } = useDirtyClose(form, onClose)
   const isNew = !sede.id
 
   // Solo coordinadores y supervisores pueden ser responsables de sede
@@ -129,7 +164,7 @@ function SedeModal({ sede, onClose, onSaved }) {
   })
 
   return (
-    <Modal title={isNew ? 'Nueva sede' : `Editar sede: ${sede.nombre}`} onClose={onClose}>
+    <Modal title={isNew ? 'Nueva sede' : `Editar sede: ${sede.nombre}`} onClose={tryClose}>
       <Field label="Nombre *"><input className="input" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} /></Field>
       <Field label="Ciudad *"><input className="input" value={form.ciudad} onChange={(e) => setForm({ ...form, ciudad: e.target.value })} placeholder="Ej: Barranquilla" /></Field>
       <Field label="Dirección"><input className="input" value={form.direccion} onChange={(e) => setForm({ ...form, direccion: e.target.value })} /></Field>
@@ -148,7 +183,7 @@ function SedeModal({ sede, onClose, onSaved }) {
           </label>
         </Field>
       )}
-      <ModalFooter onCancel={onClose} onSave={() => mutate()} saving={isPending} disabled={!form.nombre || !form.ciudad} />
+      <ModalFooter onCancel={tryClose} onSave={() => mutate()} saving={isPending} disabled={!form.nombre || !form.ciudad} />
     </Modal>
   )
 }
@@ -160,6 +195,7 @@ function ConsultorioModal({ cons, onClose, onSaved }) {
     especialidad: cons.especialidad ?? 'oftalmologia',
     activo: cons.activo ?? true,
   })
+  const { tryClose } = useDirtyClose(form, onClose)
   const isNew = !cons.id
 
   const { mutate, isPending } = useMutation({
@@ -169,7 +205,7 @@ function ConsultorioModal({ cons, onClose, onSaved }) {
   })
 
   return (
-    <Modal title={isNew ? 'Nuevo consultorio' : `Editar: ${cons.nombre}`} onClose={onClose}>
+    <Modal title={isNew ? 'Nuevo consultorio' : `Editar: ${cons.nombre}`} onClose={tryClose}>
       <Field label="Nombre *"><input className="input" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="Ej: Cons. 6" /></Field>
       <Field label="Especialidad *">
         <select className="input" value={form.especialidad} onChange={(e) => setForm({ ...form, especialidad: e.target.value })}>
@@ -187,7 +223,7 @@ function ConsultorioModal({ cons, onClose, onSaved }) {
           </label>
         </Field>
       )}
-      <ModalFooter onCancel={onClose} onSave={() => mutate()} saving={isPending} disabled={!form.nombre} />
+      <ModalFooter onCancel={tryClose} onSave={() => mutate()} saving={isPending} disabled={!form.nombre} />
     </Modal>
   )
 }
