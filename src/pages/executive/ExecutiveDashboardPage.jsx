@@ -1,0 +1,261 @@
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import toast from 'react-hot-toast'
+import { informeService, semanaService } from '@/services/api'
+import { KpiCard, Spinner, Semaforo, Badge, EmptyState } from '@/components/ui'
+import { formatCOP } from '@/utils/helpers'
+import { useNavigate } from 'react-router-dom'
+
+// Días en orden semana-arranca-domingo (RN-04). El value es el enum de la BD.
+const DIAS_SEMANA = [
+  { value: 'domingo',   label: 'Domingo' },
+  { value: 'lunes',     label: 'Lunes' },
+  { value: 'martes',    label: 'Martes' },
+  { value: 'miercoles', label: 'Miércoles' },
+  { value: 'jueves',    label: 'Jueves' },
+  { value: 'viernes',   label: 'Viernes' },
+  { value: 'sabado',    label: 'Sábado' },
+]
+const MESES_CORTOS = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
+function rangoFechasSemana(s) {
+  if (!s) return ''
+  const ini = new Date(s.start_date ?? s.startDate)
+  const fin = new Date(s.end_date ?? s.endDate)
+  const diaIni = ini.getUTCDate()
+  const diaFin = fin.getUTCDate()
+  const mesIni = MESES_CORTOS[ini.getUTCMonth()]
+  const mesFin = MESES_CORTOS[fin.getUTCMonth()]
+  const año    = fin.getUTCFullYear()
+  return mesIni === mesFin
+    ? `${diaIni}–${diaFin} ${mesFin} ${año}`
+    : `${diaIni} ${mesIni} – ${diaFin} ${mesFin} ${año}`
+}
+
+const INFORMES = [
+  { to: '/app/informes/productividad',      icon: '📈', label: 'Productividad por recurso' },
+  { to: '/app/informes/ausentismo-impacto', icon: '🚨', label: 'Ausentismo e impacto económico' },
+  { to: '/app/informes/subutilizacion',     icon: '⏰', label: 'Tiempos ociosos' },
+  { to: '/app/informes/ocupacion',          icon: '🏥', label: 'Ocupación consultorios' },
+  { to: '/app/informes/cierre-semanas',     icon: '🔒', label: 'Cumplimiento de cierre' },
+  { to: '/app/comparativo',                 icon: '↔️',  label: 'Comparativo semanal' },
+]
+
+export default function DashboardDirectivoPage() {
+  const navigate = useNavigate()
+  // Selectores: semana específica + día específico. Vacío = semana actual / toda la semana.
+  const [semanaSel, setSemanaSel] = useState('')
+  const [diaSel, setDiaSel] = useState('')
+
+  // Lista de semanas para el dropdown
+  const { data: semanas = [] } = useQuery({
+    queryKey: ['semanas-dashboard'],
+    queryFn: () => semanaService.list(),
+  })
+
+  // KPIs + sedes_ocupacion + ausencias_activas — todo desde la BD
+  const { data: dash, isLoading } = useQuery({
+    queryKey: ['dashboard-directivo', semanaSel, diaSel],
+    queryFn: () => informeService.dashboard({
+      week_id: semanaSel || undefined,
+      day: diaSel || undefined,
+    }),
+  })
+
+  const barColor = (pct) => pct >= 80 ? '#22c55e' : pct >= 70 ? '#f59e0b' : '#ef4444'
+
+  const exportar = async (formato) => {
+    try {
+      const blob = await informeService.exportar('ocupacion', formato, {})
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `ocupacion_${new Date().toISOString().slice(0, 10)}.${formato === 'pdf' ? 'pdf' : 'xlsx'}`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success(`Exportado en ${formato.toUpperCase()}`)
+    } catch (err) {
+      toast.error(err?.message ?? 'Error al exportar')
+    }
+  }
+
+  if (isLoading || !dash) {
+    return <div className="p-6 flex justify-center"><Spinner size="lg" /></div>
+  }
+
+  const sedesOcupacion = dash.sedes_ocupacion ?? []
+  const ausenciasActivas = dash.ausencias_activas ?? []
+
+  // Etiqueta del subtítulo: rango de fechas de la semana base + día filtrado
+  const rangoSemana = dash.week ? rangoFechasSemana(dash.week) : 'Semana actual'
+  const diaLabel = DIAS_SEMANA.find((d) => d.value === dash.day)?.label
+  const subtitulo = `Todas las sedes · ${rangoSemana}${diaLabel ? ` · ${diaLabel}` : ''}`
+
+  return (
+    <div className="p-3 sm:p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+        <div>
+          <h1 className="text-base font-semibold text-gray-900">Dashboard ejecutivo</h1>
+          <p className="text-xs text-gray-500">{subtitulo}</p>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <button className="btn" onClick={() => exportar('pdf')}>📥 PDF</button>
+          <button className="btn" onClick={() => exportar('excel')}>📊 Excel</button>
+        </div>
+      </div>
+
+      {/* Filtros: semana específica + día. Vacío = semana actual / toda la semana. */}
+      <div className="card mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="label">Semana</label>
+            <select
+              className="input"
+              value={semanaSel}
+              onChange={(e) => setSemanaSel(e.target.value)}
+            >
+              <option value="">Semana actual (la que contiene hoy)</option>
+              {semanas.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {rangoFechasSemana(s)}{s.status === 'cerrada' ? ' · cerrada' : ' · abierta'}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Día de la semana</label>
+            <select
+              className="input"
+              value={diaSel}
+              onChange={(e) => setDiaSel(e.target.value)}
+            >
+              <option value="">Toda la semana</option>
+              {DIAS_SEMANA.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+            </select>
+            <div className="text-[11px] text-gray-400 mt-1">
+              Pacientes programados, atendidos e impactados se filtran al día. Ocupación y ociosos se mantienen semanales.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* KPIs — todos del backend */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
+        <KpiCard
+          label="Pacientes programados"
+          value={dash.pacientes_programados?.toLocaleString('es-CO') ?? '0'}
+          delta={dash.delta_pacientes ? `${dash.delta_pacientes > 0 ? '+' : ''}${dash.delta_pacientes}% vs anterior` : null}
+          deltaUp={dash.delta_pacientes >= 0}
+        />
+        <KpiCard
+          label="Pacientes atendidos"
+          value={dash.patients_seen?.toLocaleString('es-CO') ?? '0'}
+          color={(dash.patients_seen ?? 0) > 0 ? 'success' : 'default'}
+          delta={dash.delta_atendidos ? `${dash.delta_atendidos > 0 ? '+' : ''}${dash.delta_atendidos}% vs anterior` : 'Ejecución registrada'}
+          deltaUp={dash.delta_atendidos >= 0}
+        />
+        <KpiCard
+          label="Impactados por ausencias"
+          value={dash.impactados_ausencias ?? 0}
+          color={dash.impactados_ausencias > 0 ? 'danger' : 'default'}
+          delta={dash.delta_impactados ? `${dash.delta_impactados > 0 ? '↑' : '↓'}${Math.abs(dash.delta_impactados)} vs anterior` : null}
+        />
+        <KpiCard
+          label="Recursos con tiempo ocioso"
+          value={dash.recursos_ociosos ?? 0}
+          color={dash.recursos_ociosos > 0 ? 'warning' : 'default'}
+          delta={dash.recursos_ociosos > 0 ? 'Costo fijo subutilizado' : 'Sin alertas'}
+        />
+        <div className="kpi-card">
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className="text-2xl font-semibold text-gray-900">{dash.ocupacion_global ?? 0}%</span>
+            <Semaforo pct={dash.ocupacion_global ?? 0} metaVerde={dash.meta_ocupacion ?? 80} />
+          </div>
+          <div className="text-xs text-gray-500">Ocupación global</div>
+          <div className={`text-xs mt-1 ${(dash.ocupacion_global ?? 0) >= (dash.meta_ocupacion ?? 80) ? 'text-green-600' : 'text-amber-600'}`}>
+            Meta: {dash.meta_ocupacion ?? 80}% {(dash.ocupacion_global ?? 0) >= (dash.meta_ocupacion ?? 80) ? '✓' : ''}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        {/* Gráfico por sede — del backend */}
+        <div className="card">
+          <div className="text-xs font-medium text-gray-700 mb-3">Ocupación por sede</div>
+          {sedesOcupacion.length === 0 ? (
+            <EmptyState icon="🏢" title="Sin datos de ocupación" description="Crea asignaciones para ver la ocupación." />
+          ) : (
+            <>
+              <ResponsiveContainer width="100%" height={Math.max(180, sedesOcupacion.length * 32)}>
+                <BarChart
+                  data={sedesOcupacion.map((s) => ({ name: s.name, ocupacion: s.pct }))}
+                  layout="vertical"
+                  margin={{ left: 80, right: 20, top: 0, bottom: 0 }}
+                >
+                  <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10 }} tickFormatter={(v) => `${v}%`} />
+                  <YAxis type="category" dataKey="nombre" tick={{ fontSize: 10 }} width={80} />
+                  <Tooltip formatter={(v) => `${v}%`} />
+                  <Bar dataKey="ocupacion" radius={[0, 4, 4, 0]}>
+                    {sedesOcupacion.map((s, i) => <Cell key={i} fill={barColor(s.pct)} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+              <div className="text-xs text-gray-400 mt-2">💡 Para ver una sede específica usa el filtro en Ocupación o Productividad</div>
+            </>
+          )}
+          <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />≥80%</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />70–79%</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block" />&lt;70%</span>
+          </div>
+        </div>
+
+        {/* Ausencias activas — del backend */}
+        <div className="card">
+          <div className="text-xs font-medium text-gray-700 mb-3">Ausencias activas esta semana</div>
+          {ausenciasActivas.length === 0 ? (
+            <EmptyState icon="✅" title="Sin ausencias activas" description="Ningún recurso tiene ausencia confirmada." />
+          ) : (
+            <>
+              <div className="space-y-2">
+                {ausenciasActivas.map((a, i) => (
+                  <div key={i} className="flex items-center gap-2 py-1.5 border-b border-gray-50 last:border-0">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-medium text-gray-800 truncate">{a.name}</div>
+                      <div className="text-xs text-gray-400">{a.site} · {formatCOP(a.cost)}</div>
+                    </div>
+                    <Badge variant={a.pacientes > 30 ? 'red' : 'amber'}>{a.pacientes} pac.</Badge>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 pt-3 border-t border-gray-50 flex justify-between text-xs">
+                <span className="text-gray-500">Costo total estimado</span>
+                <span className="font-semibold text-red-700">{formatCOP(dash.costo_total_ausentismo ?? 0)}</span>
+              </div>
+            </>
+          )}
+          <button className="btn w-full justify-center mt-2 text-xs" onClick={() => navigate('/app/informes/ausentismo-impacto')}>
+            Ver informe completo →
+          </button>
+        </div>
+      </div>
+
+      {/* Accesos a informes */}
+      <div className="card">
+        <div className="text-xs font-medium text-gray-700 mb-3">Informes disponibles</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          {INFORMES.map((inf) => (
+            <button
+              key={inf.to}
+              className="btn justify-start gap-2 text-xs"
+              onClick={() => navigate(inf.to)}
+            >
+              <span>{inf.icon}</span>
+              <span>{inf.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}

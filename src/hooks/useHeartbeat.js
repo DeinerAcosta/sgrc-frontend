@@ -23,7 +23,7 @@ export function useHeartbeat() {
     const enviar = async () => {
       try {
         const base = import.meta.env.VITE_API_BASE || '/api'
-        await fetch(`${base}/usuarios/me/heartbeat`, {
+        await fetch(`${base}/users/me/heartbeat`, {
           method: 'PUT',
           headers: { Authorization: `Bearer ${token}` },
         })

@@ -1,4 +1,40 @@
+import { useState } from 'react'
 import { initials } from '@/utils/helpers'
+
+/**
+ * Input de contraseña con botón de "mostrar/ocultar".
+ * Acepta cualquier prop estándar de <input>. La clase por defecto es `input pr-10`.
+ */
+export function PasswordInput({ className = '', ...props }) {
+  const [show, setShow] = useState(false)
+  return (
+    <div className="relative">
+      <input
+        {...props}
+        type={show ? 'text' : 'password'}
+        className={`input pr-10 ${className}`}
+      />
+      <button
+        type="button"
+        onClick={() => setShow((v) => !v)}
+        className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+        aria-label={show ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+        tabIndex={-1}
+      >
+        {show ? (
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029M9.88 9.88a3 3 0 104.243 4.243M9.88 9.88L4.929 4.929M9.88 9.88l4.243 4.243m0 0L19.07 19.07M14.122 14.122a3 3 0 01-4.243-4.243m4.243 4.243L4.929 4.929M14.122 14.122L19.07 19.07M9.88 9.88a3 3 0 014.243 0M2 2l20 20" />
+          </svg>
+        ) : (
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        )}
+      </button>
+    </div>
+  )
+}
 
 export function Badge({ children, variant = 'gray', className = '' }) {
   const variants = {
@@ -18,7 +54,7 @@ export function Badge({ children, variant = 'gray', className = '' }) {
   )
 }
 
-export function Avatar({ nombre, size = 'sm', color = 'blue' }) {
+export function Avatar({ name: nombre, size = 'sm', color = 'blue' }) {
   const sizes = { xs: 'w-6 h-6 text-xs', sm: 'w-8 h-8 text-xs', md: 'w-10 h-10 text-sm', lg: 'w-12 h-12 text-base' }
   const colors = {
     blue:   'bg-blue-100 text-blue-800',
@@ -70,7 +106,7 @@ export function EmptyState({ icon = '📋', title, description, action }) {
   )
 }
 
-export function AlertRow({ tipo, titulo, subtitulo, onAction, actionLabel }) {
+export function AlertRow({ type: tipo, title: titulo, subtitulo, onAction, actionLabel }) {
   const dots = { rojo: 'bg-red-500', amarillo: 'bg-amber-400', verde: 'bg-green-500' }
   const dot = tipo === 'rojo' ? 'bg-red-500' : tipo === 'amarillo' ? 'bg-amber-400' : 'bg-green-500'
   return (
