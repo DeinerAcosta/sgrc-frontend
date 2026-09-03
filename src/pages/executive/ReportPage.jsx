@@ -216,7 +216,7 @@ function formatCelda(col, val) {
 }
 
 export default function InformePage() {
-  const { type: tipo = 'ocupacion' } = useParams()
+  const { tipo = 'ocupacion' } = useParams()
   const cfg = CONFIG[tipo] ?? CONFIG.ocupacion
   const { user } = useAuthStore()
   const navigate = useNavigate()
