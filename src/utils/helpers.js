@@ -89,6 +89,12 @@ export const debeDescontarAlmuerzo = (totalMin, inicioMin, finMin, tipoRecurso =
 }
 
 export const calcularCapacidadPacientes = (horaInicio, horaFin, intervaloMinutos, tipoRecurso = null) => {
+  // PROYECTOS-3255 · Los asesores de servicios NO atienden pacientes con cita
+  // (hacen recepcion / gestion), por lo que el numero de pacientes no aplica.
+  // Devolver 0 aqui hace que el badge "N pac." no se muestre en el AsignacionModal
+  // ni en el resto de vistas que consumen esta funcion (grid del programador,
+  // resumen diario, PDF de horarios semanales).
+  if (tipoRecurso === 'asesor_servicios') return 0
   const [hI, mI] = horaInicio.split(':').map(Number)
   const [hF, mF] = horaFin.split(':').map(Number)
   const inicioMin = hI * 60 + mI
