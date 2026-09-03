@@ -143,7 +143,7 @@ export default function AdminRecursosPage() {
   )
 }
 
-function RecursoModal({ resource: recurso, onClose, onSaved }) {
+function RecursoModal({ recurso, onClose, onSaved }) {
   const isNew = !recurso.id
   const [form, setForm] = useState({
     name: recurso.name ?? '',

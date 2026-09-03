@@ -9,7 +9,7 @@ import { useSedeActiva } from '@/hooks/useActiveSite'
  * Cierra solo la SEDE activa del coord, no la semana global. Otros coords
  * pueden seguir trabajando hasta que cierren la suya.
  */
-export default function CerrarSemanaModal({ week: semana, resumen, onClose, onIrAConsultorio, onAsignarRecurso }) {
+export default function CerrarSemanaModal({ semana, resumen, onClose, onIrAConsultorio, onAsignarRecurso }) {
   const qc = useQueryClient()
   const { siteId: sedeId, sedeNombre } = useSedeActiva()
 

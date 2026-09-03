@@ -65,7 +65,7 @@ export default function AdminSedesPage() {
   )
 }
 
-function SedeCard({ site: sede, expanded, onExpand, onEdit, onAddCons, onEditCons }) {
+function SedeCard({ sede, expanded, onExpand, onEdit, onAddCons, onEditCons }) {
   const { data: consultorios = [] } = useQuery({
     queryKey: ['consultorios', sede.id],
     queryFn: () => consultorioService.list({ site_id: sede.id }),
@@ -140,7 +140,7 @@ function SedeCard({ site: sede, expanded, onExpand, onEdit, onAddCons, onEditCon
   )
 }
 
-function SedeModal({ site: sede, onClose, onSaved }) {
+function SedeModal({ sede, onClose, onSaved }) {
   const [form, setForm] = useState({
     name: sede.name ?? '',
     city: sede.city ?? '',

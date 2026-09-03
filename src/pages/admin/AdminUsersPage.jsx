@@ -226,7 +226,7 @@ export default function AdminUsuariosPage() {
   )
 }
 
-function DetalleUsuarioModal({ user: usuario, onClose, onEdit, onReenviado }) {
+function DetalleUsuarioModal({ usuario, onClose, onEdit, onReenviado }) {
   const rolInfo = ROLES[usuario.role]
   const sedes = usuario.site_names ?? []
   const confirm = useConfirm()
@@ -383,7 +383,7 @@ function Row({ label, value, mono = false, capitalize = false, suffix = '', smal
   )
 }
 
-function UsuarioModal({ user: usuario, onClose, onSaved }) {
+function UsuarioModal({ usuario, onClose, onSaved }) {
   const isNew = !usuario.id
   const [form, setForm] = useState({
     name: usuario.name ?? '',

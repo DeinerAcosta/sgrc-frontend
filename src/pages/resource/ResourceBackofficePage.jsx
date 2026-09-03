@@ -42,7 +42,7 @@ export default function BackofficeRecursoPage() {
   )
 }
 
-function AsignacionCard({ assignment: asignacion, onSaved }) {
+function AsignacionCard({ asignacion, onSaved }) {
   const [unidades, setUnidades] = useState('')
   const [tiempoReal, setTiempoReal] = useState('')
   const [obs, setObs] = useState('')

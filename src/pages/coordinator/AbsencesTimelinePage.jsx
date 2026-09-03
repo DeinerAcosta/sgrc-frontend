@@ -369,7 +369,7 @@ function ChipToggle({ active, onClick, label, dot }) {
   )
 }
 
-function AusenciaPill({ absence: ausencia, onClick }) {
+function AusenciaPill({ ausencia, onClick }) {
   const familia = ausencia.reason_ref?.family ?? 'ausencia_profesional'
   const f = FAMILIA_MAP[familia] ?? FAMILIA_MAP.otros
   const nombre = ausencia.resource?.name ?? 'Recurso'

@@ -17,7 +17,7 @@ const TIPOS_REPOSICION = [
   { value: 'otro',          label: 'Otro' },
 ]
 
-export default function RegistrarReposicionModal({ absence: ausencia, onClose }) {
+export default function RegistrarReposicionModal({ ausencia, onClose }) {
   const qc = useQueryClient()
 
   // Fase 5 · v04: precargamos motivo_solicitud con las observaciones_reposicion
