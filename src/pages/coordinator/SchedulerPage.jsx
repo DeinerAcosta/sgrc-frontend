@@ -69,6 +69,8 @@ export default function ProgramadorPage() {
   // Filtro multi-select por especialidad — array vacío = todas
   const [especialidadFilter, setEspecialidadFilter] = useState([])
   const [showFilter, setShowFilter] = useState(false)
+  const [showDescargar, setShowDescargar] = useState(false)
+  const [descargando, setDescargando] = useState(false)
   // Abre siempre en la semana ACTUAL (lunes de hoy). El coordinador usa este
   // módulo principalmente para revisar el cronograma vigente. Si necesita
   // CREAR una semana futura, usa "Siguiente →" y la regla RN-01 (anticipación
@@ -624,6 +626,50 @@ export default function ProgramadorPage() {
               </>
             )}
           </div>
+          {/* Descarga de la semana en PDF/Excel — visible cuando hay semana + sede */}
+          {semanaActual && sedeId && (
+            <div className="relative">
+              <button
+                className="btn"
+                onClick={() => setShowDescargar((v) => !v)}
+                disabled={descargando}
+                title="Descargar horario semanal en PDF o Excel"
+              >
+                {descargando ? '⏳ Generando…' : '📥 Descargar semana'}
+              </button>
+              {showDescargar && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setShowDescargar(false)} />
+                  <div className="absolute top-full left-0 mt-1 w-52 bg-white rounded-lg border border-gray-200 shadow-lg z-40 p-1">
+                    {[
+                      { fmt: 'pdf',  label: '📄 PDF (para imprimir)', ext: 'pdf'  },
+                      { fmt: 'xlsx', label: '📊 Excel (editable)',     ext: 'xlsx' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.fmt}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 rounded"
+                        onClick={async () => {
+                          setShowDescargar(false)
+                          setDescargando(true)
+                          const nombreSede = sedes.find((s) => s.id === sedeId)?.name ?? 'sede'
+                          try {
+                            await asignacionService.descargarSemana({ semanaId: semanaActual.id, sedeId, formato: opt.fmt, nombreSede })
+                            toast.success(`Horario descargado (${opt.ext.toUpperCase()})`)
+                          } catch (err) {
+                            toast.error('No se pudo generar la descarga')
+                          } finally {
+                            setDescargando(false)
+                          }
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
         <div className="hidden sm:flex gap-1">
           {diasFecha.map((d, i) => (

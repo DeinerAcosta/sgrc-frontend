@@ -517,6 +517,24 @@ export const asignacionService = {
     _asignaciones = _asignaciones.filter((a) => a.id !== id)
     return ok({ ok: true })
   },
+  /** Descarga el horario semanal de la sede en PDF o Excel. Dispara la descarga en el navegador. */
+  descargarSemana: async ({ semanaId, sedeId, formato = 'pdf', nombreSede = 'sede' }) => {
+    if (DEMO_MODE) return ok({ ok: true })
+    const resp = await api.get('/assignments/export', {
+      params: { week_id: semanaId, site_id: sedeId, format: formato },
+      responseType: 'blob',
+    })
+    const url = window.URL.createObjectURL(new Blob([resp.data]))
+    const link = document.createElement('a')
+    link.href = url
+    const ext = formato === 'xlsx' ? 'xlsx' : 'pdf'
+    link.setAttribute('download', `horarios_${nombreSede.replace(/[^\w]/g, '_')}.${ext}`)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+    return { ok: true }
+  },
   /** Copia todas las asignaciones de un día a uno o varios días destino de la misma semana */
   copiarDia: async ({ weekId: semanaId, siteId: sedeId, dayFrom: diaOrigen, targetDays: diasDestino }) => {
     if (!DEMO_MODE) return api.post('/assignments/copy-day', { weekId: semanaId, siteId: sedeId, dayFrom: diaOrigen, targetDays: diasDestino })
