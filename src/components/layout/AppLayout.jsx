@@ -7,7 +7,7 @@ import { ROLES } from '@/utils/helpers'
 import { useHeartbeat } from '@/hooks/useHeartbeat'
 
 const NAV_ITEMS = {
-  resource: [
+  recurso: [
     { to: '/app/horario',        icon: '📅', label: 'Mi horario' },
     { to: '/app/mi-ejecucion',   icon: '✅', label: 'Ejecución del día' },
     { to: '/app/ausencias',      icon: '📋', label: 'Mis ausencias' },
