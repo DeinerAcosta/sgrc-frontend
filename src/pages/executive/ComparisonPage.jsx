@@ -125,7 +125,7 @@ export default function ComparativoPage() {
         <ResponsiveContainer width="100%" height={260}>
           <LineChart data={data.ultimas_12 ?? []}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis dataKey="semana" tick={{ fontSize: 10 }} />
+            <XAxis dataKey="week" tick={{ fontSize: 10 }} />
             <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
             <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 10 }} tickFormatter={(v) => `${v}%`} />
             <Tooltip />

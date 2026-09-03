@@ -184,7 +184,7 @@ function Detalle({ data, resource: recurso, absences: ausencias = [] }) {
           <SectionHeader title="Horas por semana — últimas 4" />
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={ultimas}>
-              <XAxis dataKey="semana" tick={{ fontSize: 10 }} />
+              <XAxis dataKey="week" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 10 }} />
               <Tooltip />
               <Bar dataKey="horas" fill="#185FA5" radius={[4, 4, 0, 0]} />
@@ -195,7 +195,7 @@ function Detalle({ data, resource: recurso, absences: ausencias = [] }) {
           <SectionHeader title="Pacientes por semana — últimas 4" />
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={ultimas}>
-              <XAxis dataKey="semana" tick={{ fontSize: 10 }} />
+              <XAxis dataKey="week" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 10 }} />
               <Tooltip />
               <Bar dataKey="pacientes" radius={[4, 4, 0, 0]}>

@@ -262,7 +262,7 @@ function TabResumen({ data }) {
             <BarChart data={top_motivos} layout="vertical" margin={{ left: 120, right: 20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
               <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
-              <YAxis type="category" dataKey="nombre" tick={{ fontSize: 10 }} width={120} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={120} />
               <Tooltip />
               <Bar dataKey="count" radius={[0, 4, 4, 0]} name="Ausencias">
                 {top_motivos.map((m, i) => (
@@ -307,7 +307,7 @@ function TabMedicos({ data }) {
             <BarChart data={top} layout="vertical" margin={{ left: 130, right: 20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
               <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
-              <YAxis type="category" dataKey="nombre" tick={{ fontSize: 10 }} width={130} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={130} />
               <Tooltip />
               <Bar dataKey="dias" fill="#1B2A6C" radius={[0, 4, 4, 0]} name="Días" />
             </BarChart>
@@ -404,7 +404,7 @@ function TabReposicion({ data }) {
               <BarChart data={reposiciones.top_medicos} layout="vertical" margin={{ left: 130, right: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
-                <YAxis type="category" dataKey="nombre" tick={{ fontSize: 10 }} width={130} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={130} />
                 <Tooltip />
                 <Bar dataKey="count" fill="#8FB5DA" radius={[0, 4, 4, 0]} name="Reposiciones" />
               </BarChart>

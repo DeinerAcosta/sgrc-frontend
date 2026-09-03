@@ -193,7 +193,7 @@ export default function DashboardDirectivoPage() {
                   margin={{ left: 80, right: 20, top: 0, bottom: 0 }}
                 >
                   <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10 }} tickFormatter={(v) => `${v}%`} />
-                  <YAxis type="category" dataKey="nombre" tick={{ fontSize: 10 }} width={80} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={80} />
                   <Tooltip formatter={(v) => `${v}%`} />
                   <Bar dataKey="ocupacion" radius={[0, 4, 4, 0]}>
                     {sedesOcupacion.map((s, i) => <Cell key={i} fill={barColor(s.pct)} />)}
