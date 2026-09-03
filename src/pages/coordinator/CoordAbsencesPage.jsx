@@ -345,7 +345,7 @@ const TIPO_REPOSICION_LABEL = {
   otro:          'Otro',
 }
 
-function ReposicionesTab({ makeups: reposiciones, qc }) {
+function ReposicionesTab({ reposiciones, qc }) {
   const [seleccionada, setSeleccionada] = useState(null)
   const [nota, setNota] = useState('')
   const [motivoRechazo, setMotivoRechazo] = useState('')

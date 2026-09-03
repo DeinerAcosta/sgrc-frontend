@@ -15,7 +15,7 @@ const REQUIEREN_ANTICIPACION = ['academico', 'vacaciones', 'licencia_remunerada'
  * Queda con flag `registrado_por_coordinador = true`.
  * Solo se permite hasta 7 días hacia atrás.
  */
-export default function RegistrarAusenciaCoordModal({ siteId: sedeId, onClose, onCreated }) {
+export default function RegistrarAusenciaCoordModal({ sedeId, onClose, onCreated }) {
   const qc = useQueryClient()
   const { user } = useAuthStore()
   const [categoria, setCategoria] = useState('')

@@ -8,7 +8,7 @@ import { TIPOS_RECURSO } from '@/utils/helpers'
  * HU-C-12 + RN-38: Cuando hay una ausencia sin cubrir, sugiere recursos disponibles
  * de la sede propia primero, luego de otras sedes de la misma ciudad.
  */
-export default function SugeridorReemplazosModal({ asignacionVacia, absence: ausencia, city: ciudad, onClose }) {
+export default function SugeridorReemplazosModal({ asignacionVacia, ausencia, ciudad, onClose }) {
   const qc = useQueryClient()
 
   const { data: candidatos = [], isLoading } = useQuery({

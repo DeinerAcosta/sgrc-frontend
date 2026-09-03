@@ -219,7 +219,7 @@ function FactorBadge({ factor }) {
   )
 }
 
-function MotivoModal({ reason: motivo, onClose, onSaved }) {
+function MotivoModal({ motivo, onClose, onSaved }) {
   const esEdicion = !!motivo
   const esSistema = motivo?.is_system === true
 

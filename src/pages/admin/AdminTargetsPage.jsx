@@ -188,7 +188,7 @@ export default function AdminMetasPage() {
   )
 }
 
-function Meta({ label, description: descripcion, value, onChange }) {
+function Meta({ label, descripcion, value, onChange }) {
   return (
     <div className="flex items-start gap-4">
       <div className="flex-1">

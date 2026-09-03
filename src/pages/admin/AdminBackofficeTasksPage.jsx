@@ -145,7 +145,7 @@ export default function AdminTareasBackofficePage() {
   )
 }
 
-function TareaModal({ task: tarea, onClose, onSaved }) {
+function TareaModal({ tarea, onClose, onSaved }) {
   const isNew = !tarea.id
   const [form, setForm] = useState({
     name: tarea.name ?? '',
@@ -200,7 +200,7 @@ function TareaModal({ task: tarea, onClose, onSaved }) {
   )
 }
 
-function AprobarModal({ task: tarea, onClose, onSaved }) {
+function AprobarModal({ tarea, onClose, onSaved }) {
   const [form, setForm] = useState({
     name: tarea.name,
     description: tarea.description ?? '',
@@ -257,7 +257,7 @@ function AprobarModal({ task: tarea, onClose, onSaved }) {
   )
 }
 
-function RechazarModal({ task: tarea, onClose, onSaved }) {
+function RechazarModal({ tarea, onClose, onSaved }) {
   const [motivo, setMotivo] = useState('')
   const { tryClose } = useDirtyClose({ reason: motivo }, onClose)
 

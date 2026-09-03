@@ -1065,7 +1065,7 @@ const ESPECIALIDAD_LABEL = {
  * Mini-modal que aparece cuando el consultorio tiene servicio alternativo.
  * Pide al coordinador qué servicio va a programar antes de abrir el modal real.
  */
-function PickerServicioModal({ room: consultorio, onClose, onPick }) {
+function PickerServicioModal({ consultorio, onClose, onPick }) {
   const principal = consultorio.specialty
   const alternativo = consultorio.alt_specialty
   return (
@@ -1104,7 +1104,7 @@ function PickerServicioModal({ room: consultorio, onClose, onPick }) {
   )
 }
 
-function CopiarDiaModal({ info, weekId: semanaId, siteId: sedeId, semanaSiguienteId, origenCerrada = false, onClose, onSaved }) {
+function CopiarDiaModal({ info, semanaId, sedeId, semanaSiguienteId, origenCerrada = false, onClose, onSaved }) {
   const [destinos, setDestinos] = useState([])
   // Si la semana ORIGEN está cerrada, forzamos destino = próxima semana (no se
   // puede modificar la cerrada). El supervisor sí puede elegir cualquier opción.

@@ -460,7 +460,7 @@ function TabCausas({ data }) {
               <BarChart data={por_especialidad} layout="vertical" margin={{ left: 100, right: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
-                <YAxis type="category" dataKey="tipo" tickFormatter={(t) => TIPO_LABEL[t] ?? t} tick={{ fontSize: 10 }} width={100} />
+                <YAxis type="category" dataKey="type" tickFormatter={(t) => TIPO_LABEL[t] ?? t} tick={{ fontSize: 10 }} width={100} />
                 <Tooltip formatter={(v, n, p) => [v, TIPO_LABEL[p?.payload?.type] ?? p?.payload?.type]} />
                 <Bar dataKey="count" fill="#1B2A6C" radius={[0, 4, 4, 0]} name="Ausencias" />
               </BarChart>

@@ -139,7 +139,7 @@ export default function AdminSolicitudesPage() {
   )
 }
 
-function RechazarModal({ solicitud, reason: motivo, setMotivo, rechazando, doRechazar, onClose }) {
+function RechazarModal({ solicitud, motivo, setMotivo, rechazando, doRechazar, onClose }) {
   const { tryClose } = useDirtyClose({ reason: motivo }, onClose)
   return (
     <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && tryClose()}>

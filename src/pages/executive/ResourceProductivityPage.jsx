@@ -137,7 +137,7 @@ export default function ProductividadRecursoPage() {
 }
 
 /** Vista detallada de KPIs + gráficos + ausencias para el recurso seleccionado. */
-function Detalle({ data, resource: recurso, absences: ausencias = [] }) {
+function Detalle({ data, recurso, ausencias = [] }) {
   // Guards defensivos: si el recurso aún no tiene ejecuciones registradas, el
   // backend podría no traer estos campos → evitamos el crash (pantalla en blanco).
   const promedio = data.promedio_4_semanas ?? { horas: 0, pacientes: 0 }

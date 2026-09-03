@@ -54,7 +54,7 @@ export function Badge({ children, variant = 'gray', className = '' }) {
   )
 }
 
-export function Avatar({ name: nombre, size = 'sm', color = 'blue' }) {
+export function Avatar({ nombre, size = 'sm', color = 'blue' }) {
   const sizes = { xs: 'w-6 h-6 text-xs', sm: 'w-8 h-8 text-xs', md: 'w-10 h-10 text-sm', lg: 'w-12 h-12 text-base' }
   const colors = {
     blue:   'bg-blue-100 text-blue-800',
@@ -106,7 +106,7 @@ export function EmptyState({ icon = '📋', title, description, action }) {
   )
 }
 
-export function AlertRow({ type: tipo, title: titulo, subtitulo, onAction, actionLabel }) {
+export function AlertRow({ tipo, titulo, subtitulo, onAction, actionLabel }) {
   const dots = { rojo: 'bg-red-500', amarillo: 'bg-amber-400', verde: 'bg-green-500' }
   const dot = tipo === 'rojo' ? 'bg-red-500' : tipo === 'amarillo' ? 'bg-amber-400' : 'bg-green-500'
   return (

@@ -11,7 +11,7 @@ import { useDirtyClose } from '@/hooks/useDirtyClose'
  * Soporta UN día puntual o un RANGO de fechas (cobertura larga).
  * En modo rango: salta domingos y festivos. Sábados se incluyen hasta 12:00.
  */
-export default function AsignarBackofficeModal({ assistant: auxiliar, onClose }) {
+export default function AsignarBackofficeModal({ auxiliar, onClose }) {
   const qc = useQueryClient()
   const [esRango, setEsRango] = useState(false)
   const [sabadoMedioDia, setSabadoMedioDia] = useState(true)

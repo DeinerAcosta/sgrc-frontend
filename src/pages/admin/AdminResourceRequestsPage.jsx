@@ -149,7 +149,7 @@ export default function AdminSolicitudesRecursoPage() {
   )
 }
 
-function DecisionModal({ solicitud, action: accion, onClose, onConfirm, isPending }) {
+function DecisionModal({ solicitud, accion, onClose, onConfirm, isPending }) {
   const [motivo, setMotivo] = useState('')
   const requiereMotivo = accion === 'rechazar'
   const valido = !requiereMotivo || motivo.trim().length >= 5

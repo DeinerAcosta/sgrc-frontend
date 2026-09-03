@@ -10,7 +10,7 @@ import { useDirtyClose } from '@/hooks/useDirtyClose'
 const REQUIEREN_ANTICIPACION = ['academico', 'vacaciones', 'licencia_remunerada', 'licencia_no_remunerada']
 const SOLO_SALARIO_FIJO = ['licencia_remunerada', 'licencia_no_remunerada']
 
-export default function AusenciaFormModal({ resourceId: recursoId, payScheme: esquemaPago, onClose, horarioSemana = [] }) {
+export default function AusenciaFormModal({ recursoId, esquemaPago, onClose, horarioSemana = [] }) {
   const qc = useQueryClient()
   // motivoId = del catálogo dinámico; tipo = el enum legacy (se setea automáticamente).
   const [form, setForm] = useState({

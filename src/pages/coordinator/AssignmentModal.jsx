@@ -17,7 +17,7 @@ import { useAuthStore } from '@/store/authStore'
  *  - asignacion?: object  ← si viene, modo EDICIÓN (prefill + PUT)
  *  - sedeId, onClose, onSaved
  */
-export default function AsignacionModal({ data, assignment: asignacion, siteId: sedeId, onClose, onSaved }) {
+export default function AsignacionModal({ data, asignacion, sedeId, onClose, onSaved }) {
   const { roomId: consultorioId, room: consultorio, day: dia, weekId: semanaId, especialidadOverride } = data
   const editando = !!asignacion
   const { user } = useAuthStore()
