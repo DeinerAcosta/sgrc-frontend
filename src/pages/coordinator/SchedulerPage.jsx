@@ -651,7 +651,7 @@ export default function ProgramadorPage() {
                         onClick={async () => {
                           setShowDescargar(false)
                           setDescargando(true)
-                          const nombreSede = sedes.find((s) => s.id === sedeId)?.name ?? 'sede'
+                          const nombreSede = sedesDisponibles.find((s) => s.id === sedeId)?.name ?? 'sede'
                           try {
                             await asignacionService.descargarSemana({ semanaId: semanaActual.id, sedeId, formato: opt.fmt, nombreSede })
                             toast.success(`Horario descargado (${opt.ext.toUpperCase()})`)
