@@ -10,6 +10,21 @@ import { useDirtyClose } from '@/hooks/useDirtyClose'
 const REQUIEREN_ANTICIPACION = ['academico', 'vacaciones', 'licencia_remunerada', 'licencia_no_remunerada']
 const SOLO_SALARIO_FIJO = ['licencia_remunerada', 'licencia_no_remunerada']
 
+// Sep-2026: el recurso profesional solo debe ver los motivos que aparecen en el
+// formato oficial F-AA-126 v04. Los motivos operativos (cambio horario, formato,
+// disminuir pacientes, cubre_qx, regionales, brigada, etc.) los usa quien gestiona
+// la reprogramacion — no el profesional que se ausenta. Se filtran por code.
+const MOTIVOS_VISIBLES_RECURSO = new Set([
+  'enfermedad',
+  'calamidad',
+  'academico',
+  'familiar',
+  'vacaciones',
+  'licencia_no_remunerada',
+  'licencia_remunerada',        // se filtra despues por esquema de pago si aplica
+  'traslado_sedes_externas',
+])
+
 export default function AusenciaFormModal({ recursoId, esquemaPago, onClose, horarioSemana = [] }) {
   const qc = useQueryClient()
   // motivoId = del catálogo dinámico; tipo = el enum legacy (se setea automáticamente).
@@ -47,6 +62,9 @@ export default function AusenciaFormModal({ recursoId, esquemaPago, onClose, hor
     : TIPOS_AUSENCIA.map((t) => ({ id: null, value: t.value, label: t.label }))
 
   const tipos = opciones.filter((t) => {
+    // Filtro 1 (sep-2026): el recurso solo ve los 7 motivos del F-AA-126 oficial.
+    // Coord/sup/gerencia siguen viendo TODOS via CoordLogAbsenceModal.
+    if (!MOTIVOS_VISIBLES_RECURSO.has(t.value)) return false
     if (SOLO_SALARIO_FIJO.includes(t.value) && esquemaPago !== 'fijo') return false
     return true
   })
