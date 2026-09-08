@@ -83,6 +83,7 @@ const NAV_ITEMS = {
     { to: '/app/admin/parametros',         icon: '⚙️',  label: 'Parámetros de costo' },
     { to: '/app/admin/metas',              icon: '🎯', label: 'Metas del sistema' },
     { to: '/app/admin/motivos-ausencia',   icon: '🩹', label: 'Motivos de ausencia' },
+    { to: '/app/ausencias-coord',          icon: '⚠️',  label: 'Ausencias (gestión)' },
     { to: '/app/ausencias-cronograma',     icon: '🗓️', label: 'Cronograma ausencias' },
     { to: '/app/quejas',                   icon: '🎫', label: 'Quejas' },
     { to: '/app/admin/tareas-backoffice',  icon: '🗂️', label: 'Tareas backoffice' },
