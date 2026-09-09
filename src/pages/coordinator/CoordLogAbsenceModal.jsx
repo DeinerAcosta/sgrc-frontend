@@ -10,11 +10,11 @@ import { useAuthStore } from '@/store/authStore'
 
 const REQUIEREN_ANTICIPACION = ['academico', 'vacaciones', 'licencia_remunerada', 'licencia_no_remunerada']
 
-// Sep-2026 · feedback usuario: la reposición aplica SOLO a los profesionales que
-// atienden pacientes. Personal de apoyo (asesores, auxiliares, técnicos,
-// anestesiólogos) no repone → se oculta el bloque "¿Desea reponer?" cuando la
+// Sep-2026 · feedback usuario: la reposición aplica SOLO a los profesionales
+// que atienden pacientes directamente. Personal de apoyo (asesores, auxiliares,
+// técnicos) no repone → se oculta el bloque "¿Desea reponer?" cuando la
 // categoría elegida no está en este set.
-const TIPOS_QUE_REPONEN = new Set(['oftalmologo', 'otorrino', 'fonoaudiologa', 'optometra'])
+const TIPOS_QUE_REPONEN = new Set(['oftalmologo', 'otorrino', 'fonoaudiologa', 'optometra', 'anestesiologo'])
 
 /**
  * HU-C-06: Coordinador registra una ausencia en nombre del recurso.

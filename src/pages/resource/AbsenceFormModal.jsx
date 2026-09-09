@@ -26,15 +26,15 @@ const MOTIVOS_VISIBLES_RECURSO = new Set([
 ])
 
 // Sep-2026 · feedback usuario: la reposición de ausencias aplica SOLO a los
-// profesionales que atienden pacientes (oftalmólogos, otorrinos, fonoaudiólogas
-// y optómetras). El personal de apoyo (auxiliares, técnicos, asesores,
-// anestesiólogos) NO repone — no ven el bloque "¿Deseas reponer?" ni la caja
-// de observaciones de reposición.
+// profesionales que atienden pacientes directamente. Personal de apoyo
+// (auxiliares, técnicos, asesores) NO repone — no ven el bloque "¿Deseas
+// reponer?" ni la caja de observaciones de reposición.
 const TIPOS_QUE_REPONEN = new Set([
   'oftalmologo',
   'otorrino',
   'fonoaudiologa',
   'optometra',
+  'anestesiologo',
 ])
 
 export default function AusenciaFormModal({ recursoId, esquemaPago, tipoRecurso, onClose, horarioSemana = [] }) {
