@@ -10,6 +10,12 @@ import { useAuthStore } from '@/store/authStore'
 
 const REQUIEREN_ANTICIPACION = ['academico', 'vacaciones', 'licencia_remunerada', 'licencia_no_remunerada']
 
+// Sep-2026 · feedback usuario: la reposición aplica SOLO a los profesionales que
+// atienden pacientes. Personal de apoyo (asesores, auxiliares, técnicos,
+// anestesiólogos) no repone → se oculta el bloque "¿Desea reponer?" cuando la
+// categoría elegida no está en este set.
+const TIPOS_QUE_REPONEN = new Set(['oftalmologo', 'otorrino', 'fonoaudiologa', 'optometra'])
+
 /**
  * HU-C-06: Coordinador registra una ausencia en nombre del recurso.
  * Queda con flag `registrado_por_coordinador = true`.
@@ -290,41 +296,48 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, onCreated
               </div>
             </div>
 
-            <div className="mt-3">
-              <label className="label">¿Desea reponer?</label>
-              <div className="flex gap-4 flex-wrap">
-                {[
-                  { v: 'si', l: 'SÍ' },
-                  { v: 'no', l: 'NO' },
-                ].map((o) => (
-                  <label key={o.v} className="flex items-center gap-1.5 text-xs cursor-pointer">
-                    <input
-                      type="radio"
-                      name="desea_reponer"
-                      checked={form.wants_makeup === o.v}
-                      onChange={() => set('wants_makeup', o.v)}
-                    />
-                    {o.l}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {form.wants_makeup === 'si' && (
-              <div className="mt-3">
-                <label className="label">Observaciones de reposición</label>
-                <textarea
-                  className="input resize-none"
-                  rows={2}
-                  value={form.makeup_notes}
-                  onChange={(e) => set('makeup_notes', e.target.value)}
-                  placeholder="Detalle la fecha, horario y/o modalidad propuesta para la reposición."
-                  maxLength={2000}
-                />
-                <div className="text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded p-2 mt-2">
-                  ℹ️ Al confirmar esta ausencia, se abrirá automáticamente el formulario de <strong>Proponer reposición</strong> con estos datos precargados.
+            {/* Reposición solo aplica a profesionales que atienden pacientes.
+                El personal de apoyo (asesores, auxiliares, tecnicos,
+                anestesiologos) no repone — bloque oculto para esas categorias. */}
+            {TIPOS_QUE_REPONEN.has(categoria) && (
+              <>
+                <div className="mt-3">
+                  <label className="label">¿Desea reponer?</label>
+                  <div className="flex gap-4 flex-wrap">
+                    {[
+                      { v: 'si', l: 'SÍ' },
+                      { v: 'no', l: 'NO' },
+                    ].map((o) => (
+                      <label key={o.v} className="flex items-center gap-1.5 text-xs cursor-pointer">
+                        <input
+                          type="radio"
+                          name="desea_reponer"
+                          checked={form.wants_makeup === o.v}
+                          onChange={() => set('wants_makeup', o.v)}
+                        />
+                        {o.l}
+                      </label>
+                    ))}
+                  </div>
                 </div>
-              </div>
+
+                {form.wants_makeup === 'si' && (
+                  <div className="mt-3">
+                    <label className="label">Observaciones de reposición</label>
+                    <textarea
+                      className="input resize-none"
+                      rows={2}
+                      value={form.makeup_notes}
+                      onChange={(e) => set('makeup_notes', e.target.value)}
+                      placeholder="Detalle la fecha, horario y/o modalidad propuesta para la reposición."
+                      maxLength={2000}
+                    />
+                    <div className="text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded p-2 mt-2">
+                      ℹ️ Al confirmar esta ausencia, se abrirá automáticamente el formulario de <strong>Proponer reposición</strong> con estos datos precargados.
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 

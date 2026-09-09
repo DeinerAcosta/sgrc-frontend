@@ -177,6 +177,7 @@ export default function HorarioPage() {
         <AusenciaFormModal
           recursoId={user?.resource_id}
           esquemaPago={user?.pay_scheme}
+          tipoRecurso={user?.type}
           onClose={() => setShowAusencia(false)}
           horarioSemana={horario}
         />

@@ -141,6 +141,7 @@ export default function AusenciasRecursoPage() {
         <AusenciaFormModal
           recursoId={user?.resource_id}
           esquemaPago={user?.pay_scheme}
+          tipoRecurso={user?.type}
           onClose={() => { setShowAusencia(false); refetch() }}
           horarioSemana={[]}
         />

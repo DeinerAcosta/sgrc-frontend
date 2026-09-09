@@ -25,7 +25,20 @@ const MOTIVOS_VISIBLES_RECURSO = new Set([
   'traslado_sedes_externas',
 ])
 
-export default function AusenciaFormModal({ recursoId, esquemaPago, onClose, horarioSemana = [] }) {
+// Sep-2026 · feedback usuario: la reposición de ausencias aplica SOLO a los
+// profesionales que atienden pacientes (oftalmólogos, otorrinos, fonoaudiólogas
+// y optómetras). El personal de apoyo (auxiliares, técnicos, asesores,
+// anestesiólogos) NO repone — no ven el bloque "¿Deseas reponer?" ni la caja
+// de observaciones de reposición.
+const TIPOS_QUE_REPONEN = new Set([
+  'oftalmologo',
+  'otorrino',
+  'fonoaudiologa',
+  'optometra',
+])
+
+export default function AusenciaFormModal({ recursoId, esquemaPago, tipoRecurso, onClose, horarioSemana = [] }) {
+  const puedeReponer = TIPOS_QUE_REPONEN.has(tipoRecurso)
   const qc = useQueryClient()
   // motivoId = del catálogo dinámico; tipo = el enum legacy (se setea automáticamente).
   const [form, setForm] = useState({
@@ -184,41 +197,48 @@ export default function AusenciaFormModal({ recursoId, esquemaPago, onClose, hor
               </div>
             </div>
 
-            <div className="mt-3">
-              <label className="label">¿Deseas reponer esta ausencia?</label>
-              <div className="flex gap-4 flex-wrap">
-                {[
-                  { v: 'si', l: 'SÍ' },
-                  { v: 'no', l: 'NO' },
-                ].map((o) => (
-                  <label key={o.v} className="flex items-center gap-1.5 text-xs cursor-pointer">
-                    <input
-                      type="radio"
-                      name="desea_reponer_rec"
-                      checked={form.wants_makeup === o.v}
-                      onChange={() => set('wants_makeup', o.v)}
-                    />
-                    {o.l}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {form.wants_makeup === 'si' && (
-              <div className="mt-3">
-                <label className="label">Observaciones de reposición</label>
-                <textarea
-                  className="input resize-none"
-                  rows={2}
-                  value={form.makeup_notes}
-                  onChange={(e) => set('makeup_notes', e.target.value)}
-                  placeholder="Detalla la fecha, horario y/o modalidad propuesta para la reposición."
-                  maxLength={2000}
-                />
-                <div className="text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded p-2 mt-2">
-                  ℹ️ Cuando el coordinador confirme tu ausencia, podrás proponer formalmente la reposición desde "Mis ausencias".
+            {/* Reposición solo aplica a los profesionales que atienden pacientes.
+                El personal de apoyo (asesores, auxiliares, tecnicos, anestesiologos)
+                no repone — el bloque queda oculto para ellos. */}
+            {puedeReponer && (
+              <>
+                <div className="mt-3">
+                  <label className="label">¿Deseas reponer esta ausencia?</label>
+                  <div className="flex gap-4 flex-wrap">
+                    {[
+                      { v: 'si', l: 'SÍ' },
+                      { v: 'no', l: 'NO' },
+                    ].map((o) => (
+                      <label key={o.v} className="flex items-center gap-1.5 text-xs cursor-pointer">
+                        <input
+                          type="radio"
+                          name="desea_reponer_rec"
+                          checked={form.wants_makeup === o.v}
+                          onChange={() => set('wants_makeup', o.v)}
+                        />
+                        {o.l}
+                      </label>
+                    ))}
+                  </div>
                 </div>
-              </div>
+
+                {form.wants_makeup === 'si' && (
+                  <div className="mt-3">
+                    <label className="label">Observaciones de reposición</label>
+                    <textarea
+                      className="input resize-none"
+                      rows={2}
+                      value={form.makeup_notes}
+                      onChange={(e) => set('makeup_notes', e.target.value)}
+                      placeholder="Detalla la fecha, horario y/o modalidad propuesta para la reposición."
+                      maxLength={2000}
+                    />
+                    <div className="text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded p-2 mt-2">
+                      ℹ️ Cuando el coordinador confirme tu ausencia, podrás proponer formalmente la reposición desde "Mis ausencias".
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
