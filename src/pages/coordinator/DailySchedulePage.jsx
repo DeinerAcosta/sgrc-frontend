@@ -144,7 +144,8 @@ export default function HorarioDiarioPage() {
                     {it.resource?.specialty && <div className="text-gray-500 text-xs">{it.resource.specialty}</div>}
                   </td>
                   <td className="px-3 py-2 text-xs">{it.assistant?.name ?? '—'}</td>
-                  <td className="px-3 py-2 text-xs text-right">{it.patient_capacity}</td>
+                  {/* PROYECTOS-3255 #2.1: asesores no muestran # pacientes. */}
+                  <td className="px-3 py-2 text-xs text-right">{it.resource?.type === 'asesor_servicios' ? '—' : it.patient_capacity}</td>
                   <td className="px-3 py-2 text-center print:hidden">
                     {it.ausencia_recurso ? (
                       <Badge variant="red">Recurso ausente</Badge>

@@ -352,6 +352,9 @@ export default function EjecucionPage() {
                         <td className="px-3 py-2 text-center">
                           {tieneAusencia ? (
                             <span className="text-xs text-gray-400">—</span>
+                          ) : a.resource?.type === 'asesor_servicios' ? (
+                            // PROYECTOS-3255 #2.1: asesores no capturan # pacientes.
+                            <span className="text-xs text-gray-400" title="Los asesores no atienden pacientes con cita">N/A</span>
                           ) : (
                             <input
                               type="number"
@@ -374,6 +377,9 @@ export default function EjecucionPage() {
                         <td className="px-3 py-2 text-center">
                           {tieneAusencia ? (
                             <Badge variant="red">ausencia</Badge>
+                          ) : a.resource?.type === 'asesor_servicios' ? (
+                            // PROYECTOS-3255 #2.1: asesores no capturan pacientes atendidos.
+                            <span className="text-xs text-gray-400">N/A</span>
                           ) : (
                             <input
                               type="number"
@@ -385,7 +391,7 @@ export default function EjecucionPage() {
                               title="Pacientes que este recurso realmente atendió"
                             />
                           )}
-                          {dif !== 0 && !tieneAusencia && (
+                          {dif !== 0 && !tieneAusencia && a.resource?.type !== 'asesor_servicios' && (
                             <div className={`text-xs mt-1 ${dif > 0 ? 'text-green-600' : 'text-red-600'}`}>
                               {dif > 0 ? '+' : ''}{dif} vs prog.
                             </div>

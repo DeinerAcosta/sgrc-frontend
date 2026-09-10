@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { informeService, sedeService, semanaService } from '@/services/api'
 import { useAuthStore } from '@/store/authStore'
 import { Spinner, Badge, Semaforo, EmptyState } from '@/components/ui'
-import { formatPct, formatCOP, formatHoras, titleCase, compareNatural, TIPOS_RECURSO, ESPECIALIDADES } from '@/utils/helpers'
+import { formatPct, formatCOP, formatHoras, titleCase, compareNatural, formatFamiliaLabel, TIPOS_RECURSO, ESPECIALIDADES } from '@/utils/helpers'
 import { format, subWeeks, startOfWeek } from 'date-fns'
 import toast from 'react-hot-toast'
 
@@ -111,8 +111,10 @@ const CONFIG = {
   },
   impacto: {
     title: 'Impacto económico de ausencias',
-    desc: 'Costo de oportunidad y costos operativos por ausencias.',
-    cols: ['Recurso', 'Fecha', 'Tipo', 'Pac. afectados', 'Costo oportunidad', 'Costo personal', 'Costo reprogramación', 'Total'],
+    desc: 'Costo de oportunidad y costos operativos por ausencias, desglosado por familia del motivo.',
+    // PROYECTOS-3255 #3.2: se agrega Familia (dataImpacto ya la devolvia y desalineaba las cols siguientes).
+    cols: ['Recurso', 'Fecha', 'Tipo', 'Familia', 'Pac. afectados', 'Costo oportunidad', 'Costo personal', 'Costo reprogramación', 'Total'],
+    keys: ['resource', 'date', 'type', 'family', 'pac_afectados', 'costo_oport', 'costo_personal', 'costo_reprog', 'total'],
     meta: null,
     fn: informeService.impacto,
   },
@@ -120,6 +122,8 @@ const CONFIG = {
     title: 'Ausentismo e impacto económico',
     desc: 'Ranking de ausencias por recurso con su impacto económico. Programadas: reportadas con >15 días de anticipación. Imprevistas: ≤15 días. Quejas estimadas: 9% de pacientes afectados si la anticipación fue >30 días, 8% si fue menor.',
     cols: ['Recurso', 'Tipo', 'Sede', 'Ausencias', 'Programadas', 'Imprevistas', 'Días', 'Pac. afectados', 'Quejas', 'Costo oportunidad', 'Costo personal', 'Costo total'],
+    // PROYECTOS-3255 #3.2: claves explicitas para blindar el orden ante nuevos campos backend.
+    keys: ['resource', 'type', 'site', 'absences', 'programadas', 'imprevistas', 'dias', 'pac_afectados', 'quejas', 'opportunity_cost', 'costo_personal', 'total'],
     // Coord no ve Programadas/Imprevistas/Quejas (ago-2026, política de negocio)
     colsRestringidasACoord: new Set([4, 5, 8]),
     meta: null,
@@ -213,6 +217,49 @@ function formatCelda(col, val) {
     return ESPECIALIDADES.find((e) => e.value === val)?.label ?? titleCase(val)
   }
   return titleCase(val)
+}
+
+// PROYECTOS-3255 #3.2: panel agregado de desglose por familia (solo ausentismo-impacto).
+function PorFamiliaPanel({ filas }) {
+  const agregado = {}
+  for (const r of filas) {
+    if (!r?.por_familia) continue
+    for (const [fam, v] of Object.entries(r.por_familia)) {
+      if (!agregado[fam]) agregado[fam] = { absences: 0, dias: 0, total: 0 }
+      agregado[fam].absences += v?.absences ?? 0
+      agregado[fam].dias += v?.dias ?? 0
+      agregado[fam].total += v?.total ?? 0
+    }
+  }
+  const entradas = Object.entries(agregado).sort((a, b) => b[1].total - a[1].total)
+  if (entradas.length === 0) return null
+  return (
+    <div className="card mb-4 p-3">
+      <div className="text-xs font-medium text-gray-700 mb-2">Desglose por familia (agregado del periodo)</div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-gray-500 border-b border-gray-100">
+              <th className="text-left px-2 py-1 font-medium">Familia</th>
+              <th className="text-right px-2 py-1 font-medium">Ausencias</th>
+              <th className="text-right px-2 py-1 font-medium">Días</th>
+              <th className="text-right px-2 py-1 font-medium">Costo total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entradas.map(([fam, v]) => (
+              <tr key={fam} className="border-b border-gray-50">
+                <td className="px-2 py-1 text-gray-800">{formatFamiliaLabel(fam)}</td>
+                <td className="px-2 py-1 text-right text-gray-700">{v.absences}</td>
+                <td className="px-2 py-1 text-right text-gray-700">{v.dias}</td>
+                <td className="px-2 py-1 text-right text-gray-700">{formatCOP(v.total)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
 }
 
 export default function InformePage() {
@@ -432,6 +479,11 @@ export default function InformePage() {
         </div>
       )}
 
+      {/* PROYECTOS-3255 #3.2 · Panel de desglose por familia (agregado) — solo ausentismo-impacto */}
+      {tipo === 'ausentismo-impacto' && dataOrdenada.length > 0 && (
+        <PorFamiliaPanel filas={dataOrdenada} />
+      )}
+
       {/* Leyenda + botón "Cómo se calcula" — solo para ausentismo */}
       {esAusentismo && puedeVerColsRestringidas && (
         <div className="mb-4">
@@ -499,14 +551,16 @@ export default function InformePage() {
                   const pct = row.pct_ocupacion ?? row.pct_cumplimiento ?? row.pct_utilizacion
                   // PROYECTOS-3255 #1.3: si el recurso estuvo en incapacidad medica
                   // confirmada, NO se pinta semaforo (no se puede penalizar a un
-                  // recurso enfermo por bajo cumplimiento). Aplica solo a productividad.
-                  const enIncapacidad = tipo === 'productividad' && (row.dias_incapacidad ?? 0) > 0
+                  // recurso enfermo). Aplica a informes per-recurso con % (productividad,
+                  // subutilizacion). Ausentismo NO — ahi la incapacidad ya es el foco.
+                  const enIncapacidad = (tipo === 'productividad' || tipo === 'subutilizacion') && (row.dias_incapacidad ?? 0) > 0
                   // PROYECTOS-3255 #3.1: pct=null significa "sin actividad" → NO pintar semaforo
                   // (evita marcar en rojo un recurso que no tuvo asignaciones).
                   const semaforo = pct !== undefined && pct !== null && !enIncapacidad
                     ? pct >= (cfg.meta ?? 80) ? 'green' : pct >= (cfg.meta ?? 80) - 10 ? 'amber' : 'red'
                     : null
-                  const valores = Object.values(row)
+                  // PROYECTOS-3255 #3.2: leer por clave explicita evita desalineo cuando el backend agrega campos.
+                  const leerCelda = (idx) => cfg.keys ? row[cfg.keys[idx]] : Object.values(row)[idx]
                   // Detección de anomalías — solo en informes de ausentismo:
                   //  · días negativos = fechas corruptas (fin<inicio o typo en el año)
                   //  · ausencias con 0 días es sospechoso pero puede ser legítimo (mismo día)
@@ -524,8 +578,13 @@ export default function InformePage() {
                     <tr key={i} className={rowClass} title={anomaliaDiasNegativos ? '⚠️ Alguna ausencia de este recurso tiene fechas corruptas (fin antes que inicio, o año mal escrito). Requiere corrección manual en el módulo de Ausencias.' : undefined}>
                       {indicesVisibles.map((origIdx, j) => {
                         const col = cfg.cols[origIdx]
-                        const val = valores[origIdx]
-                        const isSemaforo = j === indicesVisibles.length - 1 && semaforo
+                        let val = leerCelda(origIdx)
+                        // PROYECTOS-3255 #2.1: en productividad, los asesores no reportan pacientes
+                        // ni % cumplimiento (hacen recepcion / gestion, no atienden con cita).
+                        const esColPacientes = tipo === 'productividad' && (col === 'Pac. programados' || col === 'Pac. atendidos' || col === '% Cumplimiento')
+                        const rowEsAsesor = row.type === 'asesor_servicios'
+                        if (esColPacientes && rowEsAsesor) val = null
+                        const isSemaforo = j === indicesVisibles.length - 1 && semaforo && !(esColPacientes && rowEsAsesor)
                         // Ícono de warning al lado del nombre si la fila tiene anomalía
                         const iconoWarning = anomaliaDiasNegativos && col === 'Recurso'
                           ? <span className="text-red-500 mr-1" title="⚠️ Fechas corruptas detectadas en al menos una ausencia">⚠️</span>
@@ -557,6 +616,8 @@ export default function InformePage() {
                               </div>
                             ) : badgeCol !== null ? (
                               badgeCol
+                            ) : col === 'Familia' && typeof val === 'string' ? (
+                              <Badge variant="gray">{formatFamiliaLabel(val)}</Badge>
                             ) : typeof val === 'number' && col.toLowerCase().includes('costo') ? (
                               formatCOP(val)
                             ) : typeof val === 'number' && col.toLowerCase().includes('hora') ? (

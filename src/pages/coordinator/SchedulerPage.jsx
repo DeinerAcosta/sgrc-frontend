@@ -783,7 +783,8 @@ export default function ProgramadorPage() {
                               `${a.resource?.name} · ${a.start_time}–${a.end_time}`,
                               a.assistant ? `Aux 1: ${a.assistant.name}` : null,
                               a.assistant2 ? `Aux 2: ${a.assistant2.name}` : null,
-                              `Capacidad: ${a.patient_capacity} pacientes`,
+                              // PROYECTOS-3255 #2.1: asesores no muestran capacidad de pacientes.
+                              a.resource?.type !== 'asesor_servicios' ? `Capacidad: ${a.patient_capacity} pacientes` : null,
                               canEdit ? '👆 Click para editar' : null,
                             ].filter(Boolean).join('\n')}
                             onClick={() => canEdit && setModalData({
@@ -806,7 +807,10 @@ export default function ProgramadorPage() {
                                 Aux2: {nombreCorto(a.assistant2?.name)}
                               </div>
                             )}
-                            <div className="text-teal-600 text-xs">{a.patient_capacity} pac.</div>
+                            {/* PROYECTOS-3255 #2.1: asesores no muestran # pacientes en el badge. */}
+                            {a.resource?.type !== 'asesor_servicios' && (
+                              <div className="text-teal-600 text-xs">{a.patient_capacity} pac.</div>
+                            )}
                             {a.is_overtime && <span className="text-amber-700 text-xs">⚠ extras</span>}
                             {canCopiar && (
                               <button

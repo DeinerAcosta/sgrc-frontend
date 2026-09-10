@@ -219,3 +219,15 @@ export const descargarCSV = (filename, headers, rows) => {
   a.remove()
   URL.revokeObjectURL(url)
 }
+
+// PROYECTOS-3255 #3.2: etiquetas legibles para las familias de motivo (schema.prisma).
+const FAMILIA_LABELS = {
+  ausencia_profesional: 'Ausencia profesional',
+  reprogramacion_operativa: 'Reprogramación operativa',
+  ajuste_cupos: 'Ajuste de cupos',
+  movilidad_regional: 'Movilidad regional',
+  calendario_festivo: 'Calendario festivo',
+  otros: 'Otros',
+  sin_familia: 'Sin motivo',
+}
+export const formatFamiliaLabel = (v) => FAMILIA_LABELS[v] ?? titleCase(v ?? 'sin_familia')
