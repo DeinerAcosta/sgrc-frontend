@@ -178,6 +178,19 @@ export default function LoginPage() {
         >
           {isPending ? <Spinner size="sm" /> : 'Ingresar'}
         </button>
+
+        {/* Sep-2026: enlace visible al autoregistro. Antes vivia solo como
+            ruta directa /registro sin puerta de entrada desde el login. */}
+        <div className="text-center text-xs text-gray-500 pt-1">
+          ¿No tienes cuenta?{' '}
+          <button
+            type="button"
+            onClick={() => navigate('/registro')}
+            className="text-brand-600 hover:underline font-medium"
+          >
+            Solicita tu registro
+          </button>
+        </div>
       </div>
 
       {DEMO_MODE && (

@@ -6,6 +6,9 @@ import NotificacionesPanel from '@/components/layout/NotificationsPanel'
 import { ROLES } from '@/utils/helpers'
 import { useHeartbeat } from '@/hooks/useHeartbeat'
 
+// Sep-2026: menus reorganizados por FUNCION en vez de flat list. Cada item
+// puede ser un link {to,icon,label} o un separador {divider:true,label}.
+// El render pinta los separadores como header sticky del grupo.
 const NAV_ITEMS = {
   recurso: [
     { to: '/app/horario',        icon: '📅', label: 'Mi horario' },
@@ -15,81 +18,126 @@ const NAV_ITEMS = {
     { to: '/app/perfil',         icon: '👤', label: 'Mi perfil' },
   ],
   coordinador: [
-    { to: '/app/dashboard-coord',    icon: '🏠', label: 'Dashboard' },
-    { to: '/app/programador',        icon: '📅', label: 'Programador' },
-    { to: '/app/ausencias-coord',      icon: '⚠️',  label: 'Ausencias' },
-    { to: '/app/ausencias-cronograma', icon: '🗓️', label: 'Cronograma ausencias' },
-    { to: '/app/ejecucion',          icon: '✅', label: 'Ejecución' },
-    { to: '/app/recursos-coord',     icon: '👥', label: 'Recursos' },
-    { to: '/app/backoffice-coord',   icon: '🗂️', label: 'Backoffice' },
-    { to: '/app/horario-diario',     icon: '📋', label: 'Resumen diario' },
-    { to: '/app/solicitudes-recurso', icon: '📨', label: 'Solicitudes de recurso' },
-    { to: '/app/quejas',             icon: '🎫', label: 'Quejas' },
-    { to: '/app/informes/ocupacion', icon: '📊', label: 'Informe ocupación' },
-    { to: '/app/perfil',             icon: '👤', label: 'Mi perfil' },
+    { divider: true, label: 'Panel' },
+    { to: '/app/dashboard-coord',      icon: '🏠', label: 'Dashboard' },
+
+    { divider: true, label: 'Operación diaria' },
+    { to: '/app/programador',          icon: '📅', label: 'Programador' },
+    { to: '/app/ejecucion',            icon: '✅', label: 'Ejecución' },
+    { to: '/app/horario-diario',       icon: '📋', label: 'Resumen diario' },
+
+    { divider: true, label: 'Ausencias' },
+    { to: '/app/ausencias-coord',      icon: '⚠️',  label: 'Gestión de ausencias' },
+    { to: '/app/ausencias-cronograma', icon: '🗓️', label: 'Cronograma' },
+
+    { divider: true, label: 'Equipo' },
+    { to: '/app/recursos-coord',       icon: '👥', label: 'Recursos' },
+    { to: '/app/backoffice-coord',     icon: '🗂️', label: 'Backoffice' },
+
+    { divider: true, label: 'Solicitudes y quejas' },
+    { to: '/app/solicitudes-recurso',  icon: '📨', label: 'Solicitudes de recurso' },
+    { to: '/app/quejas',               icon: '🎫', label: 'Quejas' },
+
+    { divider: true, label: 'Informes' },
+    { to: '/app/informes/ocupacion',   icon: '📊', label: 'Ocupación' },
+
+    { divider: true, label: 'Personal' },
+    { to: '/app/perfil',               icon: '👤', label: 'Mi perfil' },
   ],
   directivo: [
-    { to: '/app/dashboard',                icon: '📊', label: 'Dashboard' },
-    { to: '/app/informes/ocupacion',       icon: '🏥', label: 'Ocupación' },
-    { to: '/app/informes/ocupacion-asesores', icon: '👥', label: 'Ocupación asesores' },
-    { to: '/app/informes/productividad',   icon: '📈', label: 'Productividad' },
-    { to: '/app/productividad-recurso',    icon: '🧑‍⚕️', label: 'Productividad individual' },
+    { divider: true, label: 'Panel' },
+    { to: '/app/dashboard',                icon: '📊', label: 'Dashboard ejecutivo' },
+
+    { divider: true, label: 'Ocupación' },
+    { to: '/app/informes/ocupacion',          icon: '🏥', label: 'Consultorios' },
+    { to: '/app/informes/ocupacion-asesores', icon: '👥', label: 'Asesores' },
+
+    { divider: true, label: 'Productividad' },
+    { to: '/app/informes/productividad',   icon: '📈', label: 'Global' },
+    { to: '/app/productividad-recurso',    icon: '🧑‍⚕️', label: 'Individual' },
+    { to: '/app/informes/horas-prog-ejec', icon: '⏱️', label: 'Programado vs ejecutado' },
+
+    { divider: true, label: 'Ausentismo' },
     { to: '/app/informes/ausentismo-impacto', icon: '🚨', label: 'Ausentismo e impacto' },
-    { to: '/app/quejas',                   icon: '🎫', label: 'Quejas' },
-    { to: '/app/reprogramaciones',         icon: '📊', label: 'Reprogramaciones' },
-    { to: '/app/informes/subutilizacion',  icon: '⏰', label: 'Tiempos ociosos' },
-    { to: '/app/informes/horas-prog-ejec', icon: '⏱️', label: 'Prog. vs ejecutado' },
+    { to: '/app/reprogramaciones',            icon: '🔄', label: 'Reprogramaciones' },
+    { to: '/app/informes/subutilizacion',     icon: '⏰', label: 'Tiempos ociosos' },
+
+    { divider: true, label: 'Cierre y control' },
     { to: '/app/informes/cierre-semanas',  icon: '🔒', label: 'Cierre de semanas' },
-    { to: '/app/comparativo',              icon: '↔️',  label: 'Comparativo' },
+    { to: '/app/comparativo',              icon: '↔️',  label: 'Comparativo semanal' },
+    { to: '/app/quejas',                   icon: '🎫', label: 'Quejas' },
+
+    { divider: true, label: 'Personal' },
     { to: '/app/perfil',                   icon: '👤', label: 'Mi perfil' },
   ],
   supervisor: [
+    { divider: true, label: 'Catálogos maestros' },
     { to: '/app/admin/sedes',              icon: '🏢', label: 'Sedes y consultorios' },
-    { to: '/app/admin/recursos',           icon: '🩺', label: 'Recursos (catálogo)' },
+    { to: '/app/admin/recursos',           icon: '🩺', label: 'Recursos' },
     { to: '/app/admin/usuarios',           icon: '👥', label: 'Usuarios' },
-    { to: '/app/admin/solicitudes',        icon: '📨', label: 'Solicitudes de registro' },
-    { to: '/app/admin/solicitudes-recurso', icon: '📥', label: 'Solicitudes de recurso' },
+    { to: '/app/admin/motivos-ausencia',   icon: '🩹', label: 'Motivos de ausencia' },
+    { to: '/app/admin/tareas-backoffice',  icon: '🗂️', label: 'Tareas backoffice' },
+
+    { divider: true, label: 'Configuración' },
     { to: '/app/admin/parametros',         icon: '⚙️',  label: 'Parámetros de costo' },
     { to: '/app/admin/metas',              icon: '🎯', label: 'Metas del sistema' },
-    { to: '/app/admin/motivos-ausencia',   icon: '🩹', label: 'Motivos de ausencia' },
-    { to: '/app/ausencias-cronograma',     icon: '🗓️', label: 'Cronograma ausencias' },
-    { to: '/app/reprogramaciones',         icon: '📊', label: 'Reprogramaciones' },
-    { to: '/app/quejas',                   icon: '🎫', label: 'Quejas' },
-    { to: '/app/admin/tareas-backoffice',  icon: '🗂️', label: 'Tareas backoffice' },
     { to: '/app/admin/festivos',           icon: '📆', label: 'Festivos' },
-    { to: '/app/admin/auditoria',          icon: '🔍', label: 'Auditoría' },
+
+    { divider: true, label: 'Solicitudes' },
+    { to: '/app/admin/solicitudes',        icon: '📨', label: 'Solicitudes de registro' },
+    { to: '/app/admin/solicitudes-recurso', icon: '📥', label: 'Solicitudes de recurso' },
+
+    { divider: true, label: 'Gestión operativa' },
+    { to: '/app/ausencias-cronograma',     icon: '🗓️', label: 'Cronograma ausencias' },
+    { to: '/app/quejas',                   icon: '🎫', label: 'Quejas' },
     { to: '/app/programador',              icon: '🔓', label: 'Editar semana cerrada' },
+
+    { divider: true, label: 'Auditoría' },
+    { to: '/app/admin/auditoria',          icon: '🔍', label: 'Auditoría' },
+
+    { divider: true, label: 'Personal' },
     { to: '/app/perfil',                   icon: '👤', label: 'Mi perfil' },
   ],
   gerencia: [
-    // Vista ejecutiva — los dashboards e informes de los directivos
+    { divider: true, label: 'Vista ejecutiva' },
     { to: '/app/dashboard',                icon: '📊', label: 'Dashboard ejecutivo' },
-    { to: '/app/informes/ocupacion',       icon: '🏥', label: 'Ocupación' },
+    { to: '/app/informes/ocupacion',       icon: '🏥', label: 'Ocupación consultorios' },
     { to: '/app/informes/ocupacion-asesores', icon: '👥', label: 'Ocupación asesores' },
-    { to: '/app/informes/productividad',   icon: '📈', label: 'Productividad' },
+    { to: '/app/informes/productividad',   icon: '📈', label: 'Productividad global' },
     { to: '/app/productividad-recurso',    icon: '🧑‍⚕️', label: 'Productividad individual' },
     { to: '/app/informes/ausentismo-impacto', icon: '🚨', label: 'Ausentismo e impacto' },
-    { to: '/app/reprogramaciones',         icon: '📊', label: 'Reprogramaciones' },
+    { to: '/app/reprogramaciones',         icon: '🔄', label: 'Reprogramaciones' },
     { to: '/app/informes/subutilizacion',  icon: '⏰', label: 'Tiempos ociosos' },
-    { to: '/app/informes/horas-prog-ejec', icon: '⏱️', label: 'Prog. vs ejecutado' },
+    { to: '/app/informes/horas-prog-ejec', icon: '⏱️', label: 'Programado vs ejecutado' },
     { to: '/app/informes/cierre-semanas',  icon: '🔒', label: 'Cierre de semanas' },
     { to: '/app/comparativo',              icon: '↔️',  label: 'Comparativo semanal' },
-    // Gestión técnica — todo lo que ve el supervisor
-    { to: '/app/admin/sedes',              icon: '🏢', label: 'Sedes y consultorios' },
-    { to: '/app/admin/recursos',           icon: '🩺', label: 'Recursos (catálogo)' },
-    { to: '/app/admin/usuarios',           icon: '👥', label: 'Usuarios' },
-    { to: '/app/admin/solicitudes',        icon: '📨', label: 'Solicitudes de registro' },
-    { to: '/app/admin/solicitudes-recurso', icon: '📥', label: 'Solicitudes de recurso' },
-    { to: '/app/admin/parametros',         icon: '⚙️',  label: 'Parámetros de costo' },
-    { to: '/app/admin/metas',              icon: '🎯', label: 'Metas del sistema' },
-    { to: '/app/admin/motivos-ausencia',   icon: '🩹', label: 'Motivos de ausencia' },
-    { to: '/app/ausencias-coord',          icon: '⚠️',  label: 'Ausencias (gestión)' },
+
+    { divider: true, label: 'Gestión operativa' },
+    { to: '/app/ausencias-coord',          icon: '⚠️',  label: 'Ausencias' },
     { to: '/app/ausencias-cronograma',     icon: '🗓️', label: 'Cronograma ausencias' },
     { to: '/app/quejas',                   icon: '🎫', label: 'Quejas' },
-    { to: '/app/admin/tareas-backoffice',  icon: '🗂️', label: 'Tareas backoffice' },
-    { to: '/app/admin/festivos',           icon: '📆', label: 'Festivos' },
-    { to: '/app/admin/auditoria',          icon: '🔍', label: 'Auditoría' },
     { to: '/app/programador',              icon: '🔓', label: 'Editar semana cerrada' },
+
+    { divider: true, label: 'Catálogos maestros' },
+    { to: '/app/admin/sedes',              icon: '🏢', label: 'Sedes y consultorios' },
+    { to: '/app/admin/recursos',           icon: '🩺', label: 'Recursos' },
+    { to: '/app/admin/usuarios',           icon: '👥', label: 'Usuarios' },
+    { to: '/app/admin/motivos-ausencia',   icon: '🩹', label: 'Motivos de ausencia' },
+    { to: '/app/admin/tareas-backoffice',  icon: '🗂️', label: 'Tareas backoffice' },
+
+    { divider: true, label: 'Configuración' },
+    { to: '/app/admin/parametros',         icon: '⚙️',  label: 'Parámetros de costo' },
+    { to: '/app/admin/metas',              icon: '🎯', label: 'Metas del sistema' },
+    { to: '/app/admin/festivos',           icon: '📆', label: 'Festivos' },
+
+    { divider: true, label: 'Solicitudes' },
+    { to: '/app/admin/solicitudes',        icon: '📨', label: 'Solicitudes de registro' },
+    { to: '/app/admin/solicitudes-recurso', icon: '📥', label: 'Solicitudes de recurso' },
+
+    { divider: true, label: 'Auditoría' },
+    { to: '/app/admin/auditoria',          icon: '🔍', label: 'Auditoría' },
+
+    { divider: true, label: 'Personal' },
     { to: '/app/perfil',                   icon: '👤', label: 'Mi perfil' },
   ],
 }
@@ -151,22 +199,38 @@ export default function AppLayout() {
         )}
       </div>
 
-      {/* Nav */}
+      {/* Nav — soporta dos tipos de item: {to,icon,label} (link) y
+          {divider:true,label} (header de grupo). En sidebar colapsado los
+          dividers se pintan como una linea horizontal fina sin texto. */}
       <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) =>
-              `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors cursor-pointer
-               ${isActive ? 'bg-blue-50 text-brand-800 font-medium' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`
-            }
-            title={!sidebarOpen && !mobile ? item.label : undefined}
-          >
-            <span className="text-base flex-shrink-0">{item.icon}</span>
-            {(sidebarOpen || mobile) && <span className="truncate">{item.label}</span>}
-          </NavLink>
-        ))}
+        {navItems.map((item, idx) => {
+          if (item.divider) {
+            return (sidebarOpen || mobile) ? (
+              <div
+                key={`div-${idx}`}
+                className={`text-[10px] uppercase tracking-wider text-gray-400 font-semibold px-2.5 pb-1 ${idx > 0 ? 'pt-3' : 'pt-1'}`}
+              >
+                {item.label}
+              </div>
+            ) : (
+              <div key={`div-${idx}`} className={`border-t border-gray-100 mx-2 ${idx > 0 ? 'my-2' : 'mb-1'}`} />
+            )
+          }
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors cursor-pointer
+                 ${isActive ? 'bg-blue-50 text-brand-800 font-medium' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`
+              }
+              title={!sidebarOpen && !mobile ? item.label : undefined}
+            >
+              <span className="text-base flex-shrink-0">{item.icon}</span>
+              {(sidebarOpen || mobile) && <span className="truncate">{item.label}</span>}
+            </NavLink>
+          )
+        })}
       </nav>
 
       {/* User */}
