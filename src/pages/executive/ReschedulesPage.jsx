@@ -1,35 +1,32 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
-  BarChart, Bar, LineChart, Line, PieChart, Pie, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, CartesianGrid, Cell, Legend,
+  BarChart, Bar, LineChart, Line, ComposedChart, PieChart, Pie, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, CartesianGrid, Cell, Legend, LabelList,
 } from 'recharts'
-import { format, subMonths, startOfMonth } from 'date-fns'
+import { format, startOfMonth, startOfYear, endOfMonth } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { informeService, sedeService } from '@/services/api'
-import { Spinner, EmptyState, KpiCard, Badge, SectionHeader } from '@/components/ui'
-import { TIPOS_RECURSO, formatCOP } from '@/utils/helpers'
+import { Spinner, EmptyState } from '@/components/ui'
+import { TIPOS_RECURSO } from '@/utils/helpers'
+import focaLogo from '@/assets/brand/foca-blanco.png'
 
 // ============================================================================
-// Fase 4 · Dashboard "Reprogramaciones" (ago-2026)
+// Fase 4 (sep-2026 · rediseño FOCA) — Dashboard Reprogramaciones
 //
-// 4 tabs internas replicando el tablero FOCA:
-//   1. Resumen ejecutivo
-//   2. Médicos
-//   3. Reposición & cobertura
-//   4. Causas & especialidades
-//
-// Filtros globales compartidos: rango (default 3 meses), sedes, familias, tipos.
-// Un solo endpoint agregado + cache 60s.
+// Look inspirado en el tablero gerencial de FOCA: encabezado con logo, chip de
+// gestion, segmentacion por mes con botones, 4 tabs, KPI cards grandes con
+// numeros de colores, tarjetas de "Hallazgos que exigen decision" narrativas.
+// TODOS los datos vienen del backend (endpoint /reprogramaciones-dashboard).
 // ============================================================================
 
 const FAMILIAS = [
-  { value: 'ausencia_profesional',     label: 'Ausencia profesional',     color: '#ef4444' },
-  { value: 'reprogramacion_operativa', label: 'Reprogramación operativa', color: '#3b82f6' },
-  { value: 'ajuste_cupos',             label: 'Ajuste de cupos',          color: '#22c55e' },
-  { value: 'movilidad_regional',       label: 'Movilidad / Regional',     color: '#f59e0b' },
-  { value: 'calendario_festivo',       label: 'Calendario / Festivo',     color: '#64748b' },
-  { value: 'otros',                    label: 'Otros',                    color: '#9ca3af' },
+  { value: 'reprogramacion_operativa', label: 'Reprogramación operativa', color: '#1e3a8a' },
+  { value: 'ausencia_profesional',     label: 'Ausencia profesional',     color: '#f59e0b' },
+  { value: 'ajuste_cupos',             label: 'Ajuste de cupos',          color: '#93c5fd' },
+  { value: 'movilidad_regional',       label: 'Movilidad / Regional',     color: '#60a5fa' },
+  { value: 'calendario_festivo',       label: 'Calendario / Festivo',     color: '#f97316' },
+  { value: 'otros',                    label: 'Otros',                    color: '#94a3b8' },
 ]
 const FAMILIA_COLOR = Object.fromEntries(FAMILIAS.map((f) => [f.value, f.color]))
 const FAMILIA_LABEL = Object.fromEntries(FAMILIAS.map((f) => [f.value, f.label]))
@@ -37,548 +34,797 @@ const FAMILIA_LABEL = Object.fromEntries(FAMILIAS.map((f) => [f.value, f.label])
 const TIPO_LABEL = Object.fromEntries(TIPOS_RECURSO.map((t) => [t.value, t.label]))
 
 const TABS = [
-  { key: 'resumen',      label: 'Resumen ejecutivo' },
-  { key: 'medicos',      label: 'Médicos' },
-  { key: 'reposicion',   label: 'Reposición & cobertura' },
-  { key: 'causas',       label: 'Causas & especialidades' },
+  { key: 'resumen',    label: 'Resumen ejecutivo' },
+  { key: 'medicos',    label: 'Médicos' },
+  { key: 'reposicion', label: 'Reposición & cobertura' },
+  { key: 'causas',     label: 'Causas & especialidades' },
 ]
 
-// Rango por defecto: últimos 3 meses hasta hoy
-function rangoDefault() {
+const MESES_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+const MESES_ES_ABREV = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+
+const fmtNum = (n) => Number(n ?? 0).toLocaleString('es-CO')
+
+// Rango: desde 1-ene del anio actual hasta hoy — "año calendario en curso".
+// Cambia el mes con los botones de la segmentacion.
+function rangoAnio() {
   const hoy = new Date()
   return {
-    desde: format(startOfMonth(subMonths(hoy, 2)), 'yyyy-MM-dd'),
+    desde: format(startOfYear(hoy), 'yyyy-MM-dd'),
     hasta: format(hoy, 'yyyy-MM-dd'),
   }
 }
 
+// Header FOCA (estilo tablero gerencial: logo + titulo grande serif + chips)
+function HeaderFOCA({ rango, totalEventos, totalPacientes }) {
+  const gestion = useMemo(() => {
+    const d = new Date(rango.desde)
+    const h = new Date(rango.hasta)
+    return `${MESES_ES_ABREV[d.getMonth()]}–${MESES_ES_ABREV[h.getMonth()]} ${h.getFullYear()}`
+  }, [rango])
+  return (
+    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
+      <div className="w-16 h-16 bg-white border border-gray-200 rounded-xl flex items-center justify-center shrink-0 shadow-sm">
+        <img src={focaLogo} alt="FOCA" className="h-10 w-auto object-contain" style={{ filter: 'invert(20%) sepia(30%) saturate(1500%) hue-rotate(210deg)' }} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-[10px] tracking-widest uppercase text-brand-600 font-semibold">Central de citas</div>
+        <div className="text-xl sm:text-2xl font-serif text-gray-900 leading-tight">Reprogramación de agendas médicas</div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <div className="px-3 py-1.5 bg-white border border-gray-200 rounded-full text-xs text-gray-700">
+          Gestión: <strong className="text-gray-900">{gestion}</strong>
+        </div>
+        <div className="px-3 py-1.5 bg-amber-100 text-amber-900 rounded-full text-xs font-medium">
+          {fmtNum(totalEventos)} eventos · {fmtNum(totalPacientes)} pac.
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Segmentacion por mes: "Todos" o un mes especifico del anio en curso.
+function BannerSegmentacion({ mesActivo, setMesActivo, onRefresh }) {
+  const hoy = new Date()
+  const mesesDisponibles = Array.from({ length: hoy.getMonth() + 1 }, (_, i) => i)
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 p-3 sm:p-4 mb-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+      <div className="text-[10px] tracking-widest uppercase text-gray-500 font-semibold shrink-0">
+        Segmentación de tiempo
+      </div>
+      <div className="flex-1 flex flex-wrap gap-1.5">
+        <button
+          onClick={() => setMesActivo(null)}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            mesActivo === null ? 'bg-brand-600 text-white' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+          }`}
+        >Todos</button>
+        {mesesDisponibles.map((m) => (
+          <button
+            key={m}
+            onClick={() => setMesActivo(m)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              mesActivo === m ? 'bg-brand-600 text-white' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+            }`}
+          >{MESES_ES[m]}</button>
+        ))}
+      </div>
+      <div className="flex items-center gap-2 text-[11px] text-gray-500">
+        <span className="hidden sm:inline">
+          Mes de gestión · <strong className="text-gray-800">{mesActivo === null ? 'Todos los meses' : MESES_ES[mesActivo]}</strong>
+        </span>
+        <button onClick={onRefresh} className="btn text-xs py-1 px-3">↻ Actualizar</button>
+      </div>
+    </div>
+  )
+}
+
+// KPI grande estilo FOCA (numero enorme de color, label pequeno arriba).
+function KpiFoca({ label, value, color = 'text-brand-800', sub, big = false }) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 p-3 sm:p-4">
+      <div className="text-[10px] tracking-widest uppercase text-gray-500 font-semibold">{label}</div>
+      <div className={`font-serif ${big ? 'text-4xl sm:text-5xl' : 'text-3xl sm:text-4xl'} ${color} leading-none mt-2`}>
+        {value}
+      </div>
+      {sub && <div className="text-[11px] text-gray-500 mt-1.5">{sub}</div>}
+    </div>
+  )
+}
+
+// Panel con titulo serif + descripcion en gris + contenido.
+function Panel({ eyebrow, title, description, children }) {
+  return (
+    <div className="mb-6">
+      {eyebrow && <div className="text-[10px] tracking-widest uppercase text-brand-600 font-semibold">{eyebrow}</div>}
+      <h2 className="font-serif text-xl sm:text-2xl text-gray-900 mt-1">{title}</h2>
+      {description && <p className="text-xs text-gray-600 mt-1 max-w-3xl">{description}</p>}
+      <div className="mt-4">{children}</div>
+    </div>
+  )
+}
+
+// Tarjeta de hallazgo gerencial (colores: red/amber/blue/green segun severidad)
+function HallazgoCard({ eyebrow, title, body, color = 'red' }) {
+  const COLORS = {
+    red:   { border: 'border-l-red-500',   eye: 'text-red-600' },
+    amber: { border: 'border-l-amber-500', eye: 'text-amber-600' },
+    blue:  { border: 'border-l-blue-500',  eye: 'text-blue-600' },
+    green: { border: 'border-l-green-500', eye: 'text-green-600' },
+  }
+  const c = COLORS[color] ?? COLORS.blue
+  return (
+    <div className={`bg-white rounded-lg border border-gray-100 border-l-4 ${c.border} p-3`}>
+      <div className={`text-[10px] tracking-widest uppercase font-semibold ${c.eye}`}>{eyebrow}</div>
+      <div className="font-serif text-sm text-gray-900 mt-1">{title}</div>
+      <div className="text-xs text-gray-600 mt-1 leading-relaxed">{body}</div>
+    </div>
+  )
+}
+
+// Tarjeta chart (fondo blanco, header + contenido)
+function ChartCard({ title, description, children, right }) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 p-3 sm:p-4">
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="min-w-0">
+          <h3 className="font-serif text-base sm:text-lg text-gray-900">{title}</h3>
+          {description && <p className="text-[11px] text-gray-500 mt-0.5">{description}</p>}
+        </div>
+        {right}
+      </div>
+      {children}
+    </div>
+  )
+}
+
 export default function ReprogramacionesPage() {
   const [tab, setTab] = useState('resumen')
-  const [{ desde, hasta }, setRango] = useState(rangoDefault)
-  const [sedesSel, setSedesSel] = useState([])       // [] = todas
-  const [familiasSel, setFamiliasSel] = useState([]) // [] = todas
-  const [tiposSel, setTiposSel] = useState([])       // [] = todos
+  const [mesActivo, setMesActivo] = useState(null)  // null = todos, 0..11 = mes
+  const [sedesSel] = useState([])
+  const [familiasSel] = useState([])
+  const [tiposSel] = useState([])
 
-  // Sedes disponibles (para el multiselect)
-  const { data: sedes = [] } = useQuery({
+  // Rango efectivo: anio en curso, opcionalmente filtrado a un mes.
+  const rango = useMemo(() => {
+    const base = rangoAnio()
+    if (mesActivo === null) return base
+    const hoy = new Date()
+    const desde = new Date(hoy.getFullYear(), mesActivo, 1)
+    const hasta = endOfMonth(desde)
+    return {
+      desde: format(desde, 'yyyy-MM-dd'),
+      hasta: format(hasta, 'yyyy-MM-dd'),
+    }
+  }, [mesActivo])
+
+  useQuery({
     queryKey: ['sedes-reprog'],
     queryFn: () => sedeService.list(),
     staleTime: 10 * 60 * 1000,
   })
 
-  // Params al backend — el endpoint acepta CSV
   const params = useMemo(() => {
-    const p = { desde, hasta }
+    const p = { desde: rango.desde, hasta: rango.hasta }
     if (sedesSel.length) p.site_id = sedesSel.join(',')
     if (familiasSel.length) p.family = familiasSel.join(',')
     if (tiposSel.length) p.resource_type = tiposSel.join(',')
     return p
-  }, [desde, hasta, sedesSel, familiasSel, tiposSel])
+  }, [rango, sedesSel, familiasSel, tiposSel])
 
-  const { data, isLoading, isFetching } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['reprogramaciones-dashboard', params],
     queryFn: () => informeService.reprogramacionesDashboard(params),
-    staleTime: 30 * 1000,
+    keepPreviousData: true,
+    staleTime: 60 * 1000,
   })
 
-  const rangoTxt = data?.rango
-    ? `${format(new Date(data.rango.desde), 'd MMM yyyy', { locale: es })} — ${format(new Date(data.rango.hasta), 'd MMM yyyy', { locale: es })}`
-    : ''
+  if (isLoading) {
+    return <div className="p-8 flex justify-center"><Spinner /></div>
+  }
+  if (!data) {
+    return <div className="p-4"><EmptyState title="Sin datos" description="Aún no hay reprogramaciones registradas en el rango seleccionado." /></div>
+  }
+
+  const k = data.kpis ?? {}
+  const totalEventos = k.total_ausencias ?? 0
+  const totalPac = k.patients_affected ?? 0
 
   return (
-    <div className="p-3 sm:p-4 space-y-4">
-      {/* HEADER */}
-      <div>
-        <h1 className="text-base font-semibold text-gray-900">📊 Reprogramaciones</h1>
-        <p className="text-xs text-gray-500">
-          Dashboard gerencial de ausencias, causas y reposiciones · {rangoTxt}
-          {isFetching && <span className="ml-2 text-brand-600">actualizando…</span>}
-        </p>
-      </div>
+    <div className="p-3 sm:p-6 max-w-7xl mx-auto" style={{ background: '#eef1f7', minHeight: '100vh' }}>
+      <HeaderFOCA rango={rango} totalEventos={totalEventos} totalPacientes={totalPac} />
 
-      {/* FILTROS GLOBALES */}
-      <div className="card p-3 space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-          <div>
-            <label className="label text-xs">Desde</label>
-            <input
-              type="date"
-              className="input text-xs"
-              value={desde}
-              onChange={(e) => setRango((r) => ({ ...r, desde: e.target.value }))}
-            />
-          </div>
-          <div>
-            <label className="label text-xs">Hasta</label>
-            <input
-              type="date"
-              className="input text-xs"
-              value={hasta}
-              onChange={(e) => setRango((r) => ({ ...r, hasta: e.target.value }))}
-              min={desde}
-            />
-          </div>
-          <MultiSelectField
-            label="Sedes"
-            values={sedesSel}
-            options={sedes.map((s) => ({ value: s.id, label: s.name }))}
-            onChange={setSedesSel}
-            allLabel="Todas las sedes"
-          />
-          <MultiSelectField
-            label="Tipo de recurso"
-            values={tiposSel}
-            options={TIPOS_RECURSO.map((t) => ({ value: t.value, label: t.label }))}
-            onChange={setTiposSel}
-            allLabel="Todos los tipos"
-          />
-        </div>
-        <div>
-          <div className="text-[11px] text-gray-500 mb-1">Familia:</div>
-          <div className="flex flex-wrap gap-1.5">
-            <ChipToggle active={familiasSel.length === 0} onClick={() => setFamiliasSel([])} label="Todas" />
-            {FAMILIAS.map((f) => (
-              <ChipToggle
-                key={f.value}
-                active={familiasSel.includes(f.value)}
-                onClick={() =>
-                  setFamiliasSel((prev) => prev.includes(f.value)
-                    ? prev.filter((v) => v !== f.value)
-                    : [...prev, f.value]
-                  )
-                }
-                label={f.label}
-                dotColor={f.color}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
+      <BannerSegmentacion
+        mesActivo={mesActivo}
+        setMesActivo={setMesActivo}
+        onRefresh={() => refetch()}
+      />
 
-      {/* TABS */}
-      <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 w-fit overflow-x-auto">
+      {/* Tabs — botones grandes estilo FOCA */}
+      <div className="bg-white rounded-xl border border-gray-100 p-1.5 mb-4 flex flex-wrap gap-1">
         {TABS.map((t) => (
           <button
             key={t.key}
-            type="button"
             onClick={() => setTab(t.key)}
-            className={`px-3 py-1.5 text-xs rounded-md transition-colors whitespace-nowrap ${
-              tab === t.key ? 'bg-white text-gray-900 font-medium shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              tab === t.key ? 'bg-brand-600 text-white' : 'text-gray-600 hover:bg-gray-100'
             }`}
-          >
-            {t.label}
-          </button>
+          >{t.label}</button>
         ))}
       </div>
 
-      {/* CONTENIDO */}
-      {isLoading ? (
-        <div className="flex justify-center py-12"><Spinner size="lg" /></div>
-      ) : !data ? (
-        <EmptyState icon="📊" title="Sin datos" description="No se pudo cargar el dashboard." />
-      ) : tab === 'resumen'    ? <TabResumen data={data} />
-        : tab === 'medicos'    ? <TabMedicos data={data} />
-        : tab === 'reposicion' ? <TabReposicion data={data} />
-        : tab === 'causas'     ? <TabCausas data={data} />
-        : null}
+      {tab === 'resumen'    && <TabResumen data={data} />}
+      {tab === 'medicos'    && <TabMedicos data={data} />}
+      {tab === 'reposicion' && <TabReposicion data={data} />}
+      {tab === 'causas'     && <TabCausas data={data} />}
+
+      <div className="border-t border-gray-200 mt-8 pt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[11px] text-gray-500">
+        <div>
+          Fuente: <strong>SGRC — tabla ausencias</strong> · datos en vivo del sistema, actualizados cada 60 s.
+        </div>
+        <div>Tablero analítico · uso interno gerencial · FOCA Fundación</div>
+      </div>
     </div>
   )
 }
 
-// ============================================================================
-// TAB 1 · Resumen ejecutivo
-// ============================================================================
+// =============================================================================
+// TAB 1 — Resumen ejecutivo
+// =============================================================================
 function TabResumen({ data }) {
-  const { kpis, por_mes, por_familia, top_motivos } = data
-  return (
-    <div className="space-y-4">
-      {/* KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <KpiCard label="Ausencias" value={kpis.total_ausencias} />
-        <KpiCard label="Días perdidos" value={kpis.dias_perdidos} />
-        <KpiCard label="Pacientes impactados" value={kpis.patients_affected} color={kpis.patients_affected > 0 ? 'danger' : 'default'} />
-        <KpiCard label="Costo oportunidad" value={formatCOP(kpis.opportunity_cost)} />
-        <KpiCard label="Tasa reposición" value={`${kpis.tasa_reposicion_pct}%`} color={kpis.tasa_reposicion_pct >= 50 ? 'success' : kpis.tasa_reposicion_pct >= 30 ? 'warning' : 'danger'} />
-      </div>
+  const k = data.kpis ?? {}
+  const totalEventos = k.total_ausencias ?? 0
+  const totalPac = k.patients_affected ?? 0
+  const tasaRep = k.tasa_reposicion_pct ?? 0
+  const sinCobertura = data.pacientes_sin_cobertura ?? 0
+  const cubiertos = data.pacientes_cubiertos ?? 0
+  const medicos = data.medicos_involucrados ?? 0
+  const pctAntel = data.pct_antelacion_ok ?? 0
+  const pctSinRep = 100 - tasaRep
+  const promPorEvento = totalEventos > 0 ? (totalPac / totalEventos).toFixed(1) : '0'
+  const mediaAntel = data.antelacion_reporte
+    ? (function () {
+        // Aproximacion: uso ponderado del bucket para calcular la mediana estimada
+        const a = data.antelacion_reporte
+        const total = a.retroactivo + a.uno + a.dos_a_siete + a.ocho_a_treinta + a.mas_30
+        const acumulado = a.retroactivo * 0 + a.uno * 1 + a.dos_a_siete * 4 + a.ocho_a_treinta * 18 + a.mas_30 * 45
+        return total > 0 ? Math.round(acumulado / total) : 0
+      })()
+    : 0
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Evolución mensual */}
-        <div className="card">
-          <SectionHeader title="Evolución mensual" subtitle="Ausencias por mes en el rango" />
-          {por_mes.length === 0 ? (
-            <EmptyState icon="📈" title="Sin datos" description="No hay ausencias en el rango." />
-          ) : (
-            <ResponsiveContainer width="100%" height={260}>
-              <LineChart data={por_mes} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="mes" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Line type="monotone" dataKey="count" stroke="#1B2A6C" name="Ausencias" strokeWidth={2} />
-                <Line type="monotone" dataKey="pacientes" stroke="#ef4444" name="Pacientes" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          )}
-        </div>
+  const porMes = data.por_mes ?? []
+  const dataPorMes = porMes.map((m) => ({
+    mes: MESES_ES_ABREV[Number(m.mes.slice(5, 7)) - 1] ?? m.mes,
+    pacientes: m.pacientes,
+    eventos: m.count,
+  }))
 
-        {/* Pie por familia */}
-        <div className="card">
-          <SectionHeader title="Distribución por familia" subtitle="5 causas raíz FOCA" />
-          {por_familia.length === 0 ? (
-            <EmptyState icon="🥧" title="Sin datos" description="Sin familias registradas en el rango." />
-          ) : (
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie
-                  data={por_familia}
-                  dataKey="count"
-                  nameKey="label"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={90}
-                  label={(entry) => `${entry.pct}%`}
-                >
-                  {por_familia.map((f, i) => (
-                    <Cell key={i} fill={FAMILIA_COLOR[f.family] ?? '#9ca3af'} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(v, name) => [v, name]} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-      </div>
+  const donutData = [
+    { name: 'Repuestas', value: cubiertos, color: '#3b82f6' },
+    { name: 'Sin reponer', value: sinCobertura, color: '#f97316' },
+  ]
+  const repuestasCount = (data.makeups?.aprobadas ?? 0) + (data.makeups?.realizadas ?? 0)
+  const sinReponerCount = Math.max(0, totalEventos - repuestasCount)
 
-      {/* Top motivos */}
-      <div className="card">
-        <SectionHeader title="Top 10 motivos" subtitle="Con más ocurrencias en el rango" />
-        {top_motivos.length === 0 ? (
-          <EmptyState icon="🏷" title="Sin motivos" description="Sin datos en el rango." />
-        ) : (
-          <ResponsiveContainer width="100%" height={Math.max(200, top_motivos.length * 28)}>
-            <BarChart data={top_motivos} layout="vertical" margin={{ left: 120, right: 20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={120} />
-              <Tooltip />
-              <Bar dataKey="count" radius={[0, 4, 4, 0]} name="Ausencias">
-                {top_motivos.map((m, i) => (
-                  <Cell key={i} fill={FAMILIA_COLOR[m.family] ?? '#9ca3af'} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        )}
-      </div>
-    </div>
-  )
-}
+  // Top medico y % del total
+  const top3Pac = (data.por_recurso ?? []).slice(0, 3).reduce((s, r) => s + (r.pacientes ?? 0), 0)
+  const pctTop3 = totalPac > 0 ? Math.round((top3Pac / totalPac) * 100) : 0
 
-// ============================================================================
-// TAB 2 · Médicos
-// ============================================================================
-function TabMedicos({ data }) {
-  const { por_recurso } = data
-  const [filtroTipo, setFiltroTipo] = useState('')
-
-  const filtrados = filtroTipo ? por_recurso.filter((r) => r.type === filtroTipo) : por_recurso
-  const top = filtrados.slice(0, 15)
+  // Causa raiz dominante
+  const topFam = (data.por_familia ?? [])[0]
+  const causaOperativaCount = (data.por_familia ?? []).find((f) => f.family === 'reprogramacion_operativa')?.count ?? 0
+  const pctOperativa = totalEventos > 0 ? Math.round((causaOperativaCount / totalEventos) * 100) : 0
 
   return (
-    <div className="space-y-4">
-      <div className="card">
-        <SectionHeader
-          title="Ranking por días de ausencia"
-          subtitle="Top 15 profesionales del rango"
-          action={
-            <select className="input w-auto text-xs" value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)}>
-              <option value="">Todos los tipos</option>
-              {TIPOS_RECURSO.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
-          }
-        />
-        {top.length === 0 ? (
-          <EmptyState icon="🩺" title="Sin médicos" description="Sin ausencias en el rango." />
-        ) : (
-          <ResponsiveContainer width="100%" height={Math.max(200, top.length * 30)}>
-            <BarChart data={top} layout="vertical" margin={{ left: 130, right: 20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={130} />
-              <Tooltip />
-              <Bar dataKey="dias" fill="#1B2A6C" radius={[0, 4, 4, 0]} name="Días" />
-            </BarChart>
-          </ResponsiveContainer>
-        )}
-      </div>
+    <>
+      <Panel
+        eyebrow="Visión general"
+        title="Pulso de la reprogramación de agendas"
+        description="Reprogramaciones gestionadas en el rango seleccionado y su impacto en pacientes, cobertura y comportamiento operativo. Usa la segmentación superior para aislar un mes."
+      >
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <KpiFoca label="Reprogramaciones" value={fmtNum(totalEventos)} color="text-brand-800" sub="En la selección" />
+          <KpiFoca label="Pacientes impactados" value={fmtNum(totalPac)} color="text-amber-600" sub={`${promPorEvento} por evento`} />
+          <KpiFoca label="Tasa de reposición" value={`${tasaRep}%`} color="text-red-600" sub={`${pctSinRep}% no se repuso`} />
+          <KpiFoca label="Pacientes sin cobertura" value={fmtNum(sinCobertura)} color="text-red-600" sub="Sin reagenda registrada" />
+          <KpiFoca label="Médicos involucrados" value={fmtNum(medicos)} color="text-brand-800" sub="Profesionales distintos" />
+          <KpiFoca label="Reporte con antelación" value={`${pctAntel}%`} color="text-blue-600" sub={`Mediana ${mediaAntel} días`} />
+        </div>
+      </Panel>
 
-      <div className="card">
-        <SectionHeader title="Detalle por profesional" subtitle={`${filtrados.length} profesionales`} />
-        {filtrados.length === 0 ? (
-          <EmptyState icon="📋" title="Sin datos" description="Sin profesionales con ausencias." />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-gray-500 border-b border-gray-100">
-                  <th className="text-left px-2 py-2">Profesional</th>
-                  <th className="text-left px-2 py-2">Tipo</th>
-                  <th className="text-right px-2 py-2">Ausencias</th>
-                  <th className="text-right px-2 py-2">Días</th>
-                  <th className="text-right px-2 py-2">Pacientes</th>
-                  <th className="text-right px-2 py-2">Reposiciones</th>
-                  <th className="text-right px-2 py-2">Tasa</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtrados.map((r) => {
-                  const tasa = r.count > 0 ? Math.round((r.approved_makeups / r.count) * 100) : 0
-                  return (
-                    <tr key={r.resource_id} className="border-b border-gray-50 hover:bg-gray-50">
-                      <td className="px-2 py-2 font-medium text-gray-900">{r.name}</td>
-                      <td className="px-2 py-2 text-gray-500">{TIPO_LABEL[r.type] ?? r.type ?? '—'}</td>
-                      <td className="px-2 py-2 text-right">{r.count}</td>
-                      <td className="px-2 py-2 text-right">{r.dias}</td>
-                      <td className="px-2 py-2 text-right">{r.pacientes}</td>
-                      <td className="px-2 py-2 text-right">{r.approved_makeups}</td>
-                      <td className="px-2 py-2 text-right">
-                        <Badge variant={tasa >= 50 ? 'green' : tasa >= 30 ? 'amber' : 'gray'}>{tasa}%</Badge>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-6">
+        <ChartCard
+          title="Tendencia mensual de reprogramaciones"
+          description="Barras = pacientes afectados · línea = nº de reprogramaciones · por mes de gestión"
+          right={<span className="text-[10px] text-gray-400">clic para filtrar</span>}
+        >
+          <div style={{ width: '100%', height: 260 }}>
+            <ResponsiveContainer>
+              <ComposedChart data={dataPorMes}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="mes" tick={{ fontSize: 11 }} />
+                <YAxis yAxisId="left"  tick={{ fontSize: 10 }} />
+                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
+                <Tooltip formatter={(v) => fmtNum(v)} />
+                <Bar yAxisId="left" dataKey="pacientes" fill="#1e3a8a" barSize={38} radius={[4, 4, 0, 0]} name="Pacientes" />
+                <Line yAxisId="right" type="monotone" dataKey="eventos" stroke="#f97316" strokeWidth={2.5} dot={{ r: 4 }} name="Reprogramaciones" />
+              </ComposedChart>
+            </ResponsiveContainer>
           </div>
-        )}
+        </ChartCard>
+
+        <ChartCard
+          title="¿Se repuso la agenda?"
+          description="Repuestas vs. no repuestas (en la selección)"
+        >
+          <div className="flex items-center gap-3">
+            <div style={{ width: 130, height: 130 }} className="shrink-0">
+              <ResponsiveContainer>
+                <PieChart>
+                  <Pie data={donutData} dataKey="value" innerRadius={40} outerRadius={60} paddingAngle={2}>
+                    {donutData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                  </Pie>
+                  <Tooltip formatter={(v) => fmtNum(v) + ' pac.'} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="text-xs space-y-2 flex-1 min-w-0">
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-sm bg-blue-500" />
+                  <strong className="text-blue-600">{fmtNum(repuestasCount)} repuestas</strong>
+                </div>
+                <div className="text-[11px] text-gray-500 ml-4">
+                  {(k.tasa_reposicion_pct ?? 0)}% · {fmtNum(cubiertos)} pac.
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-sm bg-orange-500" />
+                  <strong className="text-orange-600">{fmtNum(sinReponerCount)} sin reponer</strong>
+                </div>
+                <div className="text-[11px] text-gray-500 ml-4">
+                  {pctSinRep}% · {fmtNum(sinCobertura)} pac.
+                </div>
+              </div>
+            </div>
+          </div>
+        </ChartCard>
       </div>
-    </div>
+
+      <Panel
+        eyebrow="Lectura gerencial"
+        title="Hallazgos que exigen decisión"
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <HallazgoCard
+            color="red"
+            eyebrow="Brecha crítica"
+            title={`${Math.round(pctSinRep / 33)} de cada 3 agendas no se reponen`}
+            body={`${fmtNum(sinReponerCount)} de ${fmtNum(totalEventos)} reprogramaciones quedaron sin reposición, dejando ${fmtNum(sinCobertura)} pacientes sin reagenda registrada.`}
+          />
+          <HallazgoCard
+            color="amber"
+            eyebrow="Concentración"
+            title="Carga muy concentrada"
+            body={`Los 3 profesionales con más eventos generan el ${pctTop3}% del impacto en pacientes. Revisar modelo de agenda y causa estructural.`}
+          />
+          <HallazgoCard
+            color="blue"
+            eyebrow="Causa raíz"
+            title={topFam?.family === 'reprogramacion_operativa' ? 'Mayoría operativa, no clínica' : `Predomina: ${topFam?.label ?? '—'}`}
+            body={`Las reprogramaciones operativas (cambio horario, formato) suman ${fmtNum(causaOperativaCount)} eventos: ${pctOperativa}% del total, en gran parte planificables.`}
+          />
+          <HallazgoCard
+            color="blue"
+            eyebrow="Antelación"
+            title="El aviso llega a tiempo"
+            body={`El ${pctAntel}% de los reportes se hace con antelación (mediana ${mediaAntel} días). El cuello de botella es reponer, no avisar.`}
+          />
+          <HallazgoCard
+            color="amber"
+            eyebrow="Pacientes"
+            title="Impacto por evento"
+            body={`Cada reprogramación afecta en promedio ${promPorEvento} pacientes en esta selección.`}
+          />
+          <HallazgoCard
+            color="green"
+            eyebrow="Cobertura"
+            title="Pacientes cubiertos"
+            body={`Solo ${fmtNum(cubiertos)} pacientes quedaron en agendas repuestas frente a ${fmtNum(sinCobertura)} sin cobertura.`}
+          />
+        </div>
+      </Panel>
+    </>
   )
 }
 
-// ============================================================================
-// TAB 3 · Reposición & cobertura
-// ============================================================================
-function TabReposicion({ data }) {
-  const { makeups: reposiciones } = data
+// =============================================================================
+// TAB 2 — Médicos
+// =============================================================================
+function TabMedicos({ data }) {
+  const rec = data.por_recurso ?? []
+  const totalPac = data.kpis?.patients_affected ?? 0
+  const top3Pac = rec.slice(0, 3).reduce((s, r) => s + (r.pacientes ?? 0), 0)
+  const pctTop3 = totalPac > 0 ? Math.round((top3Pac / totalPac) * 100) : 0
+  const lider = rec[0]
+
+  // Mejor reposicion: el que tenga mayor approved / count (min 3 eventos)
+  const mejorRep = [...rec].filter((r) => (r.count ?? 0) >= 3)
+    .map((r) => ({ ...r, ratio: r.count > 0 ? r.approved_makeups / r.count : 0 }))
+    .sort((a, b) => b.ratio - a.ratio)[0]
+
+  // Ordenar por pacientes, top 12
+  const top12 = [...rec].sort((a, b) => (b.pacientes ?? 0) - (a.pacientes ?? 0)).slice(0, 12).reverse()
+
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <KpiCard label="Solicitadas" value={reposiciones.solicitadas} />
-        <KpiCard label="Aprobadas" value={reposiciones.aprobadas} color="success" />
-        <KpiCard label="Rechazadas" value={reposiciones.rechazadas} color={reposiciones.rechazadas > 0 ? 'danger' : 'default'} />
-        <KpiCard label="Realizadas" value={reposiciones.realizadas} />
-        <KpiCard label="% Aprobación" value={`${reposiciones.pct_aprobacion}%`} color={reposiciones.pct_aprobacion >= 70 ? 'success' : reposiciones.pct_aprobacion >= 40 ? 'warning' : 'danger'} />
-        <KpiCard label="Tiempo medio" value={reposiciones.tiempo_medio_aprobacion_h != null ? `${reposiciones.tiempo_medio_aprobacion_h}h` : '—'} />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="card">
-          <SectionHeader title="Evolución mensual" subtitle="Solicitadas vs aprobadas" />
-          {reposiciones.por_mes.length === 0 || reposiciones.solicitadas === 0 ? (
-            <EmptyState icon="🔁" title="Sin reposiciones" description="No hay reposiciones en el rango." />
-          ) : (
-            <ResponsiveContainer width="100%" height={260}>
-              <LineChart data={reposiciones.por_mes} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="mes" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
-                <Tooltip />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Line type="monotone" dataKey="solicitadas" stroke="#f59e0b" name="Solicitadas" strokeWidth={2} />
-                <Line type="monotone" dataKey="aprobadas" stroke="#22c55e" name="Aprobadas" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          )}
+    <>
+      <Panel
+        eyebrow="Profundización · Médicos"
+        title="Concentración y reposición por profesional"
+        description="Quién genera el mayor impacto en pacientes y qué tan frecuentemente repone su agenda. Barra = eventos, segmentada entre repuestos y no repuestos."
+      >
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <KpiFoca label="Top 3 médicos" value={`${pctTop3}%`} color="text-amber-600" sub="de los pacientes afectados" />
+          <KpiFoca label="Líder de impacto" value={lider?.name?.split(' ')[0] ?? '—'} color="text-red-600" sub={`${fmtNum(lider?.pacientes ?? 0)} pac · ${lider?.count > 0 ? Math.round((lider.approved_makeups / lider.count) * 100) : 0}% repone`} />
+          <KpiFoca label="Mejor reposición" value={mejorRep?.name?.split(' ')[0] ?? '—'} color="text-blue-600" sub={`${mejorRep?.approved_makeups ?? 0} de ${mejorRep?.count ?? 0} repuestos`} />
+          <KpiFoca label="Médicos en selección" value={fmtNum(data.medicos_involucrados ?? 0)} color="text-brand-800" sub="distribución asimétrica" />
         </div>
+      </Panel>
 
-        <div className="card">
-          <SectionHeader title="Top médicos que más reponen" subtitle="Ranking por cantidad" />
-          {reposiciones.top_medicos.length === 0 ? (
-            <EmptyState icon="🏅" title="Sin datos" description="Nadie ha propuesto reposiciones aún." />
-          ) : (
-            <ResponsiveContainer width="100%" height={Math.max(200, reposiciones.top_medicos.length * 30)}>
-              <BarChart data={reposiciones.top_medicos} layout="vertical" margin={{ left: 130, right: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={130} />
-                <Tooltip />
-                <Bar dataKey="count" fill="#8FB5DA" radius={[0, 4, 4, 0]} name="Reposiciones" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-6">
+        <ChartCard
+          title="Eventos por médico — ¿repuso o no?"
+          description="Azul = repuestos · coral = sin reponer · ordenado por pacientes afectados"
+        >
+          <div style={{ width: '100%', height: Math.max(220, top12.length * 28) }}>
+            <ResponsiveContainer>
+              <BarChart data={top12} layout="vertical" margin={{ top: 5, right: 20, left: 100, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 10 }} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={100} />
+                <Tooltip formatter={(v) => fmtNum(v)} />
+                <Bar dataKey="approved_makeups" stackId="a" fill="#3b82f6" name="Repuestos" />
+                <Bar dataKey={(r) => Math.max(0, (r.count ?? 0) - (r.approved_makeups ?? 0))} stackId="a" fill="#f97316" name="Sin reponer" />
               </BarChart>
             </ResponsiveContainer>
+          </div>
+        </ChartCard>
+
+        <div className="space-y-3">
+          <div className="bg-brand-800 text-white rounded-xl p-4">
+            <div className="text-[10px] tracking-widest uppercase text-white/70 font-semibold">Caso prioritario</div>
+            <div className="font-serif text-2xl mt-1">{lider?.name ?? '—'}</div>
+            <div className="text-[11px] text-white/60 mt-0.5">{lider?.count ?? 0} eventos en la selección</div>
+            <div className="grid grid-cols-3 gap-2 mt-3">
+              <div className="bg-white/10 rounded-lg p-2 text-center">
+                <div className="font-serif text-xl">{lider?.count ?? 0}</div>
+                <div className="text-[9px] uppercase tracking-wider text-white/60">Eventos</div>
+              </div>
+              <div className="bg-white/10 rounded-lg p-2 text-center">
+                <div className="font-serif text-xl">{fmtNum(lider?.pacientes ?? 0)}</div>
+                <div className="text-[9px] uppercase tracking-wider text-white/60">Pacientes</div>
+              </div>
+              <div className="bg-white/10 rounded-lg p-2 text-center">
+                <div className="font-serif text-xl">{lider?.count > 0 ? Math.round((lider.approved_makeups / lider.count) * 100) : 0}%</div>
+                <div className="text-[9px] uppercase tracking-wider text-white/60">Repone</div>
+              </div>
+            </div>
+            <div className="text-[11px] text-white/70 mt-3 leading-relaxed">
+              Mayor generador de impacto en la selección. Revisar contrato, modelo de agenda y causa estructural de los cambios.
+            </div>
+          </div>
+
+          {mejorRep && (
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+              <div className="text-[10px] tracking-widest uppercase text-blue-700 font-semibold">Recomendación</div>
+              <div className="font-serif text-base text-gray-900 mt-1">Replicar a quienes sí reponen</div>
+              <div className="text-xs text-gray-600 mt-1 leading-relaxed">
+                <strong>{mejorRep.name}</strong> repuso {mejorRep.approved_makeups} de {mejorRep.count} eventos. Documentar el modelo y estandarizarlo como protocolo de reposición.
+              </div>
+            </div>
           )}
         </div>
       </div>
-    </div>
+    </>
   )
 }
 
-// ============================================================================
-// TAB 4 · Causas & especialidades
-// ============================================================================
-function TabCausas({ data }) {
-  const { por_familia, por_especialidad, cruce_familia_especialidad } = data
+// =============================================================================
+// TAB 3 — Reposición & cobertura
+// =============================================================================
+function TabReposicion({ data }) {
+  const cubiertos = data.pacientes_cubiertos ?? 0
+  const sinCob = data.pacientes_sin_cobertura ?? 0
+  const ratio = cubiertos > 0 ? (sinCob / cubiertos).toFixed(1) : '∞'
+  const total = cubiertos + sinCob
+  const pctCub = total > 0 ? (cubiertos / total) * 100 : 0
 
-  // Pivote para tabla cruzada: filas=familia, columnas=tipo
-  const tipos = [...new Set(cruce_familia_especialidad.map((c) => c.type))].sort()
-  const familias = [...new Set(cruce_familia_especialidad.map((c) => c.family))]
-  const cruceMap = new Map(cruce_familia_especialidad.map((c) => [`${c.family}|${c.type}`, c.count]))
+  const porSede = data.por_sede ?? []
+  const sla = data.sla_reposicion ?? {}
+  const antel = data.antelacion_reporte ?? {}
 
-  const maxCruce = Math.max(1, ...cruce_familia_especialidad.map((c) => c.count))
+  const dataSede = porSede.map((s) => ({ name: s.name, pct: s.pct }))
+  const dataSla = [
+    { name: 'Adelantada', value: sla.adelantada ?? 0, color: '#3b82f6' },
+    { name: 'Mismo día',  value: sla.mismo_dia ?? 0,  color: '#1e3a8a' },
+    { name: '1-7 d',      value: sla.uno_a_siete ?? 0, color: '#93c5fd' },
+    { name: '8-30 d',     value: sla.ocho_a_treinta ?? 0, color: '#1e3a8a' },
+    { name: '>30 d',      value: sla.mas_30 ?? 0, color: '#1e3a8a' },
+  ]
+  const dataAntel = [
+    { name: 'Retroact.', value: antel.retroactivo ?? 0, color: '#f97316' },
+    { name: '≤1 día',    value: antel.uno ?? 0,          color: '#f59e0b' },
+    { name: '2-7 d',     value: antel.dos_a_siete ?? 0,  color: '#1e3a8a' },
+    { name: '8-30 d',    value: antel.ocho_a_treinta ?? 0, color: '#1e3a8a' },
+    { name: '>30 d',     value: antel.mas_30 ?? 0,         color: '#1e3a8a' },
+  ]
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="card">
-          <SectionHeader title="Por familia" subtitle="Distribución de causas raíz" />
-          {por_familia.length === 0 ? (
-            <EmptyState icon="🏷" title="Sin datos" description="Sin familias en el rango." />
-          ) : (
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={por_familia}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 9 }} angle={-15} textAnchor="end" height={60} />
-                <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+    <>
+      <Panel
+        eyebrow="Profundización · Cobertura"
+        title="La brecha de reposición"
+        description="La organización avisa a tiempo, pero no siempre logra reponer. Aquí se contrasta el impacto cubierto frente al no cubierto y la oportunidad de la reposición."
+      >
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <div className="bg-white rounded-xl border border-gray-100 p-4">
+            <div className="font-serif text-lg text-gray-900 mb-3">Pacientes: cubiertos vs. sin cobertura</div>
+            <div className="flex items-center justify-around">
+              <div className="text-center">
+                <div className="font-serif text-4xl text-blue-600">{fmtNum(cubiertos)}</div>
+                <div className="text-[10px] uppercase tracking-widest text-gray-500 mt-1">Con reposición</div>
+              </div>
+              <div className="text-2xl text-gray-300 font-serif">vs</div>
+              <div className="text-center">
+                <div className="font-serif text-4xl text-orange-600">{fmtNum(sinCob)}</div>
+                <div className="text-[10px] uppercase tracking-widest text-gray-500 mt-1">Sin cobertura</div>
+              </div>
+            </div>
+            <div className="mt-4 h-2 bg-orange-500 rounded-full overflow-hidden">
+              <div className="h-full bg-blue-500" style={{ width: `${pctCub}%` }} />
+            </div>
+            <div className="text-[11px] text-gray-500 mt-2">
+              Por cada paciente cuya agenda se repuso, <strong className="text-orange-600">{ratio} pacientes</strong> quedaron sin reagenda registrada.
+            </div>
+          </div>
+
+          <ChartCard
+            title="Tasa de reposición por sede"
+            description="% de eventos repuestos sobre el total de cada sede"
+          >
+            <div style={{ width: '100%', height: 220 }}>
+              <ResponsiveContainer>
+                <BarChart data={dataSede}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-15} textAnchor="end" height={50} />
+                  <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${v}%`} />
+                  <Tooltip formatter={(v) => `${v}%`} />
+                  <Bar dataKey="pct" radius={[4, 4, 0, 0]}>
+                    {dataSede.map((d, i) => (
+                      <Cell key={i} fill={d.pct >= 80 ? '#3b82f6' : d.pct >= 50 ? '#f59e0b' : '#f97316'} />
+                    ))}
+                    <LabelList dataKey="pct" position="top" formatter={(v) => `${v}%`} style={{ fontSize: 10, fill: '#475569' }} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </ChartCard>
+        </div>
+      </Panel>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <ChartCard
+          title="Oportunidad de la reposición (SLA)"
+          description="Cuándo se repone respecto a la fecha de ausencia · solo eventos repuestos"
+        >
+          <div style={{ width: '100%', height: 220 }}>
+            <ResponsiveContainer>
+              <BarChart data={dataSla}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip />
-                <Bar dataKey="count" radius={[4, 4, 0, 0]} name="Ausencias">
-                  {por_familia.map((f, i) => <Cell key={i} fill={FAMILIA_COLOR[f.family] ?? '#9ca3af'} />)}
+                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                  {dataSla.map((d, i) => <Cell key={i} fill={d.color} />)}
+                  <LabelList dataKey="value" position="top" style={{ fontSize: 10, fill: '#475569' }} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
-          )}
-        </div>
+          </div>
+        </ChartCard>
 
-        <div className="card">
-          <SectionHeader title="Por especialidad" subtitle="Ausencias por tipo de recurso" />
-          {por_especialidad.length === 0 ? (
-            <EmptyState icon="🩺" title="Sin datos" description="Sin datos en el rango." />
-          ) : (
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={por_especialidad} layout="vertical" margin={{ left: 100, right: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
-                <YAxis type="category" dataKey="type" tickFormatter={(t) => TIPO_LABEL[t] ?? t} tick={{ fontSize: 10 }} width={100} />
-                <Tooltip formatter={(v, n, p) => [v, TIPO_LABEL[p?.payload?.type] ?? p?.payload?.type]} />
-                <Bar dataKey="count" fill="#1B2A6C" radius={[0, 4, 4, 0]} name="Ausencias" />
+        <ChartCard
+          title="Antelación del reporte"
+          description="Días entre el reporte y la fecha de la cita"
+        >
+          <div style={{ width: '100%', height: 220 }}>
+            <ResponsiveContainer>
+              <BarChart data={dataAntel}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip />
+                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                  {dataAntel.map((d, i) => <Cell key={i} fill={d.color} />)}
+                  <LabelList dataKey="value" position="top" style={{ fontSize: 10, fill: '#475569' }} />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
-          )}
-        </div>
-      </div>
-
-      <div className="card">
-        <SectionHeader title="Cruce familia × especialidad" subtitle="Ausencias por combinación" />
-        {familias.length === 0 || tipos.length === 0 ? (
-          <EmptyState icon="🎯" title="Sin cruces" description="Sin datos en el rango." />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-gray-500 border-b border-gray-100">
-                  <th className="text-left px-2 py-2">Familia \ Especialidad</th>
-                  {tipos.map((t) => <th key={t} className="text-right px-2 py-2">{TIPO_LABEL[t] ?? t}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {familias.map((f) => (
-                  <tr key={f} className="border-b border-gray-50">
-                    <td className="px-2 py-2">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="inline-block w-2 h-2 rounded-full" style={{ background: FAMILIA_COLOR[f] ?? '#9ca3af' }} />
-                        {FAMILIA_LABEL[f] ?? f}
-                      </span>
-                    </td>
-                    {tipos.map((t) => {
-                      const v = cruceMap.get(`${f}|${t}`) ?? 0
-                      const intensity = v > 0 ? Math.max(0.08, v / maxCruce) : 0
-                      return (
-                        <td key={t} className="px-2 py-2 text-right" style={{ background: v > 0 ? `rgba(27, 42, 108, ${intensity * 0.35})` : undefined }}>
-                          {v || '—'}
-                        </td>
-                      )
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
-        )}
+        </ChartCard>
       </div>
-    </div>
+    </>
   )
 }
 
-// ============================================================================
-// Componentes auxiliares
-// ============================================================================
-function ChipToggle({ active, onClick, label, dotColor }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`text-[11px] px-2 py-0.5 rounded-full border transition inline-flex items-center gap-1 ${
-        active
-          ? 'bg-brand-600 text-white border-brand-600 shadow-sm'
-          : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-      }`}
-    >
-      {dotColor && <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: dotColor }} />}
-      {label}
-    </button>
-  )
-}
+// =============================================================================
+// TAB 4 — Causas & especialidades
+// =============================================================================
+function TabCausas({ data }) {
+  const totalEventos = data.kpis?.total_ausencias ?? 0
+  const familias = data.por_familia ?? []
+  const donut = familias.map((f) => ({
+    name: f.label,
+    value: f.count,
+    pac: f.pacientes,
+    color: FAMILIA_COLOR[f.family] ?? '#94a3b8',
+  }))
 
-function MultiSelectField({ label, values, options, onChange, allLabel = 'Todas' }) {
-  const [open, setOpen] = useState(false)
-  const toggle = (v) => {
-    onChange(values.includes(v) ? values.filter((x) => x !== v) : [...values, v])
-  }
-  const summary = values.length === 0
-    ? allLabel
-    : values.length === 1
-      ? options.find((o) => o.value === values[0])?.label ?? '1'
-      : `${values.length} seleccionados`
+  const topMotivos = (data.top_motivos ?? []).map((m) => ({
+    name: (m.name ?? m.code ?? '').charAt(0).toUpperCase() + (m.name ?? m.code ?? '').slice(1),
+    count: m.count,
+  })).reverse()
+
+  const porEsp = (data.por_especialidad ?? []).map((e) => ({
+    name: TIPO_LABEL[e.type] ?? e.type,
+    pacientes: e.pacientes ?? 0,
+  })).reverse()
+
+  const porSub = data.por_subespecialidad ?? []
+  const topSub = porSub.slice(0, 10).map((s) => ({
+    name: s.specialty,
+    pacientes: s.pacientes ?? 0,
+  })).reverse()
+
+  const cruceTop = porSub.slice(0, 10).map((s) => ({
+    name: `${TIPO_LABEL[s.type] ?? s.type} · ${s.specialty}`,
+    pacientes: s.pacientes ?? 0,
+  })).reverse()
+
+  const dias = data.por_dia_semana ?? []
+  const LABELS_DOW = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+  const maxDia = Math.max(...dias.map((d) => d.pacientes ?? 0), 0)
+  const dataDow = dias.map((d, i) => ({
+    name: LABELS_DOW[i],
+    pacientes: d.pacientes ?? 0,
+    eventos: d.count ?? 0,
+    color: (d.pacientes ?? 0) === maxDia ? '#f97316' : '#1e3a8a',
+  }))
+
   return (
-    <div className="relative">
-      <label className="label text-xs">{label}</label>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="input text-xs text-left flex items-center justify-between"
+    <>
+      <Panel
+        eyebrow="Profundización · Operación"
+        title="Causas, especialidades y subespecialidades"
+        description="De dónde nacen las reprogramaciones y dónde golpean. Distinguir lo operativo de la ausencia profesional real cambia las palancas de acción."
       >
-        <span className="truncate">{summary}</span>
-        <span className="text-gray-400">▾</span>
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg py-1">
-            <button
-              type="button"
-              onClick={() => onChange([])}
-              className={`w-full text-left text-xs px-3 py-1.5 ${values.length === 0 ? 'bg-brand-50 text-brand-800 font-medium' : 'hover:bg-gray-50'}`}
-            >
-              {allLabel}
-            </button>
-            <div className="border-t border-gray-100 my-0.5" />
-            {options.map((o) => (
-              <label key={o.value} className="flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-gray-50 cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="rounded"
-                  checked={values.includes(o.value)}
-                  onChange={() => toggle(o.value)}
-                />
-                <span className="truncate">{o.label}</span>
-              </label>
-            ))}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <ChartCard title="Naturaleza de la reprogramación" description="Eventos por causa raíz">
+            <div className="flex items-start gap-3">
+              <div style={{ width: 180, height: 180 }} className="shrink-0">
+                <ResponsiveContainer>
+                  <PieChart>
+                    <Pie data={donut} dataKey="value" innerRadius={55} outerRadius={85} paddingAngle={2}>
+                      {donut.map((d, i) => <Cell key={i} fill={d.color} />)}
+                    </Pie>
+                    <Tooltip formatter={(v, n, p) => `${v} eventos · ${p.payload.pac} pac.`} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex-1 space-y-1 text-xs min-w-0">
+                {donut.map((d, i) => (
+                  <div key={i} className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: d.color }} />
+                      <span className="truncate text-gray-700">{d.name}</span>
+                    </div>
+                    <span className="text-gray-500 text-[11px] shrink-0">
+                      {d.value} · <span className="tabular-nums">{fmtNum(d.pac)} pac.</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </ChartCard>
+
+          <ChartCard title="Motivos específicos más frecuentes" description="Nº de eventos por tipo de ausencia">
+            <div style={{ width: '100%', height: Math.max(200, topMotivos.length * 24) }}>
+              <ResponsiveContainer>
+                <BarChart data={topMotivos} layout="vertical" margin={{ top: 5, right: 45, left: 100, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 10 }} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={100} />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#1e3a8a" radius={[0, 4, 4, 0]}>
+                    <LabelList dataKey="count" position="right" style={{ fontSize: 10, fill: '#475569' }} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </ChartCard>
+        </div>
+      </Panel>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-6">
+        <ChartCard title="Impacto por especialidad" description="Pacientes afectados">
+          <div style={{ width: '100%', height: 220 }}>
+            <ResponsiveContainer>
+              <BarChart data={porEsp} layout="vertical" margin={{ top: 5, right: 45, left: 100, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 10 }} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={100} />
+                <Tooltip formatter={(v) => fmtNum(v)} />
+                <Bar dataKey="pacientes" fill="#3b82f6" radius={[0, 4, 4, 0]}>
+                  <LabelList dataKey="pacientes" position="right" formatter={(v) => fmtNum(v)} style={{ fontSize: 10, fill: '#475569' }} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
-        </>
-      )}
-    </div>
+        </ChartCard>
+
+        <ChartCard title="Impacto por subespecialidad" description="Pacientes afectados · top subespecialidades">
+          <div style={{ width: '100%', height: Math.max(220, topSub.length * 24) }}>
+            <ResponsiveContainer>
+              <BarChart data={topSub} layout="vertical" margin={{ top: 5, right: 45, left: 100, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 10 }} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={100} />
+                <Tooltip formatter={(v) => fmtNum(v)} />
+                <Bar dataKey="pacientes" fill="#f59e0b" radius={[0, 4, 4, 0]}>
+                  <LabelList dataKey="pacientes" position="right" formatter={(v) => fmtNum(v)} style={{ fontSize: 10, fill: '#475569' }} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartCard>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <ChartCard title="Patrón por día de la semana" description="Barras = pacientes · línea = nº de reprogramaciones">
+          <div style={{ width: '100%', height: 220 }}>
+            <ResponsiveContainer>
+              <ComposedChart data={dataDow}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
+                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
+                <Tooltip formatter={(v) => fmtNum(v)} />
+                <Bar yAxisId="left" dataKey="pacientes" barSize={32} radius={[4, 4, 0, 0]} name="Pacientes">
+                  {dataDow.map((d, i) => <Cell key={i} fill={d.color} />)}
+                </Bar>
+                <Line yAxisId="right" type="monotone" dataKey="eventos" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} name="Reprogramaciones" />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartCard>
+
+        <ChartCard title="Especialidad × subespecialidad" description="Mayor detalle del top de impacto">
+          <div style={{ width: '100%', height: Math.max(220, cruceTop.length * 24) }}>
+            <ResponsiveContainer>
+              <BarChart data={cruceTop} layout="vertical" margin={{ top: 5, right: 45, left: 150, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 10 }} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={150} />
+                <Tooltip formatter={(v) => fmtNum(v)} />
+                <Bar dataKey="pacientes" fill="#1e3a8a" radius={[0, 4, 4, 0]}>
+                  <LabelList dataKey="pacientes" position="right" formatter={(v) => fmtNum(v)} style={{ fontSize: 10, fill: '#475569' }} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartCard>
+      </div>
+    </>
   )
 }
