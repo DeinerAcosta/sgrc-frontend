@@ -251,6 +251,13 @@ export const recursoService = {
     if (params.active !== undefined) list = list.filter((r) => r.active === params.active)
     return ok(list)
   },
+  // Sep-2026: getById devuelve el recurso COMPLETO (incluye firma_url MEDIUMTEXT).
+  // El list() ahora omite firma_url por performance — cuando el modal de editar
+  // se abre, llama este endpoint para traer la firma bajo demanda.
+  getById: async (id) => {
+    if (!DEMO_MODE) return api.get(`/resources/${id}`)
+    return ok(_recursos.find((r) => r.id === id))
+  },
   create: async (data) => {
     if (!DEMO_MODE) return api.post('/resources', data)
     const nuevo = { ...data, id: uid(), active: data.active ?? true }

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { recursoService, usuarioService } from '@/services/api'
@@ -159,9 +159,29 @@ function RecursoModal({ recurso, onClose, onSaved }) {
     // CSV de tipos donde el recurso puede aparecer como apoyo además del suyo.
     support_types: recurso.support_types ?? '',
     // PROYECTOS-3255 #5.1 · Firma escaneada del profesional (data URL base64).
-    // Se muestra en el PDF F-AA-126 al pie ("Firma del prestador"). Opcional.
-    signature_url: recurso.signature_url ?? '',
+    // Sep-2026: el list() del backend ya NO trae signature_url (perf). Se
+    // hidrata bajo demanda con recursoService.getById al abrir el modal.
+    signature_url: '',
   })
+
+  // firmaTocada = true cuando el usuario subio o quito firma en esta sesion
+  // del modal. Si es false, en el update NO reenviamos signature_url para
+  // ahorrar tráfico (evita re-subir 768 KB de Alejandra al cambiar un check).
+  const [firmaTocada, setFirmaTocada] = useState(false)
+
+  // Fetch bajo demanda del recurso completo (con signature_url) cuando el
+  // modal se abre para EDITAR. Nuevos recursos no requieren fetch.
+  const { data: detalleRecurso } = useQuery({
+    queryKey: ['recurso-detalle', recurso.id],
+    queryFn: () => recursoService.getById(recurso.id),
+    enabled: !isNew && !!recurso.id,
+    staleTime: 0,   // firma puede haberse cambiado desde otra sesion → siempre fresh
+  })
+  useEffect(() => {
+    if (detalleRecurso?.signature_url && !firmaTocada) {
+      setForm((f) => ({ ...f, signature_url: detalleRecurso.signature_url }))
+    }
+  }, [detalleRecurso, firmaTocada])
 
   // Helpers para el set de "tipos de apoyo" (CSV ↔ array)
   const apoyoSet = new Set(form.support_types ? form.support_types.split(',') : [])
@@ -182,7 +202,14 @@ function RecursoModal({ recurso, onClose, onSaved }) {
   const cambiaEstado = !isNew && form.active !== recurso.active
 
   const { mutate, isPending } = useMutation({
-    mutationFn: () => isNew ? recursoService.create(form) : recursoService.update(recurso.id, form),
+    mutationFn: () => {
+      // Sep-2026 · perf [6]: si el usuario NO toco la firma, no la reenviamos.
+      // Prisma trata `undefined` como "no cambiar el campo", asi que la firma
+      // en la BD queda intacta. Para nuevos, siempre incluir (puede ser '').
+      const payload = { ...form }
+      if (!isNew && !firmaTocada) delete payload.signature_url
+      return isNew ? recursoService.create(payload) : recursoService.update(recurso.id, payload)
+    },
     onSuccess: () => {
       toast.success(isNew ? 'Recurso creado' : 'Recurso actualizado')
       if (cambiaEstado && !form.active) {
@@ -248,6 +275,14 @@ function RecursoModal({ recurso, onClose, onSaved }) {
             <div className="text-xs text-gray-500 mb-2">
               PNG o JPG de la firma del profesional. Se imprime al pie del PDF F-AA-126 en la caja "Firma del prestador". Máximo 1 MB (se guarda en base64 en la BD).
             </div>
+            {/* Sep-2026 · perf [5]: si el recurso tiene firma en BD pero aun
+                no llego el detalle, muestra un placeholder para que el user no
+                piense que esta vacio. Con el detalle cargado, se pinta el <img>. */}
+            {!form.signature_url && recurso.has_signature && !firmaTocada && (
+              <div className="mb-2 p-2 bg-gray-50 border border-dashed border-gray-300 rounded text-xs text-gray-500 italic">
+                Cargando firma actual...
+              </div>
+            )}
             {form.signature_url && (
               <div className="mb-2 p-2 bg-white border border-gray-200 rounded inline-block">
                 <img src={form.signature_url} alt="Firma" style={{ maxHeight: 60, maxWidth: 280 }} />
@@ -271,7 +306,10 @@ function RecursoModal({ recurso, onClose, onSaved }) {
                     return
                   }
                   const reader = new FileReader()
-                  reader.onload = () => setForm({ ...form, signature_url: String(reader.result) })
+                  reader.onload = () => {
+                    setForm({ ...form, signature_url: String(reader.result) })
+                    setFirmaTocada(true)   // trackear cambio para omitir en PUT si no se toca
+                  }
                   reader.onerror = () => toast.error('No se pudo leer el archivo')
                   reader.readAsDataURL(file)
                 }}
@@ -280,7 +318,7 @@ function RecursoModal({ recurso, onClose, onSaved }) {
                 <button
                   type="button"
                   className="text-xs text-red-600 hover:text-red-800"
-                  onClick={() => setForm({ ...form, signature_url: '' })}
+                  onClick={() => { setForm({ ...form, signature_url: '' }); setFirmaTocada(true) }}
                 >
                   Quitar firma
                 </button>
