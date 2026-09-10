@@ -246,11 +246,11 @@ function RecursoModal({ recurso, onClose, onSaved }) {
           <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
             <div className="text-xs font-medium text-gray-700 mb-1">Firma escaneada (opcional)</div>
             <div className="text-xs text-gray-500 mb-2">
-              PNG o JPG de la firma del profesional. Se imprime al pie del PDF F-AA-126 en la caja "Firma del prestador". Máximo 300 KB (se guarda en base64).
+              PNG o JPG de la firma del profesional. Se imprime al pie del PDF F-AA-126 en la caja "Firma del prestador". Máximo 1 MB (se guarda en base64 en la BD).
             </div>
             {form.signature_url && (
               <div className="mb-2 p-2 bg-white border border-gray-200 rounded inline-block">
-                <img src={form.signature_url} alt="Firma" style={{ maxHeight: 50, maxWidth: 240 }} />
+                <img src={form.signature_url} alt="Firma" style={{ maxHeight: 60, maxWidth: 280 }} />
               </div>
             )}
             <div className="flex gap-2 items-center">
@@ -261,8 +261,12 @@ function RecursoModal({ recurso, onClose, onSaved }) {
                 onChange={(e) => {
                   const file = e.target.files?.[0]
                   if (!file) return
-                  if (file.size > 300 * 1024) {
-                    toast.error('La firma supera 300 KB — reducila o escaneala en menor resolucion')
+                  // Sep-2026: limite subido a 1 MB (era 300 KB) porque algunas firmas
+                  // escaneadas del consolidado de septiembre superaban ese tope.
+                  // La columna firma_url ahora es MEDIUMTEXT (16 MB) y el backend Zod
+                  // acepta hasta 2 MB en base64 (~1.5 MB de imagen real).
+                  if (file.size > 1024 * 1024) {
+                    toast.error('La firma supera 1 MB — reducila o escaneala en menor resolucion')
                     e.target.value = ''
                     return
                   }
