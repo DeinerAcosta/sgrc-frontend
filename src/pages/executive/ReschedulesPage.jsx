@@ -9,7 +9,7 @@ import { es } from 'date-fns/locale'
 import { informeService, sedeService } from '@/services/api'
 import { Spinner, EmptyState } from '@/components/ui'
 import { TIPOS_RECURSO } from '@/utils/helpers'
-import focaLogo from '@/assets/brand/foca-blanco.png'
+import focaLogo from '@/assets/brand/foca-azul.png'
 
 // ============================================================================
 // Fase 4 (sep-2026 · rediseño FOCA) — Dashboard Reprogramaciones
@@ -65,11 +65,11 @@ function HeaderFOCA({ rango, totalEventos, totalPacientes }) {
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
       <div className="w-16 h-16 bg-white border border-gray-200 rounded-xl flex items-center justify-center shrink-0 shadow-sm">
-        <img src={focaLogo} alt="FOCA" className="h-10 w-auto object-contain" style={{ filter: 'invert(20%) sepia(30%) saturate(1500%) hue-rotate(210deg)' }} />
+        <img src={focaLogo} alt="FOCA" className="h-10 w-auto object-contain" />
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-[10px] tracking-widest uppercase text-brand-600 font-semibold">Central de citas</div>
-        <div className="text-xl sm:text-2xl font-serif text-gray-900 leading-tight">Reprogramación de agendas médicas</div>
+        <div className="text-xl sm:text-2xl font-semibold text-gray-900 leading-tight">Reprogramación de agendas médicas</div>
       </div>
       <div className="flex flex-wrap gap-2">
         <div className="px-3 py-1.5 bg-white border border-gray-200 rounded-full text-xs text-gray-700">
@@ -124,7 +124,7 @@ function KpiFoca({ label, value, color = 'text-brand-800', sub, big = false }) {
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-3 sm:p-4">
       <div className="text-[10px] tracking-widest uppercase text-gray-500 font-semibold">{label}</div>
-      <div className={`font-serif ${big ? 'text-4xl sm:text-5xl' : 'text-3xl sm:text-4xl'} ${color} leading-none mt-2`}>
+      <div className={`font-semibold ${big ? 'text-4xl sm:text-5xl' : 'text-3xl sm:text-4xl'} ${color} leading-none mt-2`}>
         {value}
       </div>
       {sub && <div className="text-[11px] text-gray-500 mt-1.5">{sub}</div>}
@@ -137,7 +137,7 @@ function Panel({ eyebrow, title, description, children }) {
   return (
     <div className="mb-6">
       {eyebrow && <div className="text-[10px] tracking-widest uppercase text-brand-600 font-semibold">{eyebrow}</div>}
-      <h2 className="font-serif text-xl sm:text-2xl text-gray-900 mt-1">{title}</h2>
+      <h2 className="font-semibold text-xl sm:text-2xl text-gray-900 mt-1">{title}</h2>
       {description && <p className="text-xs text-gray-600 mt-1 max-w-3xl">{description}</p>}
       <div className="mt-4">{children}</div>
     </div>
@@ -156,7 +156,7 @@ function HallazgoCard({ eyebrow, title, body, color = 'red' }) {
   return (
     <div className={`bg-white rounded-lg border border-gray-100 border-l-4 ${c.border} p-3`}>
       <div className={`text-[10px] tracking-widest uppercase font-semibold ${c.eye}`}>{eyebrow}</div>
-      <div className="font-serif text-sm text-gray-900 mt-1">{title}</div>
+      <div className="font-semibold text-sm text-gray-900 mt-1">{title}</div>
       <div className="text-xs text-gray-600 mt-1 leading-relaxed">{body}</div>
     </div>
   )
@@ -168,7 +168,7 @@ function ChartCard({ title, description, children, right }) {
     <div className="bg-white rounded-xl border border-gray-100 p-3 sm:p-4">
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0">
-          <h3 className="font-serif text-base sm:text-lg text-gray-900">{title}</h3>
+          <h3 className="font-semibold text-base sm:text-lg text-gray-900">{title}</h3>
           {description && <p className="text-[11px] text-gray-500 mt-0.5">{description}</p>}
         </div>
         {right}
@@ -494,19 +494,19 @@ function TabMedicos({ data }) {
         <div className="space-y-3">
           <div className="bg-brand-800 text-white rounded-xl p-4">
             <div className="text-[10px] tracking-widest uppercase text-white/70 font-semibold">Caso prioritario</div>
-            <div className="font-serif text-2xl mt-1">{lider?.name ?? '—'}</div>
+            <div className="font-semibold text-2xl mt-1">{lider?.name ?? '—'}</div>
             <div className="text-[11px] text-white/60 mt-0.5">{lider?.count ?? 0} eventos en la selección</div>
             <div className="grid grid-cols-3 gap-2 mt-3">
               <div className="bg-white/10 rounded-lg p-2 text-center">
-                <div className="font-serif text-xl">{lider?.count ?? 0}</div>
+                <div className="font-semibold text-xl">{lider?.count ?? 0}</div>
                 <div className="text-[9px] uppercase tracking-wider text-white/60">Eventos</div>
               </div>
               <div className="bg-white/10 rounded-lg p-2 text-center">
-                <div className="font-serif text-xl">{fmtNum(lider?.pacientes ?? 0)}</div>
+                <div className="font-semibold text-xl">{fmtNum(lider?.pacientes ?? 0)}</div>
                 <div className="text-[9px] uppercase tracking-wider text-white/60">Pacientes</div>
               </div>
               <div className="bg-white/10 rounded-lg p-2 text-center">
-                <div className="font-serif text-xl">{lider?.count > 0 ? Math.round((lider.approved_makeups / lider.count) * 100) : 0}%</div>
+                <div className="font-semibold text-xl">{lider?.count > 0 ? Math.round((lider.approved_makeups / lider.count) * 100) : 0}%</div>
                 <div className="text-[9px] uppercase tracking-wider text-white/60">Repone</div>
               </div>
             </div>
@@ -518,7 +518,7 @@ function TabMedicos({ data }) {
           {mejorRep && (
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
               <div className="text-[10px] tracking-widest uppercase text-blue-700 font-semibold">Recomendación</div>
-              <div className="font-serif text-base text-gray-900 mt-1">Replicar a quienes sí reponen</div>
+              <div className="font-semibold text-base text-gray-900 mt-1">Replicar a quienes sí reponen</div>
               <div className="text-xs text-gray-600 mt-1 leading-relaxed">
                 <strong>{mejorRep.name}</strong> repuso {mejorRep.approved_makeups} de {mejorRep.count} eventos. Documentar el modelo y estandarizarlo como protocolo de reposición.
               </div>
@@ -569,15 +569,15 @@ function TabReposicion({ data }) {
       >
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           <div className="bg-white rounded-xl border border-gray-100 p-4">
-            <div className="font-serif text-lg text-gray-900 mb-3">Pacientes: cubiertos vs. sin cobertura</div>
+            <div className="font-semibold text-lg text-gray-900 mb-3">Pacientes: cubiertos vs. sin cobertura</div>
             <div className="flex items-center justify-around">
               <div className="text-center">
-                <div className="font-serif text-4xl text-blue-600">{fmtNum(cubiertos)}</div>
+                <div className="font-semibold text-4xl text-blue-600">{fmtNum(cubiertos)}</div>
                 <div className="text-[10px] uppercase tracking-widest text-gray-500 mt-1">Con reposición</div>
               </div>
-              <div className="text-2xl text-gray-300 font-serif">vs</div>
+              <div className="text-2xl text-gray-300 font-semibold">vs</div>
               <div className="text-center">
-                <div className="font-serif text-4xl text-orange-600">{fmtNum(sinCob)}</div>
+                <div className="font-semibold text-4xl text-orange-600">{fmtNum(sinCob)}</div>
                 <div className="text-[10px] uppercase tracking-widest text-gray-500 mt-1">Sin cobertura</div>
               </div>
             </div>
