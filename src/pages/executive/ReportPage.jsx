@@ -138,8 +138,9 @@ const CONFIG = {
   },
   'cierre-semanas': {
     title: 'Cumplimiento de cierre por sede',
-    desc: 'Cada coordinador cierra su sede tras la ejecución semanal. "Días tras fin" = días entre el sábado (fin de la semana) y la fecha de cierre. Período de gracia: 4 días — pasada esa ventana el sistema cierra automáticamente y aparece como "Auto (Sistema)".',
-    cols: ['Semana', 'Sede', 'Coordinador', 'Fecha de cierre', 'Días tras fin', 'Estado'],
+    desc: 'Cada coordinador cierra su sede tras la ejecución semanal. Fecha de cierre = lunes 23:59 siguiente al fin de la semana. Si el coordinador no cierra manualmente, el sistema cierra automáticamente esa misma noche y aparece como "Auto (Sistema)".',
+    cols: ['Semana', 'Sede', 'Coordinador', 'Fecha de cierre', 'Estado'],
+    keys: ['week', 'site', 'coordinador', 'fecha_cierre', 'status'],
     meta: null,
     fn: informeService.cierreSemanas,
   },
@@ -321,9 +322,16 @@ export default function InformePage() {
   // Columnas visibles según rol: si el CONFIG define colsRestringidasACoord
   // y el usuario es coordinador, ocultamos esos índices (ago-2026: en el
   // informe de ausentismo, coord no ve Programadas/Imprevistas/Quejas).
-  const indicesVisibles = cfg.cols.map((_, i) => i).filter((i) =>
-    user?.role === 'coordinador' && cfg.colsRestringidasACoord?.has(i) ? false : true
-  )
+  // PROYECTOS-3255 #2.1: en Productividad, si el filtro es SOLO asesor_servicios,
+  // ocultamos las columnas de pacientes/cumplimiento — los asesores no atienden
+  // con cita, esas cifras no aplican y sale todo en '—'.
+  const SOLO_ASESORES = tipo === 'productividad' && tiposSel.length === 1 && tiposSel[0] === 'asesor_servicios'
+  const COLS_PACIENTES_PRODUCTIVIDAD = new Set(['Pac. programados', 'Pac. atendidos', '% Cumplimiento'])
+  const indicesVisibles = cfg.cols.map((_, i) => i).filter((i) => {
+    if (user?.role === 'coordinador' && cfg.colsRestringidasACoord?.has(i)) return false
+    if (SOLO_ASESORES && COLS_PACIENTES_PRODUCTIVIDAD.has(cfg.cols[i])) return false
+    return true
+  })
   const colsVisibles = indicesVisibles.map((i) => cfg.cols[i])
 
   // KPIs resumen — solo para informes de ausentismo (tienen columnas Programadas/Imprevistas/Quejas)

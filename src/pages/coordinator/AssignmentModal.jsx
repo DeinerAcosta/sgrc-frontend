@@ -233,8 +233,9 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
             </div>
           </div>
 
-          {/* Capacidad calculada + override manual */}
-          {form.resource_id && (
+          {/* PROYECTOS-3255 #2.1: capacidad y campo de pacientes ocultos para asesores.
+              Los asesores hacen recepcion/gestion; no atienden pacientes con cita. */}
+          {form.resource_id && recursoSel?.type !== 'asesor_servicios' && (
             <div className="space-y-2">
               <div className="bg-blue-50 rounded-lg px-3 py-2 text-xs text-blue-800">
                 📊 Capacidad calculada: <strong>{capacidad} pacientes</strong>
