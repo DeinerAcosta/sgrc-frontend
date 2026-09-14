@@ -173,6 +173,35 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
     if (ok) doEliminar()
   }
 
+  // Bug real recurrente: coord escribe "01:00" pensando que es 1 PM (el sistema
+  // usa formato 24h → "01:00" es 1 AM). Genera bloques enormes (p.ej. 01-16 =
+  // 15h) y conflictos falsos con otras auxiliares. Pedimos confirmación explícita
+  // cuando la hora inicio queda fuera del rango típico de operación (07-19).
+  const handleGuardar = async () => {
+    const horaInicioAtipica = form.start_time && form.start_time < '07:00'
+    if (horaInicioAtipica) {
+      const sugerida = (() => {
+        const h = parseInt(form.start_time.slice(0, 2), 10)
+        return h >= 1 && h <= 6 ? String(h + 12).padStart(2, '0') + form.start_time.slice(2) : null
+      })()
+      const ok = await confirm({
+        title: '¿Hora de inicio antes de las 07:00?',
+        message:
+          `La hora de inicio "${form.start_time}" está antes del horario típico de operación.\n\n` +
+          (sugerida
+            ? `El sistema usa formato de 24 horas: "${form.start_time}" = ${parseInt(form.start_time.slice(0,2),10)} AM (madrugada).\n` +
+              `Si querías registrar por la tarde, debería ser "${sugerida}".\n\n` +
+              `¿Confirmás que la asignación empieza a las ${form.start_time} de la madrugada?`
+            : `¿Confirmás que la asignación empieza a las ${form.start_time}?`),
+        confirmLabel: 'Sí, es correcta',
+        cancelLabel: 'Corregir',
+        variant: 'warning',
+      })
+      if (!ok) return
+    }
+    mutate()
+  }
+
   const diaLabel = DIAS_FULL[DIAS.indexOf(dia)] ?? dia
   const motivoOk = !requiereMotivo || (form.supervisor_reason && form.supervisor_reason.trim().length >= 5)
   const valid = form.resource_id && form.start_time && form.end_time && (!requiereAuxAdicional || form.assistant_id) && motivoOk
@@ -513,7 +542,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
           <button className="btn flex-1 justify-center" onClick={tryClose}>Cancelar</button>
           <button
             className="btn-primary flex-1 justify-center"
-            onClick={() => mutate()}
+            onClick={handleGuardar}
             disabled={!valid || isPending || eliminando}
           >
             {isPending ? <Spinner size="sm" /> : (editando ? 'Guardar cambios' : 'Guardar asignación')}
