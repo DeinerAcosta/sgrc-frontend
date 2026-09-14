@@ -90,7 +90,11 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, onCreated
   const anticip = form.start_date ? differenceInDays(parseFechaLocal(form.start_date), new Date()) : null
   const alertaAnticip = REQUIEREN_ANTICIPACION.includes(form.type) && anticip !== null && anticip < 30
   const diasAtras = form.start_date ? differenceInDays(new Date(), parseFechaLocal(form.start_date)) : 0
-  const fechaInvalida = diasAtras > 7
+  // Sep-14-2026: supervisor y gerencia pueden registrar ausencias retroactivas
+  // sin limite (para casos excepcionales como vacaciones ya iniciadas). El
+  // coordinador mantiene el limite de 7 dias para proteger el historico.
+  const puedeSaltarRestriccionFecha = user?.role === 'supervisor' || user?.role === 'gerencia'
+  const fechaInvalida = !puedeSaltarRestriccionFecha && diasAtras > 7
 
   // Duración calculada de la ausencia parcial (ej: el recurso llegó 2h tarde)
   const minutosParcial = (() => {
@@ -358,6 +362,12 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, onCreated
           {fechaInvalida && (
             <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-800">
               ⛔ Solo puedes registrar ausencias para el día actual o hasta 7 días atrás.
+            </div>
+          )}
+          {/* Sep-14-2026: aviso a supervisor/gerencia cuando registra retroactivo mas alla del limite del coord. */}
+          {puedeSaltarRestriccionFecha && diasAtras > 7 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
+              ⚠️ Estás registrando una ausencia iniciada hace <strong>{diasAtras} días</strong>. Los coordinadores no pueden registrar con más de 7 días de atraso, pero como <strong>{user?.role}</strong> sí puedes. Quedará registrado en la auditoría.
             </div>
           )}
 
