@@ -48,6 +48,9 @@ export default function AusenciaFormModal({ recursoId, esquemaPago, tipoRecurso,
     affected_company: '',
     wants_makeup: '',
     makeup_notes: '',
+    // F-AA-126 v05 (sep-14-2026) — solo se muestran para oftalmólogo/optómetra.
+    affected_process: '',
+    novelty_type: '',
   })
   const { tryClose } = useDirtyClose(form, onClose)
 
@@ -89,6 +92,8 @@ export default function AusenciaFormModal({ recursoId, esquemaPago, tipoRecurso,
       affected_company: form.affected_company || undefined,
       wants_makeup: form.wants_makeup === 'si' ? true : form.wants_makeup === 'no' ? false : undefined,
       makeup_notes: form.wants_makeup === 'si' ? (form.makeup_notes || undefined) : undefined,
+      affected_process: form.affected_process || undefined,
+      novelty_type: form.novelty_type || undefined,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['ausencias'] })
@@ -99,7 +104,10 @@ export default function AusenciaFormModal({ recursoId, esquemaPago, tipoRecurso,
   })
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
-  const valid = form.type && form.start_date && !!form.affected_company  // Fase 5 · v04: empresa obligatoria
+  // F-AA-126 v05 (sep-14-2026): oftalmo/optometra requieren proceso + novedad.
+  const requiereV05 = ['oftalmologo', 'optometra'].includes(tipoRecurso)
+  const v05Ok = !requiereV05 || (!!form.affected_process && !!form.novelty_type)
+  const valid = form.type && form.start_date && !!form.affected_company && v05Ok
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && tryClose()}>
@@ -196,6 +204,39 @@ export default function AusenciaFormModal({ recursoId, esquemaPago, tipoRecurso,
                 ))}
               </div>
             </div>
+
+            {/* F-AA-126 v05 (sep-14-2026) — Proceso que afecta + Tipo de novedad.
+                Solo para oftalmólogo/optómetra. */}
+            {['oftalmologo', 'optometra'].includes(tipoRecurso) && (
+              <>
+                <div className="mt-3">
+                  <label className="label">Proceso que afecta *</label>
+                  <select
+                    className="input"
+                    value={form.affected_process}
+                    onChange={(e) => set('affected_process', e.target.value)}
+                  >
+                    <option value="">Seleccionar...</option>
+                    <option value="consulta_externa">Consulta externa</option>
+                    <option value="ayudas_diagnosticas">Ayudas diagnósticas</option>
+                    <option value="cirugia">Cirugía</option>
+                  </select>
+                </div>
+                <div className="mt-3">
+                  <label className="label">Tipo de novedad *</label>
+                  <select
+                    className="input"
+                    value={form.novelty_type}
+                    onChange={(e) => set('novelty_type', e.target.value)}
+                  >
+                    <option value="">Seleccionar...</option>
+                    <option value="cambio_permanente">Cambio permanente de horario</option>
+                    <option value="cambio_periodo">Cambio de horario de periodo determinado</option>
+                    <option value="ausencia_periodo">Ausencia de un período determinado</option>
+                  </select>
+                </div>
+              </>
+            )}
 
             {/* Reposición solo aplica a los profesionales que atienden pacientes.
                 El personal de apoyo (asesores, auxiliares, tecnicos, anestesiologos)
