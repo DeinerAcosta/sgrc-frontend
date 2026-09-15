@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { asignacionService, recursoService, semanaService } from '@/services/api'
+import { asignacionService, recursoService, semanaService, usuarioService } from '@/services/api'
 import { Spinner } from '@/components/ui'
 import SearchableSelect from '@/components/ui/SearchableSelect'
 import { calcularCapacidadPacientes, DIAS_FULL, DIAS, TIPOS_RECURSO } from '@/utils/helpers'
@@ -74,6 +74,11 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
     // Motivo obligatorio cuando el supervisor edita una sede cerrada (queda en
     // auditoría). Se muestra el input solo si `requiereMotivo` es true.
     supervisor_reason: '',
+    // Sep-2026 · Ley 2101 · Autorización directivo para aux que trabajan
+    // sáb+dom en la misma semana. Se llenan solo si el modal detecta el
+    // escenario y el coord elige un directivo.
+    authorized_by_id:    asignacion?.authorized_by_id    ?? asignacion?.authorizedById    ?? '',
+    authorization_reason: asignacion?.authorization_reason ?? asignacion?.authorizationReason ?? '',
   })
   // Toggle local "horario distinto al recurso principal" para cada auxiliar.
   const [auxHorarioDistinto,  setAuxHorarioDistinto]  = useState(!!(asignacion?.assistant_start_time  ?? asignacion?.assistantStartTime))
@@ -113,6 +118,45 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
     ? poolApoyo.filter((r) => r.id !== form.resource_id)
     : poolApoyo
 
+  // Sep-2026 · Ley 2101 · Autorización directivo para aux sáb+dom.
+  const esFinde = dia === 'sabado' || dia === 'domingo'
+  const otroDiaFinde = dia === 'sabado' ? 'domingo' : 'sabado'
+  const auxsSeleccionados = [form.assistant_id, form.assistant2_id].filter(Boolean)
+  const auxsTipoAuxiliar = auxsSeleccionados
+    .map((id) => auxiliares.find((a) => a.id === id))
+    .filter((r) => r?.type === 'auxiliar')
+  const necesitaChequearFinde = esFinde && auxsTipoAuxiliar.length > 0
+
+  // Consultar si CUALQUIERA de los aux seleccionados ya tiene asignación
+  // en el otro día del finde de esta misma semana. Query condicional.
+  const { data: asigsAuxOtroDia = [] } = useQuery({
+    queryKey: ['asigs-aux-finde', semanaId, otroDiaFinde, auxsTipoAuxiliar.map((a) => a.id).sort().join(',')],
+    queryFn: async () => {
+      const results = await Promise.all(
+        auxsTipoAuxiliar.map((aux) =>
+          asignacionService.list({ week_id: semanaId, resource_id: aux.id, day: otroDiaFinde }),
+        ),
+      )
+      // Aplanar y devolver [{ auxId, auxNombre, asignaciones: [...] }]
+      return auxsTipoAuxiliar.map((aux, i) => ({
+        auxId: aux.id,
+        auxNombre: aux.name,
+        asignaciones: (results[i] ?? []).filter((a) => a.id !== asignacion?.id),
+      })).filter((x) => x.asignaciones.length > 0)
+    },
+    enabled: necesitaChequearFinde,
+  })
+  const auxsQueRequierenAutorizacion = asigsAuxOtroDia
+  const requiereAutorizacionFinde = auxsQueRequierenAutorizacion.length > 0
+
+  // Lista de directivos activos — solo se carga si aplica el escenario.
+  const { data: directivos = [] } = useQuery({
+    queryKey: ['directivos'],
+    queryFn: () => usuarioService.listDirectivos(),
+    enabled: requiereAutorizacionFinde,
+    staleTime: 5 * 60 * 1000,
+  })
+
   const recursoSel = recursos.find((r) => r.id === form.resource_id)
   const capacidad = form.resource_id
     ? calcularCapacidadPacientes(
@@ -149,6 +193,10 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
         expected_patients: form.expected_patients === '' ? null : Number(form.expected_patients),
         // Motivo: solo se envía si la sede está cerrada y el supervisor llenó el campo.
         supervisor_reason: requiereMotivo ? form.supervisor_reason : undefined,
+        // Autorización fin de semana (Ley 2101 · aux con sáb+dom la misma semana).
+        // Solo se envían si el escenario aplica; sino el backend guarda null.
+        authorized_by_id:    requiereAutorizacionFinde ? (form.authorized_by_id || undefined) : undefined,
+        authorization_reason: requiereAutorizacionFinde ? (form.authorization_reason || undefined) : undefined,
       }
       return editando
         ? asignacionService.update(asignacion.id, payload)
@@ -204,7 +252,11 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
 
   const diaLabel = DIAS_FULL[DIAS.indexOf(dia)] ?? dia
   const motivoOk = !requiereMotivo || (form.supervisor_reason && form.supervisor_reason.trim().length >= 5)
-  const valid = form.resource_id && form.start_time && form.end_time && (!requiereAuxAdicional || form.assistant_id) && motivoOk
+  // Sep-2026 · Ley 2101 · Si el escenario aux+sáb+dom aplica, exigir directivo + motivo.
+  const autorizacionOk =
+    !requiereAutorizacionFinde ||
+    (form.authorized_by_id && form.authorization_reason && form.authorization_reason.trim().length >= 5)
+  const valid = form.resource_id && form.start_time && form.end_time && (!requiereAuxAdicional || form.assistant_id) && motivoOk && autorizacionOk
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && tryClose()}>
@@ -499,6 +551,47 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                 </div>
               )}
             </>
+          )}
+
+          {/* Sep-2026 · Ley 2101 · Autorizacion directivo para aux con sáb+dom */}
+          {requiereAutorizacionFinde && (
+            <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
+              <div className="text-xs text-amber-900">
+                <div className="font-semibold mb-1">⚠️ Autorización de directivo requerida (Ley 2101)</div>
+                <div>
+                  {auxsQueRequierenAutorizacion.map((x) => x.auxNombre).join(', ')}{' '}
+                  {auxsQueRequierenAutorizacion.length === 1 ? 'ya tiene' : 'ya tienen'} asignación el <b>{otroDiaFinde}</b> de esta semana.
+                  Asignar {auxsQueRequierenAutorizacion.length === 1 ? 'esta persona' : 'estas personas'} también el <b>{dia}</b> hace que trabaje el fin de semana completo — requiere autorización explícita de un directivo.
+                </div>
+              </div>
+              <div>
+                <label className="label text-amber-900">Directivo que autoriza *</label>
+                <select
+                  className="input"
+                  value={form.authorized_by_id}
+                  onChange={(e) => set('authorized_by_id', e.target.value)}
+                >
+                  <option value="">— Selecciona un directivo —</option>
+                  {directivos.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name} · {d.role === 'gerencia' ? 'Gerencia' : 'Directivo'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label text-amber-900">
+                  Motivo de la autorización * <span className="text-amber-700 font-normal">(mín 5 caracteres · queda en auditoría)</span>
+                </label>
+                <textarea
+                  className="input resize-none"
+                  rows={2}
+                  value={form.authorization_reason}
+                  onChange={(e) => set('authorization_reason', e.target.value)}
+                  placeholder="Ej: Cobertura de cirugía programada · autorización verbal del Dr. Pérez confirmada por email"
+                />
+              </div>
+            </div>
           )}
 
           {/* Motivo obligatorio cuando supervisor edita una sede cerrada (queda en auditoría) */}

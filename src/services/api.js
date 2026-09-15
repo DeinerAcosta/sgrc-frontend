@@ -1015,6 +1015,12 @@ export const usuarioService = {
     if (!DEMO_MODE) return api.post(`/users/${id}/resend-credentials`)
     return ok({ ok: true, email: 'demo@cofca.com', password: 'SGRC2026!', smtp_activo: false })
   },
+  /** Sep-2026 · Ley 2101 · Lista de directivos + gerencia activos para el
+   *  modal de asignación cuando un aux va a trabajar sáb+dom (autorización). */
+  listDirectivos: async () => {
+    if (!DEMO_MODE) return api.get('/users/directivos')
+    return ok(_usuarios_lista.filter((u) => ['directivo', 'gerencia'].includes(u.role) && u.active))
+  },
   /** Elimina usuario. hard=true intenta borrar fila completa; soft (default) desactiva. */
   remove: async (id, hard = false) => {
     if (!DEMO_MODE) return api.delete(`/users/${id}${hard ? '?hard=true' : ''}`)
