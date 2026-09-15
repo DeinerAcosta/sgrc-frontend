@@ -1021,6 +1021,17 @@ export const usuarioService = {
     if (!DEMO_MODE) return api.get('/users/directivos')
     return ok(_usuarios_lista.filter((u) => ['directivo', 'gerencia'].includes(u.role) && u.active))
   },
+  /** Sep-2026 · Self-service de firma para el propio médico.
+   *  Devuelve { signatureUrl, hasSignature }. Solo funciona para rol=recurso. */
+  getMiFirma: async () => {
+    if (!DEMO_MODE) return api.get('/users/me/signature')
+    return ok({ signatureUrl: null, hasSignature: false })
+  },
+  /** Guarda o borra la firma. Pasar `dataUrl=null` para borrar. */
+  actualizarMiFirma: async (dataUrl) => {
+    if (!DEMO_MODE) return api.put('/users/me/signature', { signatureUrl: dataUrl })
+    return ok({ ok: true, hasSignature: !!dataUrl })
+  },
   /** Elimina usuario. hard=true intenta borrar fila completa; soft (default) desactiva. */
   remove: async (id, hard = false) => {
     if (!DEMO_MODE) return api.delete(`/users/${id}${hard ? '?hard=true' : ''}`)
