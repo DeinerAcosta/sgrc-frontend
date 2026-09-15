@@ -707,16 +707,22 @@ export default function ProgramadorPage() {
               {DIAS.map((_, i) => <col key={i} style={{ width: `${(100 - 14) / 7}%` }} />)}
             </colgroup>
             <thead>
+              {/* Sticky header: la fila de fechas queda pegada arriba al hacer
+                  scroll. La primera celda ("Consultorio") tambien es sticky a
+                  la izquierda, con z-index mayor porque es la esquina que se
+                  superpone con la columna sticky de los consultorios. */}
               <tr className="bg-gray-50">
-                <th className="p-2 text-left text-xs font-medium text-gray-500 border-b border-gray-100">Consultorio</th>
+                <th className="p-2 text-left text-xs font-medium text-gray-500 border-b border-gray-100 sticky top-0 left-0 z-20 bg-gray-50">Consultorio</th>
                 {DIAS_LABEL.map((d, i) => {
                   const esHoy = format(diasFecha[i], 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
                   const esFestivo = festivosSet.has(fechasISO[i])
                   const diaKey = DIAS[i]
                   // Solo muestra el botón "Copiar día" si ese día tiene asignaciones
                   const tieneAsigs = asignaciones.some((a) => a.weekday === diaKey)
+                  // bg explicito en cada th porque sticky no hereda el bg del tr
+                  const bgClase = esFestivo ? 'bg-amber-50/95' : 'bg-gray-50'
                   return (
-                    <th key={i} className={`p-2 text-center text-xs font-medium border-b border-gray-100 ${esHoy ? 'text-brand-600' : esFestivo ? 'text-amber-700 bg-amber-50/50' : 'text-gray-500'}`}>
+                    <th key={i} className={`p-2 text-center text-xs font-medium border-b border-gray-100 sticky top-0 z-10 ${bgClase} ${esHoy ? 'text-brand-600' : esFestivo ? 'text-amber-700' : 'text-gray-500'}`}>
                       <div className="flex items-center justify-center gap-1">
                         <span>{d} {format(diasFecha[i], 'd')}</span>
                         {tieneAsigs && canCopiar && (
@@ -753,7 +759,7 @@ export default function ProgramadorPage() {
                   ref={(el) => { if (el) rowRefs.current[cons.id] = el; else delete rowRefs.current[cons.id] }}
                   className={`border-b border-gray-50 transition-colors ${highlightCons === cons.id ? 'bg-amber-100/70 ring-2 ring-amber-300' : ''}`}
                 >
-                  <td className="p-2 bg-gray-50 border-r border-gray-100 align-top">
+                  <td className="p-2 bg-gray-50 border-r border-gray-100 align-top sticky left-0 z-10">
                     <div className="flex items-center justify-between gap-1">
                       <div>
                         <div className="font-medium text-gray-700 text-xs">{cons.name}</div>

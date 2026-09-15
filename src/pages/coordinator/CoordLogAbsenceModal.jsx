@@ -126,8 +126,40 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, onCreated
       recorded_by_coordinator: true,
     }),
     onSuccess: (creada) => {
-      toast.success('Ausencia registrada. El sistema calculó el impacto.')
       qc.invalidateQueries({ queryKey: ['ausencias-coord'] })
+      // Si el recurso es de los tipos que emiten formato F-AA-126, mostramos un
+      // toast con boton para descargarlo YA — evita que el coord tenga que
+      // buscar la ausencia en la lista para bajar el PDF.
+      const emiteFormato = TIPOS_QUE_REPONEN.has(categoria)
+      if (emiteFormato && creada?.id) {
+        toast((t) => (
+          <div className="flex flex-col gap-2 min-w-[240px]">
+            <div className="text-sm font-medium text-gray-800">✅ Ausencia registrada.</div>
+            <button
+              className="text-xs bg-brand-600 text-white rounded px-3 py-1.5 hover:bg-brand-700 self-start"
+              onClick={async () => {
+                toast.dismiss(t.id)
+                try {
+                  const blob = await ausenciaService.descargarFormatoFAA126(creada.id)
+                  const url = URL.createObjectURL(blob)
+                  const a = document.createElement('a')
+                  a.href = url
+                  const nombreSafe = (creada.resource?.name ?? 'profesional').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+                  a.download = `F-AA-126_${nombreSafe}_${creada.id.slice(0, 8)}.pdf`
+                  a.click()
+                  URL.revokeObjectURL(url)
+                } catch (err) {
+                  toast.error(err?.message ?? 'No se pudo generar el formato')
+                }
+              }}
+            >
+              📄 Descargar F-AA-126
+            </button>
+          </div>
+        ), { duration: 12000 })
+      } else {
+        toast.success('Ausencia registrada. El sistema calculó el impacto.')
+      }
       // Fase 5 · v04: si vino desea_reponer=SÍ, notificamos al padre para que
       // encadene el modal de proponer reposición (Fase 3).
       if (creada?.wants_makeup === true && typeof onCreated === 'function') {
