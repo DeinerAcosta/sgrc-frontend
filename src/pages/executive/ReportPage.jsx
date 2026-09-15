@@ -282,6 +282,9 @@ export default function InformePage() {
   const [tiposSel, setTiposSel] = useState([])
   // Panel expandible "Cómo se calcula" — solo aparece en informes de ausentismo.
   const [mostrarMetodologia, setMostrarMetodologia] = useState(false)
+  // Sep-2026 · Feedback usuario · Productividad individual: buscador por nombre
+  // sobre la tabla. Aplica solo a informes por-recurso (productividad, subutilizacion).
+  const [busquedaRecurso, setBusquedaRecurso] = useState('')
 
   // Sedes reales del backend. El coordinador solo ve las suyas.
   const { data: sedes = [] } = useQuery({
@@ -315,9 +318,19 @@ export default function InformePage() {
   // Wendy (gerencia) pidió consultorios en orden numérico natural
   // (1, 2, 3, ..., 10, 11) en lugar del orden por defecto del backend.
   // Para los demás informes respetamos el ranking del servidor.
-  const dataOrdenada = tipo === 'ocupacion'
+  const dataBase = tipo === 'ocupacion'
     ? [...data].sort((x, y) => compareNatural(Object.values(x)[0], Object.values(y)[0]))
     : data
+  // Filtro por nombre (feedback usuario sep-2026). Aplica en productividad y
+  // subutilizacion — informes per-recurso donde el primer campo es el nombre.
+  // Sin buscador o vacío, muestra todo tal cual llega del backend.
+  const soportaBusqueda = tipo === 'productividad' || tipo === 'subutilizacion'
+  const dataOrdenada = soportaBusqueda && busquedaRecurso.trim()
+    ? dataBase.filter((row) => {
+        const nombre = String(Object.values(row)[0] ?? '').toLowerCase()
+        return nombre.includes(busquedaRecurso.trim().toLowerCase())
+      })
+    : dataBase
 
   // Columnas visibles según rol: si el CONFIG define colsRestringidasACoord
   // y el usuario es coordinador, ocultamos esos índices (ago-2026: en el
@@ -523,6 +536,36 @@ export default function InformePage() {
         </div>
       )}
 
+      {/* Buscador por nombre — solo en informes per-recurso (productividad, subutilización) */}
+      {soportaBusqueda && (
+        <div className="mb-3">
+          <div className="relative max-w-md">
+            <input
+              className="input pl-8"
+              type="search"
+              placeholder="🔍 Buscar recurso por nombre…"
+              value={busquedaRecurso}
+              onChange={(e) => setBusquedaRecurso(e.target.value)}
+            />
+            {busquedaRecurso && (
+              <button
+                type="button"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
+                onClick={() => setBusquedaRecurso('')}
+                title="Limpiar búsqueda"
+              >
+                ×
+              </button>
+            )}
+          </div>
+          {busquedaRecurso.trim() && (
+            <div className="text-[11px] text-gray-500 mt-1">
+              {dataOrdenada.length} de {dataBase.length} recursos
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Tabla */}
       <div className="card overflow-hidden">
         {isLoading ? (
@@ -534,7 +577,7 @@ export default function InformePage() {
             <table className="w-full text-xs border-collapse min-w-[800px]">
               <thead>
                 <tr className="bg-gray-50">
-                  {colsVisibles.map((col) => {
+                  {colsVisibles.map((col, colIdx) => {
                     // Tooltip explicativo — solo aplica a informes de ausentismo
                     const tooltip = esAusentismo ? TOOLTIPS_AUSENTISMO[col] : null
                     // Cabeceras nuevas con ícono para destacarlas visualmente
@@ -542,11 +585,14 @@ export default function InformePage() {
                       : col === 'Imprevistas' ? '⚡ Imprevistas'
                       : col === 'Quejas' ? '🎫 Quejas'
                       : col
+                    // Sticky: la fila superior de encabezados queda pegada al
+                    // hacer scroll vertical para no perder el contexto.
+                    const stickyClase = 'sticky top-0 z-10 bg-gray-50'
                     return (
                       <th
                         key={col}
                         title={tooltip ?? undefined}
-                        className={`px-3 py-2.5 text-left text-xs font-medium border-b border-gray-100 whitespace-nowrap ${tooltip ? 'text-gray-700 cursor-help border-b-dashed' : 'text-gray-500'}`}
+                        className={`px-3 py-2.5 text-left text-xs font-medium border-b border-gray-100 whitespace-nowrap ${stickyClase} ${tooltip ? 'text-gray-700 cursor-help border-b-dashed' : 'text-gray-500'}`}
                       >
                         {label}
                       </th>
