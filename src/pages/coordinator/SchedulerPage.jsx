@@ -706,7 +706,11 @@ export default function ProgramadorPage() {
       ) : !semanaActual ? (
         <EmptyState icon="📅" title="No hay semana creada para este período" description="Crea la semana para comenzar a programar recursos." />
       ) : (
-        <div className="overflow-x-auto -mx-3 sm:mx-0">
+        // Sep-2026 · sticky vertical: sin max-h el div no tiene scroll propio y
+        // el sticky top-0 queda "encerrado" arriba del div sin efecto visible.
+        // Con max-h el div genera scroll interno y el sticky funciona correctamente.
+        // Altura ~ viewport menos el espacio del header/filtros/topbar.
+        <div className="overflow-auto -mx-3 sm:mx-0 max-h-[calc(100vh-260px)]">
           <table className="w-full min-w-[800px] border-collapse text-xs" style={{ tableLayout: 'fixed' }}>
             <colgroup>
               <col style={{ width: '100px' }} />
