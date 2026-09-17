@@ -49,11 +49,17 @@ const AREAS = [
 export default function ProgramadorPage() {
   const { user } = useAuthStore()
   const qc = useQueryClient()
+  // Sep-2026 · Los roles admin (gerencia, supervisor, directivo) NUNCA quedan
+  // encerrados en 1 sola sede aunque tengan exactamente 1 sede vinculada por
+  // accidente de configuración. Siempre ven el selector — misma regla que en
+  // el hook useSedeActiva. Bug reportado: Wendy (gerencia) veía el Programador
+  // como si fuera coord de una sola sede porque tenía 1 site en su usuario.
+  const esAdminSched = ['gerencia', 'supervisor', 'directivo'].includes(user?.role)
   // sedePropia solo si tiene EXACTAMENTE 1 sede (caso típico coordinador 1 sede).
   // Si tiene 2+ sedes (coordinador multi-sede como Wadys que tiene 5),
   // mostramos el selector para que elija cuál programar.
-  const sedePropia = user?.sites?.length === 1 ? user.sites[0] : null
-  const tieneVariasSedes = (user?.sites?.length ?? 0) > 1
+  const sedePropia = (!esAdminSched && user?.sites?.length === 1) ? user.sites[0] : null
+  const tieneVariasSedes = !esAdminSched && (user?.sites?.length ?? 0) > 1
   const primeraSede = user?.sites?.[0]
 
   const [sedeManual, setSedeManual] = useState('')
