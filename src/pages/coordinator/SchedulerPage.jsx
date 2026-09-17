@@ -769,7 +769,14 @@ export default function ProgramadorPage() {
                   ref={(el) => { if (el) rowRefs.current[cons.id] = el; else delete rowRefs.current[cons.id] }}
                   className={`border-b border-gray-50 transition-colors ${highlightCons === cons.id ? 'bg-amber-100/70 ring-2 ring-amber-300' : ''}`}
                 >
-                  <td className="p-2 bg-gray-50 border-r border-gray-100 align-top sticky left-0 z-10">
+                  {/* Sep-2026 · Sticky en 2 ejes para consultorios con MUCHAS
+                      asignaciones apiladas (row muy alta). left-0 pega la celda
+                      del nombre al scrollear horizontal; top-[44px] la pega
+                      DEBAJO del thead sticky (~44px) al scrollear vertical
+                      dentro de una row alta — asi no se pierde de vista qué
+                      consultorio estas mirando cuando revisas la parte inferior
+                      de esa row. */}
+                  <td className="p-2 bg-gray-50 border-r border-gray-100 align-top sticky left-0 top-[44px] z-10">
                     <div className="flex items-center justify-between gap-1">
                       <div>
                         <div className="font-medium text-gray-700 text-xs">{cons.name}</div>
