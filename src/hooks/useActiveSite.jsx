@@ -14,8 +14,16 @@ import { sedeService } from '@/services/api'
  */
 export function useSedeActiva() {
   const { user } = useAuthStore()
-  const sedePropia = user?.sites?.length === 1 ? user.sites[0] : null
-  const tieneVariasSedes = (user?.sites?.length ?? 0) > 1
+  // Sep-2026 · Bug real detectado: si un usuario supervisor/gerencia/directivo
+  // tiene EXACTAMENTE 1 sede vinculada (por accidente de configuracion o
+  // asignacion inicial), el codigo lo trataba como coord con sede fija y le
+  // ocultaba el selector — quedando "encerrado" en esa sede y viendo 0 en
+  // pendientes cuando en realidad hay N en otras sedes. Los roles admin
+  // NUNCA deben quedar limitados a una sola sede: siempre ven el selector
+  // (con la opcion "Selecciona una sede..." = todas).
+  const esAdmin = ['gerencia', 'supervisor', 'directivo'].includes(user?.role)
+  const sedePropia = (!esAdmin && user?.sites?.length === 1) ? user.sites[0] : null
+  const tieneVariasSedes = !esAdmin && (user?.sites?.length ?? 0) > 1
   const primeraSede = user?.sites?.[0]
 
   // Inicialización síncrona: multi-sede arranca en su primera sede.
