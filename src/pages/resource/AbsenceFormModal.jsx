@@ -105,7 +105,11 @@ export default function AusenciaFormModal({ recursoId, esquemaPago, tipoRecurso,
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
   // F-AA-126 v05 (sep-14-2026): oftalmo/optometra requieren proceso + novedad.
-  const requiereV05 = ['oftalmologo', 'optometra'].includes(tipoRecurso)
+  // Sep-2026 · Bug reportado: los 5 tipos que emiten F-AA-126 (oftalmólogo,
+  // optómetra, otorrino, fonoaudióloga, anestesiólogo) deben ver los campos
+  // v05 "Proceso que afecta" y "Tipo de novedad" — antes solo se mostraban
+  // a oftalmólogos y optómetras. Usamos el mismo set TIPOS_QUE_REPONEN.
+  const requiereV05 = TIPOS_QUE_REPONEN.has(tipoRecurso)
   const v05Ok = !requiereV05 || (!!form.affected_process && !!form.novelty_type)
   const valid = form.type && form.start_date && !!form.affected_company && v05Ok
 
@@ -207,7 +211,7 @@ export default function AusenciaFormModal({ recursoId, esquemaPago, tipoRecurso,
 
             {/* F-AA-126 v05 (sep-14-2026) — Proceso que afecta + Tipo de novedad.
                 Solo para oftalmólogo/optómetra. */}
-            {['oftalmologo', 'optometra'].includes(tipoRecurso) && (
+            {TIPOS_QUE_REPONEN.has(tipoRecurso) && (
               <>
                 <div className="mt-3">
                   <label className="label">Proceso que afecta *</label>

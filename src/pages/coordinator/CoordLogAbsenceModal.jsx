@@ -174,7 +174,12 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, onCreated
   const ciudadOk = !esMotivoRegional || form.regional_city.trim().length >= 2
   const empresaOk = !!form.affected_company  // Fase 5 · v04: campo obligatorio del formato
   // F-AA-126 v05 (sep-14-2026): proceso + novedad son obligatorios para oftalmo/optometra.
-  const requiereFormatoV05 = ['oftalmologo', 'optometra'].includes(categoria)
+  // Sep-2026 · Bug reportado: los otorrinos, fonoaudiólogas y anestesiólogos
+  // también emiten F-AA-126 (están en TIPOS_QUE_REPONEN) pero el modal solo
+  // les mostraba los dropdowns "Proceso que afecta" y "Tipo de novedad" a
+  // oftalmólogos y optómetras. Unificamos: los 5 tipos que reponen ven los
+  // campos v05, no solo 2.
+  const requiereFormatoV05 = TIPOS_QUE_REPONEN.has(categoria)
   const formatoOk = !requiereFormatoV05 || (!!form.affected_process && !!form.novelty_type)
   const valid = form.resource_id && form.type && form.start_date && !fechaInvalida && horasOk && ciudadOk && empresaOk && formatoOk
 
@@ -343,7 +348,7 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, onCreated
 
             {/* F-AA-126 v05 (sep-14-2026) — Proceso que afecta + Tipo de novedad.
                 Solo para oftalmólogo/optómetra (los que usan el formato oficial). */}
-            {['oftalmologo', 'optometra'].includes(categoria) && (
+            {TIPOS_QUE_REPONEN.has(categoria) && (
               <>
                 <div className="mt-3">
                   <label className="label">Proceso que afecta *</label>
