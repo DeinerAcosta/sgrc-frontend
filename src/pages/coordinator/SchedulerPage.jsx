@@ -276,7 +276,7 @@ export default function ProgramadorPage() {
       // Auto-recover: si sedeId está vacío pero user.sedes tiene contenido,
       // usamos user.sedes[0] como fallback antes de rechazar. Solo abortamos si
       // realmente no hay ninguna sede que usar.
-      const sedeFallback = sedeId || sedePropia || user?.sites?.[0] || null
+      const sedeFallback = sedeId || sedePropia || (esAdminSched ? null : user?.sites?.[0]) || null
       if (!sedeFallback) {
         throw new Error('No se pudo determinar la sede. Recarga la página y vuelve a intentar.')
       }
@@ -317,13 +317,16 @@ export default function ProgramadorPage() {
   // tiene asignaciones. Esto evita borrados accidentales — el conteo y los
   // mensajes son del ALCANCE DE SU SEDE (no global) — la solicitud al backend
   // también va con sede_id, así otras sedes nunca se ven afectadas.
-  const sedeActivaNombre = user?.sites_info?.find((s) => s.id === sedeId)?.name ?? 'tu sede'
+  // Admin: su sede vinculada no dice nada de la sede que está programando —
+  // el nombre sale del catálogo completo (antes decía "tu sede").
+  const sedeActivaNombre = todasSedes.find((s) => s.id === sedeId)?.name
+    ?? user?.sites_info?.find((s) => s.id === sedeId)?.name ?? 'tu sede'
   const onClickCopiarSemana = async () => {
     // Validación temprana: si aún no hay sede seleccionada (dropdown vacío en
     // supervisor/gerencia, o hidratación pendiente del auth para coord), avisar
     // ANTES de mostrar el confirm — así el mensaje del backend "Debes especificar
     // la(s) sede(s)..." nunca aparece al usuario final.
-    const sedeFallback = sedeId || sedePropia || user?.sites?.[0] || null
+    const sedeFallback = sedeId || sedePropia || (esAdminSched ? null : user?.sites?.[0]) || null
     if (!sedeFallback) {
       toast.error('Selecciona una sede antes de copiar (arriba en el selector).', { duration: 4000 })
       return
