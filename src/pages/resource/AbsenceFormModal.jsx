@@ -48,9 +48,6 @@ export default function AusenciaFormModal({ recursoId, esquemaPago, tipoRecurso,
     affected_company: '',
     wants_makeup: '',
     makeup_notes: '',
-    // F-AA-126 v05 (sep-14-2026) — solo se muestran para oftalmólogo/optómetra.
-    affected_process: '',
-    novelty_type: '',
   })
   const { tryClose } = useDirtyClose(form, onClose)
 
@@ -92,8 +89,6 @@ export default function AusenciaFormModal({ recursoId, esquemaPago, tipoRecurso,
       affected_company: form.affected_company || undefined,
       wants_makeup: form.wants_makeup === 'si' ? true : form.wants_makeup === 'no' ? false : undefined,
       makeup_notes: form.wants_makeup === 'si' ? (form.makeup_notes || undefined) : undefined,
-      affected_process: form.affected_process || undefined,
-      novelty_type: form.novelty_type || undefined,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['ausencias'] })
@@ -104,14 +99,7 @@ export default function AusenciaFormModal({ recursoId, esquemaPago, tipoRecurso,
   })
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
-  // F-AA-126 v05 (sep-14-2026): oftalmo/optometra requieren proceso + novedad.
-  // Sep-2026 · Bug reportado: los 5 tipos que emiten F-AA-126 (oftalmólogo,
-  // optómetra, otorrino, fonoaudióloga, anestesiólogo) deben ver los campos
-  // v05 "Proceso que afecta" y "Tipo de novedad" — antes solo se mostraban
-  // a oftalmólogos y optómetras. Usamos el mismo set TIPOS_QUE_REPONEN.
-  const requiereV05 = TIPOS_QUE_REPONEN.has(tipoRecurso)
-  const v05Ok = !requiereV05 || (!!form.affected_process && !!form.novelty_type)
-  const valid = form.type && form.start_date && !!form.affected_company && v05Ok
+  const valid = form.type && form.start_date && !!form.affected_company
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && tryClose()}>
@@ -209,38 +197,6 @@ export default function AusenciaFormModal({ recursoId, esquemaPago, tipoRecurso,
               </div>
             </div>
 
-            {/* F-AA-126 v05 (sep-14-2026) — Proceso que afecta + Tipo de novedad.
-                Solo para oftalmólogo/optómetra. */}
-            {TIPOS_QUE_REPONEN.has(tipoRecurso) && (
-              <>
-                <div className="mt-3">
-                  <label className="label">Proceso que afecta *</label>
-                  <select
-                    className="input"
-                    value={form.affected_process}
-                    onChange={(e) => set('affected_process', e.target.value)}
-                  >
-                    <option value="">Seleccionar...</option>
-                    <option value="consulta_externa">Consulta externa</option>
-                    <option value="ayudas_diagnosticas">Ayudas diagnósticas</option>
-                    <option value="cirugia">Cirugía</option>
-                  </select>
-                </div>
-                <div className="mt-3">
-                  <label className="label">Tipo de novedad *</label>
-                  <select
-                    className="input"
-                    value={form.novelty_type}
-                    onChange={(e) => set('novelty_type', e.target.value)}
-                  >
-                    <option value="">Seleccionar...</option>
-                    <option value="cambio_permanente">Cambio permanente de horario</option>
-                    <option value="cambio_periodo">Cambio de horario de periodo determinado</option>
-                    <option value="ausencia_periodo">Ausencia de un período determinado</option>
-                  </select>
-                </div>
-              </>
-            )}
 
             {/* Reposición solo aplica a los profesionales que atienden pacientes.
                 El personal de apoyo (asesores, auxiliares, tecnicos, anestesiologos)

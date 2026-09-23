@@ -41,9 +41,6 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, onCreated
     affected_company: '',
     wants_makeup: '',                    // '' = sin elegir, 'si' | 'no'
     makeup_notes: '',
-    // F-AA-126 v05 (sep-14-2026) — solo se muestran para oftalmólogo/optómetra.
-    affected_process: '',                // consulta_externa | ayudas_diagnosticas | cirugia
-    novelty_type: '',                    // cambio_permanente | cambio_periodo | ausencia_periodo
   })
 
   // Catálogo dinámico de motivos. Fallback al hardcoded si la API falla.
@@ -119,9 +116,6 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, onCreated
       affected_company: form.affected_company || undefined,
       wants_makeup: form.wants_makeup === 'si' ? true : form.wants_makeup === 'no' ? false : undefined,
       makeup_notes: form.wants_makeup === 'si' ? (form.makeup_notes || undefined) : undefined,
-      // F-AA-126 v05 · solo relevante para oftalmo/optometra
-      affected_process: form.affected_process || undefined,
-      novelty_type: form.novelty_type || undefined,
       end_date: form.end_date || form.start_date,
       recorded_by_coordinator: true,
     }),
@@ -173,15 +167,7 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, onCreated
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
   const ciudadOk = !esMotivoRegional || form.regional_city.trim().length >= 2
   const empresaOk = !!form.affected_company  // Fase 5 · v04: campo obligatorio del formato
-  // F-AA-126 v05 (sep-14-2026): proceso + novedad son obligatorios para oftalmo/optometra.
-  // Sep-2026 · Bug reportado: los otorrinos, fonoaudiólogas y anestesiólogos
-  // también emiten F-AA-126 (están en TIPOS_QUE_REPONEN) pero el modal solo
-  // les mostraba los dropdowns "Proceso que afecta" y "Tipo de novedad" a
-  // oftalmólogos y optómetras. Unificamos: los 5 tipos que reponen ven los
-  // campos v05, no solo 2.
-  const requiereFormatoV05 = TIPOS_QUE_REPONEN.has(categoria)
-  const formatoOk = !requiereFormatoV05 || (!!form.affected_process && !!form.novelty_type)
-  const valid = form.resource_id && form.type && form.start_date && !fechaInvalida && horasOk && ciudadOk && empresaOk && formatoOk
+  const valid = form.resource_id && form.type && form.start_date && !fechaInvalida && horasOk && ciudadOk && empresaOk
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && tryClose()}>
@@ -346,39 +332,6 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, onCreated
               </div>
             </div>
 
-            {/* F-AA-126 v05 (sep-14-2026) — Proceso que afecta + Tipo de novedad.
-                Solo para oftalmólogo/optómetra (los que usan el formato oficial). */}
-            {TIPOS_QUE_REPONEN.has(categoria) && (
-              <>
-                <div className="mt-3">
-                  <label className="label">Proceso que afecta *</label>
-                  <select
-                    className="input"
-                    value={form.affected_process}
-                    onChange={(e) => set('affected_process', e.target.value)}
-                  >
-                    <option value="">Seleccionar...</option>
-                    <option value="consulta_externa">Consulta externa</option>
-                    <option value="ayudas_diagnosticas">Ayudas diagnósticas</option>
-                    <option value="cirugia">Cirugía</option>
-                  </select>
-                </div>
-
-                <div className="mt-3">
-                  <label className="label">Tipo de novedad *</label>
-                  <select
-                    className="input"
-                    value={form.novelty_type}
-                    onChange={(e) => set('novelty_type', e.target.value)}
-                  >
-                    <option value="">Seleccionar...</option>
-                    <option value="cambio_permanente">Cambio permanente de horario</option>
-                    <option value="cambio_periodo">Cambio de horario de periodo determinado</option>
-                    <option value="ausencia_periodo">Ausencia de un período determinado</option>
-                  </select>
-                </div>
-              </>
-            )}
 
             {/* Reposición solo aplica a profesionales que atienden pacientes.
                 El personal de apoyo (asesores, auxiliares, tecnicos,
