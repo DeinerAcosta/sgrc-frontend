@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { initials } from '@/utils/helpers'
 
 /**
@@ -150,6 +150,98 @@ export function SectionHeader({ title, subtitle, action }) {
         {subtitle && <div className="text-xs text-gray-400">{subtitle}</div>}
       </div>
       {action}
+    </div>
+  )
+}
+
+// ============================================================================
+// PAGINACIÓN DE LISTADOS
+// ============================================================================
+// Sep-2026 · pedido de dirección: las grillas largas (informes, usuarios,
+// recursos…) se paginan de a 10 y muestran el total de registros, para poder
+// cuadrar la contabilidad completa sin hacer scroll infinito.
+//
+// Se usa en pareja: el hook recorta la lista, el componente pinta el control.
+// La lista que entra ya viene filtrada y ordenada por la página; acá solo se
+// corta. Los KPIs y la exportación siguen calculándose sobre la lista COMPLETA.
+//
+//   const pag = usePaginacion(dataOrdenada)
+//   ...
+//   {pag.visibles.map(...)}
+//   <Paginacion estado={pag} etiqueta="registros" />
+
+/**
+ * @param {Array} items         Lista COMPLETA ya filtrada/ordenada.
+ * @param {number} porPaginaIni Tamaño de página inicial (10 por defecto).
+ */
+export function usePaginacion(items = [], porPaginaIni = 10) {
+  const [pagina, setPagina] = useState(1)
+  const [porPagina, setPorPagina] = useState(porPaginaIni)
+
+  const total = items.length
+  const totalPaginas = Math.max(1, Math.ceil(total / porPagina))
+
+  // Al cambiar un filtro la lista se acorta y la página actual puede quedar
+  // fuera de rango: la tabla saldría vacía y parecería que no hay datos.
+  useEffect(() => { setPagina(1) }, [total, porPagina])
+
+  // Además de resetear, acotamos en el render: entre que cambia `total` y que
+  // corre el efecto hay un render intermedio que pintaría la página vacía.
+  const paginaSegura = Math.min(pagina, totalPaginas)
+  const ini = (paginaSegura - 1) * porPagina
+
+  const visibles = useMemo(() => items.slice(ini, ini + porPagina), [items, ini, porPagina])
+
+  return {
+    visibles,
+    pagina: paginaSegura,
+    setPagina,
+    porPagina,
+    setPorPagina,
+    total,
+    totalPaginas,
+    desde: total === 0 ? 0 : ini + 1,
+    hasta: Math.min(ini + porPagina, total),
+  }
+}
+
+/** Control de paginación + contador. `estado` es lo que devuelve usePaginacion(). */
+export function Paginacion({ estado, etiqueta = 'registros', opciones = [10, 25, 50, 100], className = '' }) {
+  const { pagina, setPagina, porPagina, setPorPagina, total, totalPaginas, desde, hasta } = estado
+  // Con una sola página se sigue mostrando el conteo (es el dato que se pide
+  // para cuadrar), pero sin botones de navegación, que no harían nada.
+  const navegable = totalPaginas > 1
+
+  return (
+    <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-1 pt-3 ${className}`}>
+      <div className="text-xs text-gray-500">
+        {total === 0
+          ? `Sin ${etiqueta}`
+          : <>Mostrando <span className="font-medium text-gray-700">{desde}–{hasta}</span> de{' '}
+             <span className="font-medium text-gray-700">{total}</span> {etiqueta}</>}
+      </div>
+
+      <div className="flex items-center gap-2">
+        <label className="text-xs text-gray-400 hidden sm:inline">Por página:</label>
+        <select
+          className="input w-auto py-1 text-xs"
+          value={porPagina}
+          onChange={(e) => setPorPagina(Number(e.target.value))}
+          aria-label="Registros por página"
+        >
+          {opciones.map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+
+        {navegable && (
+          <div className="flex items-center gap-1">
+            <button className="btn px-2 py-1 text-xs" onClick={() => setPagina(1)} disabled={pagina === 1} aria-label="Primera página">«</button>
+            <button className="btn px-2 py-1 text-xs" onClick={() => setPagina(pagina - 1)} disabled={pagina === 1} aria-label="Página anterior">‹</button>
+            <span className="text-xs text-gray-600 px-1 whitespace-nowrap">{pagina} / {totalPaginas}</span>
+            <button className="btn px-2 py-1 text-xs" onClick={() => setPagina(pagina + 1)} disabled={pagina === totalPaginas} aria-label="Página siguiente">›</button>
+            <button className="btn px-2 py-1 text-xs" onClick={() => setPagina(totalPaginas)} disabled={pagina === totalPaginas} aria-label="Última página">»</button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

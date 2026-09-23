@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { informeService, sedeService, semanaService } from '@/services/api'
 import { useAuthStore } from '@/store/authStore'
-import { Spinner, Badge, Semaforo, EmptyState } from '@/components/ui'
+import { Spinner, Badge, Semaforo, EmptyState, usePaginacion, Paginacion } from '@/components/ui'
 import { formatPct, formatCOP, formatHoras, titleCase, compareNatural, formatFamiliaLabel, TIPOS_RECURSO, ESPECIALIDADES } from '@/utils/helpers'
 import { format, subWeeks, startOfWeek } from 'date-fns'
 import toast from 'react-hot-toast'
@@ -332,6 +332,11 @@ export default function InformePage() {
       })
     : dataBase
 
+  // Paginación de la grilla (10 por página). Los KPIs, los totales y la
+  // exportación a PDF/Excel siguen calculándose sobre `dataOrdenada` COMPLETA:
+  // la página es solo lo que se pinta, nunca lo que se cuenta.
+  const pag = usePaginacion(dataOrdenada)
+
   // Columnas visibles según rol: si el CONFIG define colsRestringidasACoord
   // y el usuario es coordinador, ocultamos esos índices (ago-2026: en el
   // informe de ausentismo, coord no ve Programadas/Imprevistas/Quejas).
@@ -573,8 +578,14 @@ export default function InformePage() {
         ) : dataOrdenada.length === 0 ? (
           <EmptyState icon="📊" title="Sin datos para los filtros seleccionados" description="Ajusta el rango de fechas o los filtros para ver resultados." />
         ) : (
-          <div className="overflow-x-auto -mx-4 sm:mx-0">
-            <table className="w-full text-xs border-collapse min-w-[800px]">
+          /* Sep-2026 · el sticky del <th> NO funcionaba acá: sin max-h el div no
+             genera scroll propio, así que el `sticky top-0` no tiene contra qué
+             fijarse y el encabezado se iba con el scroll de la página. Mismo
+             arreglo que ya se hizo en el Programador (commit 6bc213b).
+             border-separate: con border-collapse el navegador descarta los
+             bordes de una celda sticky y el encabezado queda sin línea. */
+          <div className="overflow-auto -mx-4 sm:mx-0 max-h-[calc(100vh-320px)]">
+            <table className="w-full text-xs border-separate border-spacing-0 min-w-[800px]">
               <thead>
                 <tr className="bg-gray-50">
                   {colsVisibles.map((col, colIdx) => {
@@ -601,7 +612,7 @@ export default function InformePage() {
                 </tr>
               </thead>
               <tbody>
-                {dataOrdenada.map((row, i) => {
+                {pag.visibles.map((row, i) => {
                   const pct = row.pct_ocupacion ?? row.pct_cumplimiento ?? row.pct_utilizacion
                   // PROYECTOS-3255 #1.3: si el recurso estuvo en incapacidad medica
                   // confirmada, NO se pinta semaforo (no se puede penalizar a un
@@ -690,6 +701,7 @@ export default function InformePage() {
             </table>
           </div>
         )}
+        {dataOrdenada.length > 0 && <Paginacion estado={pag} etiqueta="registros" />}
       </div>
 
       {cfg.meta && (
