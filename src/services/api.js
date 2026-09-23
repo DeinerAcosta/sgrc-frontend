@@ -1219,28 +1219,4 @@ export const solicitudRecursoService = {
   },
 }
 
-// PROYECTOS-3255 #4.1 · Quejas (MVP)
-export const quejaService = {
-  list: async (params = {}) => {
-    if (!DEMO_MODE) return api.get('/complaints', { params })
-    return ok([])
-  },
-  getById: async (id) => {
-    if (!DEMO_MODE) return api.get(`/complaints/${id}`)
-    return ok(null)
-  },
-  crear: async (data) => {
-    if (!DEMO_MODE) return api.post('/complaints', data)
-    return ok({ id: `demo-${Date.now()}`, ...data, status: 'pendiente' })
-  },
-  actualizar: async (id, data) => {
-    if (!DEMO_MODE) return api.put(`/complaints/${id}`, data)
-    return ok({ id, ...data })
-  },
-  eliminar: async (id) => {
-    if (!DEMO_MODE) return api.delete(`/complaints/${id}`)
-    return ok({ ok: true })
-  },
-}
-
 export default api

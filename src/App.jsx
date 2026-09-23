@@ -40,7 +40,6 @@ const RecursosCoordPage       = lazy(() => import('@/pages/coordinator/CoordReso
 const BackofficeCoordPage     = lazy(() => import('@/pages/coordinator/CoordBackofficePage'))
 const HorarioDiarioPage       = lazy(() => import('@/pages/coordinator/DailySchedulePage'))
 const SolicitudesRecursoCoordPage = lazy(() => import('@/pages/coordinator/CoordResourceRequestsPage'))
-const QuejasPage                = lazy(() => import('@/pages/coordinator/ComplaintsPage'))
 
 // Directivo
 const DashboardDirectivoPage    = lazy(() => import('@/pages/executive/ExecutiveDashboardPage'))
@@ -83,7 +82,7 @@ function RequireAuth({ children, roles }) {
 function RoleRedirect() {
   const { user } = useAuthStore()
   const routes = {
-    resource:     '/app/horario',
+    recurso:     '/app/horario',
     coordinador: '/app/dashboard-coord',
     directivo:   '/app/dashboard',
     supervisor:  '/app/admin/sedes',
@@ -124,7 +123,6 @@ export default function App() {
           <Route path="backoffice-coord" element={<RequireAuth roles={['coordinador']}><BackofficeCoordPage /></RequireAuth>} />
           <Route path="horario-diario" element={<RequireAuth roles={['coordinador', 'supervisor']}><HorarioDiarioPage /></RequireAuth>} />
           <Route path="solicitudes-recurso" element={<RequireAuth roles={['coordinador']}><SolicitudesRecursoCoordPage /></RequireAuth>} />
-          <Route path="quejas" element={<RequireAuth roles={['coordinador', 'supervisor', 'directivo']}><QuejasPage /></RequireAuth>} />
 
           {/* DIRECTIVO */}
           <Route path="dashboard" element={<RequireAuth roles={['directivo']}><DashboardDirectivoPage /></RequireAuth>} />

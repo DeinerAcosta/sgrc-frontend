@@ -34,9 +34,8 @@ const NAV_ITEMS = {
     { to: '/app/recursos-coord',       icon: '👥', label: 'Recursos' },
     { to: '/app/backoffice-coord',     icon: '🗂️', label: 'Backoffice' },
 
-    { divider: true, label: 'Solicitudes y quejas' },
+    { divider: true, label: 'Solicitudes' },
     { to: '/app/solicitudes-recurso',  icon: '📨', label: 'Solicitudes de recurso' },
-    { to: '/app/quejas',               icon: '🎫', label: 'Quejas' },
 
     { divider: true, label: 'Informes' },
     { to: '/app/informes/ocupacion',   icon: '📊', label: 'Ocupación' },
@@ -65,7 +64,6 @@ const NAV_ITEMS = {
     { divider: true, label: 'Cierre y control' },
     { to: '/app/informes/cierre-semanas',  icon: '🔒', label: 'Cierre de semanas' },
     { to: '/app/comparativo',              icon: '↔️',  label: 'Comparativo semanal' },
-    { to: '/app/quejas',                   icon: '🎫', label: 'Quejas' },
 
     { divider: true, label: 'Personal' },
     { to: '/app/perfil',                   icon: '👤', label: 'Mi perfil' },
@@ -89,7 +87,6 @@ const NAV_ITEMS = {
 
     { divider: true, label: 'Gestión operativa' },
     { to: '/app/ausencias-cronograma',     icon: '🗓️', label: 'Cronograma ausencias' },
-    { to: '/app/quejas',                   icon: '🎫', label: 'Quejas' },
     { to: '/app/programador',              icon: '🔓', label: 'Editar semana cerrada' },
 
     { divider: true, label: 'Auditoría' },
@@ -115,7 +112,6 @@ const NAV_ITEMS = {
     { divider: true, label: 'Gestión operativa' },
     { to: '/app/ausencias-coord',          icon: '⚠️',  label: 'Ausencias' },
     { to: '/app/ausencias-cronograma',     icon: '🗓️', label: 'Cronograma ausencias' },
-    { to: '/app/quejas',                   icon: '🎫', label: 'Quejas' },
     { to: '/app/programador',              icon: '🔓', label: 'Editar semana cerrada' },
 
     { divider: true, label: 'Catálogos maestros' },
