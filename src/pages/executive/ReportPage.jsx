@@ -105,7 +105,15 @@ const CONFIG = {
   subutilizacion: {
     title: 'Recursos subutilizados',
     desc: 'Recursos con horas disponibles sin asignar. Meta: ≥90% utilización para auxiliares y optómetras.',
-    cols: ['Recurso', 'Tipo', 'Sede', 'Horas asignadas', 'Horas disponibles', '% Utilización', 'Semanas consecutivas'],
+    // Sep-2026 · se quita "Semanas consecutivas". La tabla leía por POSICIÓN y
+    // esa columna caía en el índice 6, que es `pct_bruto` (el % sin tope): por
+    // eso mostraba cosas como "371" donde debía ir un conteo de semanas. Y el
+    // campo real, `sem_consec`, está fijo en 0 en el backend — nunca se calculó.
+    // Mejor no mostrar la columna que mostrar otro dato disfrazado.
+    // Las `keys` explícitas evitan que vuelva a desalinearse si el backend
+    // agrega campos nuevos.
+    cols: ['Recurso', 'Tipo', 'Sede', 'Horas asignadas', 'Horas disponibles', '% Utilización'],
+    keys: ['resource', 'type', 'site', 'h_asignadas', 'h_disponibles', 'pct_utilizacion'],
     meta: 90,
     fn: informeService.subutilizacion,
   },
