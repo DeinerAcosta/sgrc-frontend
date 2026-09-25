@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { recursoService, usuarioService } from '@/services/api'
 import { Avatar, Badge, Spinner, EmptyState } from '@/components/ui'
-import { TIPOS_RECURSO } from '@/utils/helpers'
+import { TIPOS_RECURSO, TIPOS_POR_PACIENTE } from '@/utils/helpers'
 import { useDirtyClose } from '@/hooks/useDirtyClose'
 
 const ESQUEMAS_PAGO = [
@@ -197,8 +197,14 @@ function RecursoModal({ recurso, onClose, onSaved }) {
   // médica como Retina/Glaucoma/Córnea/etc., y rotación entre consultorios).
   const requiereEspecialidad = form.type === 'oftalmologo'
   const puedeMultiConsultorio = form.type === 'oftalmologo'
-  // Tipos que cobran por paciente: sin tope semanal (esquema por_paciente).
-  const esPorPaciente = form.type === 'oftalmologo' || form.type === 'fonoaudiologa'
+  // Sep-2026 · SE DECIDE POR EL ESQUEMA, NO POR EL TIPO.
+  // Antes esto era `form.type === 'oftalmologo' || form.type === 'fonoaudiologa'`,
+  // y ese era el motivo por el que los 94 oftalmólogos con esquema 'fijo' y tope
+  // NULL no se podían arreglar desde aquí: con tipo oftalmólogo la casilla
+  // "Horas máx. semana" NO SE RENDERIZABA, así que la pantalla no ofrecía forma
+  // de salir de ese estado. El tipo solo aporta el defecto del esquema (ver el
+  // onChange de abajo); a partir de ahí manda el esquema.
+  const esPorPaciente = form.pay_scheme === 'por_paciente'
   const cambiaEstado = !isNew && form.active !== recurso.active
 
   const { mutate, isPending } = useMutation({
@@ -239,16 +245,19 @@ function RecursoModal({ recurso, onClose, onSaved }) {
               value={form.type}
               onChange={(e) => {
                 const nuevoTipo = e.target.value
-                // Oftalmólogos y fonoaudiólogas: esquema por paciente → sin tope semanal.
+                // El tipo PROPONE el esquema de pago (oftalmólogos y fonoaudiólogas
+                // cobran por paciente), y el esquema decide el tope semanal. Quien
+                // quiera un oftalmólogo de salario fijo cambia el esquema abajo y la
+                // casilla de horas aparece — antes ese camino no existía.
                 // Multi-consultorio y subespecialidad: solo oftalmólogos.
-                // Otros: conservan lo que tenían. Al cambiar limpiamos lo que no aplica.
-                const nuevoEsPorPaciente = nuevoTipo === 'oftalmologo' || nuevoTipo === 'fonoaudiologa'
+                const nuevoEsquema = TIPOS_POR_PACIENTE.includes(nuevoTipo) ? 'por_paciente' : 'fijo'
                 setForm({
                   ...form,
                   type: nuevoTipo,
                   multi_room: nuevoTipo === 'oftalmologo' ? form.multi_room : false,
                   specialty: nuevoTipo === 'oftalmologo' ? form.specialty : '',
-                  max_hours_per_week: nuevoEsPorPaciente ? null : (form.max_hours_per_week ?? 44),
+                  pay_scheme: nuevoEsquema,
+                  max_hours_per_week: nuevoEsquema === 'por_paciente' ? null : (form.max_hours_per_week ?? 44),
                 })
               }}
             >
@@ -357,11 +366,26 @@ function RecursoModal({ recurso, onClose, onSaved }) {
           <div className={`grid gap-3 ${esPorPaciente ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-3'}`}>
             <div>
               <label className="label">Esquema de pago *</label>
-              <select className="input" value={form.pay_scheme} onChange={(e) => setForm({ ...form, pay_scheme: e.target.value })}>
+              <select
+                className="input"
+                value={form.pay_scheme}
+                onChange={(e) => {
+                  // Invariante: por_paciente ⇔ sin tope semanal. El backend lo
+                  // vuelve a aplicar al guardar (lib/resourceTypes.js), pero lo
+                  // reflejamos aquí para que la pantalla no muestre un tope que
+                  // luego se va a descartar.
+                  const nuevoEsquema = e.target.value
+                  setForm({
+                    ...form,
+                    pay_scheme: nuevoEsquema,
+                    max_hours_per_week: nuevoEsquema === 'por_paciente' ? null : (form.max_hours_per_week ?? 44),
+                  })
+                }}
+              >
                 {ESQUEMAS_PAGO.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
               </select>
             </div>
-            {/* Recursos por_paciente (oftalmólogos, fonoaudiólogas) no tienen tope semanal contractual */}
+            {/* Esquema por_paciente: sin tope semanal contractual → no se pide */}
             {!esPorPaciente && (
               <div>
                 <label className="label">Horas máx. semana</label>
@@ -393,9 +417,17 @@ function RecursoModal({ recurso, onClose, onSaved }) {
               </div>
             </div>
           </div>
-          {esPorPaciente && (
+          {/* El aviso explica las CONSECUENCIAS del esquema, no del tipo: antes
+              decía "Oftalmólogos"/"Fonoaudiólogas" según form.type, y con el
+              esquema ya desacoplado eso podía contradecir lo que se ve en
+              pantalla (p.ej. un optómetra puesto en por_paciente). */}
+          {esPorPaciente ? (
             <div className="bg-amber-50 border border-amber-100 rounded-lg p-2.5 text-xs text-amber-800">
-              ℹ️ {form.type === 'oftalmologo' ? 'Oftalmólogos' : 'Fonoaudiólogas'} no tienen tope semanal — se les paga por paciente atendido. El sistema no marcará "horas extras".
+              ℹ️ Esquema <strong>por paciente</strong>: sin tope semanal. El sistema no marcará "horas extras", no lo incluirá en el informe de <strong>Tiempos ociosos</strong> ni le enviará alertas de horas sin asignar — las horas libres no representan costo fijo.
+            </div>
+          ) : (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-2.5 text-xs text-gray-600">
+              ℹ️ Esquema <strong>{form.pay_scheme === 'mixto' ? 'mixto' : 'de salario fijo'}</strong>: sí entra al informe de <strong>Tiempos ociosos</strong> y a las alertas RN-25. El tope semanal es el denominador del % de utilización, por eso es obligatorio.
             </div>
           )}
           {puedeMultiConsultorio && (

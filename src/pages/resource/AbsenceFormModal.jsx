@@ -7,21 +7,25 @@ import { Spinner } from '@/components/ui'
 import { differenceInDays } from 'date-fns'
 import { useDirtyClose } from '@/hooks/useDirtyClose'
 
-const REQUIEREN_ANTICIPACION = ['academico', 'vacaciones', 'licencia_remunerada', 'licencia_no_remunerada']
-const SOLO_SALARIO_FIJO = ['licencia_remunerada', 'licencia_no_remunerada']
+const REQUIEREN_ANTICIPACION = ['academico', 'vacaciones']
 
 // Sep-2026: el recurso profesional solo debe ver los motivos que aparecen en el
 // formato oficial F-AA-126 v04. Los motivos operativos (cambio horario, formato,
 // disminuir pacientes, cubre_qx, regionales, brigada, etc.) los usa quien gestiona
 // la reprogramacion — no el profesional que se ausenta. Se filtran por code.
+//
+// Sep-2026 · feedback usuario: las LICENCIAS (remunerada y no remunerada) salen
+// de esta lista. El diligenciamiento se simplifico y las licencias no las
+// registra el profesional — las tramita quien maneja la novedad de personal, y
+// coord/sup/gerencia las siguen viendo completas en CoordLogAbsenceModal. Con
+// esto cayo tambien el filtro SOLO_SALARIO_FIJO, que existia solo para
+// esconderle esos dos motivos a quien no fuera de salario fijo.
 const MOTIVOS_VISIBLES_RECURSO = new Set([
   'enfermedad',
   'calamidad',
   'academico',
   'familiar',
   'vacaciones',
-  'licencia_no_remunerada',
-  'licencia_remunerada',        // se filtra despues por esquema de pago si aplica
   'traslado_sedes_externas',
 ])
 
@@ -37,7 +41,10 @@ const TIPOS_QUE_REPONEN = new Set([
   'anestesiologo',
 ])
 
-export default function AusenciaFormModal({ recursoId, esquemaPago, tipoRecurso, onClose, horarioSemana = [] }) {
+// Sep-2026: se retiró el prop `esquemaPago`. Solo alimentaba el filtro que
+// escondía las licencias a quien no fuera de salario fijo, y las licencias ya no
+// se le ofrecen al profesional.
+export default function AusenciaFormModal({ recursoId, tipoRecurso, onClose, horarioSemana = [] }) {
   const puedeReponer = TIPOS_QUE_REPONEN.has(tipoRecurso)
   const qc = useQueryClient()
   // motivoId = del catálogo dinámico; tipo = el enum legacy (se setea automáticamente).
@@ -74,13 +81,10 @@ export default function AusenciaFormModal({ recursoId, esquemaPago, tipoRecurso,
     ? motivosCatalogo.map((m) => ({ id: m.id, value: m.code, label: m.name }))
     : TIPOS_AUSENCIA.map((t) => ({ id: null, value: t.value, label: t.label }))
 
-  const tipos = opciones.filter((t) => {
-    // Filtro 1 (sep-2026): el recurso solo ve los 7 motivos del F-AA-126 oficial.
-    // Coord/sup/gerencia siguen viendo TODOS via CoordLogAbsenceModal.
-    if (!MOTIVOS_VISIBLES_RECURSO.has(t.value)) return false
-    if (SOLO_SALARIO_FIJO.includes(t.value) && esquemaPago !== 'fijo') return false
-    return true
-  })
+  // Sep-2026: el recurso solo ve los motivos del F-AA-126 oficial, ya sin las
+  // dos licencias. Coord/sup/gerencia siguen viendo TODOS via
+  // CoordLogAbsenceModal, que es por donde se tramita una licencia.
+  const tipos = opciones.filter((t) => MOTIVOS_VISIBLES_RECURSO.has(t.value))
 
   const { mutate, isPending } = useMutation({
     mutationFn: () => ausenciaService.create({

@@ -52,6 +52,17 @@ export const TIPOS_RECURSO = [
   { value: 'otorrino',         label: 'Otorrino',            color: 'orange' },
 ]
 
+/**
+ * Tipos cuyo esquema de pago POR DEFECTO es "por paciente" (sin tope semanal).
+ * Espejo de TIPOS_POR_PACIENTE en el backend (src/lib/resourceTypes.js).
+ *
+ * Es solo el DEFECTO que propone el formulario al elegir el tipo. La regla real
+ * la marca el esquema de pago: `por_paciente` ⇔ sin tope semanal. Mezclar las
+ * dos cosas fue lo que dejó 94 oftalmólogos en un estado del que la interfaz no
+ * permitía salir.
+ */
+export const TIPOS_POR_PACIENTE = ['oftalmologo', 'fonoaudiologa']
+
 export const ESPECIALIDADES = [
   { value: 'oftalmologia',         label: 'Oftalmología' },
   { value: 'optometria',           label: 'Optometría' },
