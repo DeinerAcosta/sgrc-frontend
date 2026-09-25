@@ -2,16 +2,19 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { semanaService } from '@/services/api'
 import { Spinner, Semaforo } from '@/components/ui'
-import { useSedeActiva } from '@/hooks/useActiveSite'
 
 /**
  * HU-C-09 + RN-02: confirmar cierre de semana MOSTRANDO RESUMEN previo.
  * Cierra solo la SEDE activa del coord, no la semana global. Otros coords
  * pueden seguir trabajando hasta que cierren la suya.
+ *
+ * La sede llega del Programador (la que el usuario está viendo). Antes el modal
+ * calculaba la suya con useSedeActiva(), cuyo estado es independiente: a un
+ * coord multi-sede le cerraba SIEMPRE su primera sede aunque estuviera viendo
+ * otra, y a gerencia/supervisor le mandaba sede vacía (error 400).
  */
-export default function CerrarSemanaModal({ semana, resumen, onClose, onIrAConsultorio, onAsignarRecurso }) {
+export default function CerrarSemanaModal({ semana, resumen, sedeId, sedeNombre, onClose, onIrAConsultorio, onAsignarRecurso }) {
   const qc = useQueryClient()
-  const { siteId: sedeId, sedeNombre } = useSedeActiva()
 
   const { mutate, isPending } = useMutation({
     mutationFn: () => semanaService.cerrar(semana.id, sedeId),

@@ -346,7 +346,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                   max="200"
                   placeholder={`Vacío = usar ${capacidad} (capacidad calculada)`}
                   value={form.expected_patients}
-                  onChange={(e) => set('pacientes_esperados', e.target.value)}
+                  onChange={(e) => set('expected_patients', e.target.value)}
                 />
                 {form.expected_patients !== '' && Number(form.expected_patients) !== capacidad && (
                   <div className="text-[11px] text-amber-700 mt-1">
@@ -604,7 +604,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                 className="input resize-none"
                 rows={2}
                 value={form.supervisor_reason}
-                onChange={(e) => set('motivo_supervisor', e.target.value)}
+                onChange={(e) => set('supervisor_reason', e.target.value)}
                 placeholder="Ej: Corrección solicitada por gerencia tras revisión del cierre · ticket #..."
               />
               <div className="text-[11px] text-red-700 mt-1">

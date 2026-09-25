@@ -74,7 +74,7 @@ export const ESPECIALIDADES = [
 ]
 
 export const ROLES = {
-  resource:     { label: 'Recurso',             color: 'green' },
+  recurso:     { label: 'Recurso',             color: 'green' },
   coordinador: { label: 'Coordinador',         color: 'blue' },
   directivo:   { label: 'Directivo',           color: 'purple' },
   supervisor:  { label: 'Supervisor',          color: 'amber' },
@@ -115,7 +115,7 @@ export const calcularCapacidadPacientes = (horaInicio, horaFin, intervaloMinutos
   const minAlmuerzo = ALMUERZO_CORTO_TIPOS.has(tipoRecurso) ? 30 : 60
   const descuenta = debeDescontarAlmuerzo(totalMin, inicioMin, finMin, tipoRecurso)
   const jornada = descuenta ? totalMin - minAlmuerzo : totalMin
-  return Math.floor(jornada / (intervaloMinutos || 15))
+  return Math.floor(jornada / (intervaloMinutos || 10))
 }
 
 export const semanaLabel = (fechaInicio) => {

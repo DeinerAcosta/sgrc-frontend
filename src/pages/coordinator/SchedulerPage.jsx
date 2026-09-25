@@ -536,7 +536,13 @@ export default function ProgramadorPage() {
             </button>
           )}
           {semanaActual && !isCerrada && (
-            <button className="btn" style={{ borderColor: '#d1fae5', color: '#065f46' }} onClick={() => setShowCierre(true)}>
+            <button className="btn" style={{ borderColor: '#d1fae5', color: '#065f46' }} onClick={() => {
+              if (!sedeId) {
+                toast.error('Selecciona una sede antes de cerrar (arriba en el selector).', { duration: 4000 })
+                return
+              }
+              setShowCierre(true)
+            }}>
               🔒 Cerrar semana
             </button>
           )}
@@ -987,6 +993,8 @@ export default function ProgramadorPage() {
           <CerrarSemanaModal
             semana={semanaActual}
             resumen={resumen}
+            sedeId={sedeId}
+            sedeNombre={sedeActivaNombre}
             onClose={() => setShowCierre(false)}
             onIrAConsultorio={irAConsultorio}
             onAsignarRecurso={asignarRecursoOcioso}
