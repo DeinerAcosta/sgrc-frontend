@@ -71,6 +71,11 @@ const CONFIG = {
     title: 'Ocupación de consultorios',
     desc: 'Horas asignadas vs horas disponibles por consultorio y sede. Asesores se excluyen (no son consultorios físicos) — ver "Ocupación de asesores".',
     cols: ['Consultorio', 'Sede', 'Especialidad', 'Horas asignadas', 'Horas base', '% Ocupación'],
+    // `keys` explícitas: sin ellas la tabla lee por POSICIÓN y basta con que el
+    // backend reordene una clave para que las columnas se crucen. Pasó: al
+    // sembrar todos los consultorios quedó `h_base` antes que `h_asignadas` y
+    // la pantalla mostró la base bajo "Horas asignadas".
+    keys: ['room', 'site', 'specialty', 'h_asignadas', 'h_base', 'pct_ocupacion'],
     meta: 80,
     fn: informeService.ocupacion,
     porSemana: true,  // usa selector de semana en lugar de rango Desde/Hasta
@@ -79,6 +84,7 @@ const CONFIG = {
     title: 'Ocupación del área de asesores',
     desc: 'Ocupación de los asesores de servicios por sede. Capacidad = N° de asesores × tope semanal individual. Mide qué tan cargada está la recepción.',
     cols: ['Sede', '# Asesores', 'Horas asignadas', 'Horas base', '% Ocupación'],
+    keys: ['site', 'n_asesores', 'h_asignadas', 'h_base', 'pct_ocupacion'],
     meta: 80,
     fn: informeService.ocupacionAsesores,
     porSemana: true,
@@ -88,6 +94,7 @@ const CONFIG = {
     title: 'Productividad por recurso',
     desc: 'Horas y pacientes programados vs ejecutados por recurso. Incluye TODOS los recursos activos (los sin actividad aparecen con 0h al final). Promedios calculados sobre horas ejecutadas dividido por semanas o meses del rango.',
     cols: ['Recurso', 'Tipo', 'Sede', 'H. programadas', 'H. ejecutadas', 'Prom. semanal (h)', 'Prom. mensual (h)', 'Pac. programados', 'Pac. atendidos', '% Cumplimiento'],
+    keys: ['resource', 'type', 'site', 'h_prog', 'h_ejec', 'prom_h_semanal', 'prom_h_mensual', 'pac_prog', 'pac_at', 'pct_cumplimiento'],
     meta: 85,
     fn: informeService.productividad,
   },
@@ -95,6 +102,7 @@ const CONFIG = {
     title: 'Ausentismo y ranking',
     desc: 'Ranking de recursos por número de ausencias, pacientes afectados y costo estimado. Programadas: reportadas con >15 días de anticipación. Imprevistas: ≤15 días. Quejas estimadas: 9% de pacientes afectados si la anticipación fue >30 días, 8% si fue menor.',
     cols: ['Recurso', 'Tipo', 'Sede', 'Ausencias', 'Programadas', 'Imprevistas', 'Días', 'Pac. afectados', 'Costo estimado', 'Quejas'],
+    keys: ['resource', 'type', 'site', 'absences', 'programadas', 'imprevistas', 'dias', 'pac_afectados', 'cost', 'quejas'],
     // Columnas visibles SOLO para gerencia+supervisor+directivo (ago-2026):
     // coord no ve Programadas/Imprevistas/Quejas para no exponer datos que
     // se usan para análisis de reprogramación y responsabilidad.
@@ -141,6 +149,7 @@ const CONFIG = {
     title: 'Horas programadas vs ejecutadas',
     desc: 'Comparación entre lo que se programó y lo que realmente se ejecutó por sede y semana. Meta: ≥85% de cumplimiento.',
     cols: ['Sede', 'Semana', 'H. programadas', 'H. ejecutadas', 'Diferencia', '% Cumplimiento'],
+    keys: ['site', 'week', 'h_programadas', 'h_ejecutadas', 'diferencia', 'pct_cumplimiento'],
     meta: 85,
     fn: informeService.horasProgEjec,
   },
