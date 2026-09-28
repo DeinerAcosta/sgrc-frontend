@@ -11,6 +11,7 @@
 
 import axios from 'axios'
 import { useAuthStore } from '@/store/authStore'
+import { ESPECIALIDADES_EXIGEN_APOYO } from '@/utils/helpers'
 import {
   USUARIOS, SEDES, CONSULTORIOS, RECURSOS, SEMANAS, ASIGNACIONES,
   AUSENCIAS, NOTIFICACIONES, TAREAS_BACKOFFICE, DASH_DIRECTIVO,
@@ -1074,7 +1075,7 @@ export const consultorioService = {
   },
   create: async (data) => {
     if (!DEMO_MODE) return api.post('/rooms', data)
-    const requiereAux = ['oftalmologia', 'anestesiologia'].includes(data.specialty)
+    const requiereAux = ESPECIALIDADES_EXIGEN_APOYO.includes(data.specialty)
     const nuevo = { id: uid(), ...data, requires_assistant: requiereAux, active: data.active ?? true }
     _consultorios.push(nuevo)
     return ok(nuevo)

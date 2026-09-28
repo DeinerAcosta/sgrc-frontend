@@ -4,7 +4,7 @@ import toast from 'react-hot-toast'
 import { sedeService, consultorioService, usuarioService } from '@/services/api'
 import { Badge, Spinner, EmptyState } from '@/components/ui'
 import { useDirtyClose } from '@/hooks/useDirtyClose'
-import { ESPECIALIDADES as ESPECIALIDADES_GLOBAL } from '@/utils/helpers'
+import { ESPECIALIDADES as ESPECIALIDADES_GLOBAL, ESPECIALIDADES_EXIGEN_APOYO } from '@/utils/helpers'
 
 // Catálogo único — incluye "asesoria" (área de asesores) para que el modal
 // pueda crear/editar correctamente AREA ASESORES en cualquier sede. Antes
@@ -216,7 +216,7 @@ function ConsultorioModal({ cons, onClose, onSaved }) {
           {ESPECIALIDADES.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
         </select>
         <div className="text-xs text-gray-500 mt-1">
-          Requiere auxiliar: {['oftalmologia', 'anestesiologia'].includes(form.specialty) ? 'Sí' : 'No'}
+          Requiere auxiliar: {ESPECIALIDADES_EXIGEN_APOYO.includes(form.specialty) ? 'Sí' : 'No'}
         </div>
       </Field>
       <Field label="Servicio alternativo (opcional)">

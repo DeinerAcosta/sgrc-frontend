@@ -4,7 +4,7 @@ import toast from 'react-hot-toast'
 import { asignacionService, recursoService, semanaService, usuarioService } from '@/services/api'
 import { Spinner } from '@/components/ui'
 import SearchableSelect from '@/components/ui/SearchableSelect'
-import { calcularCapacidadPacientes, DIAS_FULL, DIAS, TIPOS_RECURSO } from '@/utils/helpers'
+import { calcularCapacidadPacientes, DIAS_FULL, DIAS, TIPOS_RECURSO, ESPECIALIDADES_EXIGEN_APOYO, ESPECIALIDADES_PERMITEN_APOYO } from '@/utils/helpers'
 import { useDirtyClose } from '@/hooks/useDirtyClose'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useAuthStore } from '@/store/authStore'
@@ -39,14 +39,14 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
   // (cuando hay servicio alternativo y el coord lo escogió). En cualquier caso
   // se comporta como un consultorio normal de esa especialidad: el "recurso
   // principal" es el médico/profesional del tipo correspondiente y el auxiliar
-  // se exige solo si esa especialidad lo requiere (oftalmología y anestesiología).
+  // se exige solo si esa especialidad lo requiere (ver ESPECIALIDADES_EXIGEN_APOYO).
   const especialidadActiva = especialidadOverride ?? consultorio.specialty
   const esServicioAlternativo = !!especialidadOverride && especialidadOverride !== consultorio.specialty
-  // Oftalmología y anestesiología EXIGEN al menos un recurso de apoyo (aux).
-  // Diagnóstico PERMITE un segundo técnico de apoyo (opcional) — uno puede
-  // salir antes que el otro para otro servicio.
-  const ESPECIALIDADES_EXIGEN_APOYO = ['oftalmologia', 'anestesiologia']
-  const ESPECIALIDADES_PERMITEN_APOYO = ['oftalmologia', 'anestesiologia', 'diagnostico']
+  // Oftalmología, anestesiología y otorrinolaringología EXIGEN al menos un
+  // recurso de apoyo (aux). Diagnóstico PERMITE un segundo técnico de apoyo
+  // (opcional) — uno puede salir antes que el otro para otro servicio.
+  // Sep-2026: las dos listas estaban escritas a mano aquí dentro y se habían
+  // quedado sin otorrino; ahora salen de helpers, espejo del backend.
   const _exigeApoyoPorEspecialidad = ESPECIALIDADES_EXIGEN_APOYO.includes(especialidadActiva)
   const permiteApoyoOpcional = ESPECIALIDADES_PERMITEN_APOYO.includes(especialidadActiva)
   // En diagnóstico el apoyo es OTRO TÉCNICO, no una auxiliar.

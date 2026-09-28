@@ -73,6 +73,23 @@ export const ESPECIALIDADES = [
   { value: 'otorrinolaringologia', label: 'Otorrinolaringología' },
 ]
 
+/**
+ * APOYO EN CONSULTORIO — espejo de ESPECIALIDADES_EXIGEN_APOYO /
+ * ESPECIALIDADES_PERMITEN_APOYO en el backend (src/lib/timeSlots.js).
+ *
+ * EXIGEN: la auxiliar es obligatoria, el profesional no atiende solo.
+ * PERMITEN: admiten apoyo. Diagnóstico solo permite, y ahí el apoyo es OTRO
+ * TÉCNICO, no una auxiliar.
+ *
+ * Sep-2026 · se agrega 'otorrinolaringologia'. Estaba en las tres listas de
+ * apoyo que había copiadas a mano (dos en AssignmentModal, una en AdminSitesPage)
+ * pero en ninguna figuraba, así que el modal de asignación no mostraba el campo
+ * de auxiliar y la ficha del consultorio decía "Requiere auxiliar: No" — cuando
+ * el backend ya los creaba con `requiere_auxiliar = true` desde jul-2026.
+ */
+export const ESPECIALIDADES_EXIGEN_APOYO = ['oftalmologia', 'anestesiologia', 'otorrinolaringologia']
+export const ESPECIALIDADES_PERMITEN_APOYO = [...ESPECIALIDADES_EXIGEN_APOYO, 'diagnostico']
+
 export const ROLES = {
   recurso:     { label: 'Recurso',             color: 'green' },
   coordinador: { label: 'Coordinador',         color: 'blue' },
