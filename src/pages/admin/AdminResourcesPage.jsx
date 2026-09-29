@@ -5,6 +5,7 @@ import { recursoService, usuarioService } from '@/services/api'
 import { Avatar, Badge, Spinner, EmptyState } from '@/components/ui'
 import { TIPOS_RECURSO, TIPOS_POR_PACIENTE } from '@/utils/helpers'
 import { useDirtyClose } from '@/hooks/useDirtyClose'
+import { useConfirm } from '@/contexts/ConfirmContext'
 
 const ESQUEMAS_PAGO = [
   { value: 'por_paciente', label: 'Por paciente' },
@@ -191,6 +192,7 @@ function RecursoModal({ recurso, onClose, onSaved }) {
     setForm({ ...form, support_types: [...apoyoSet].join(',') })
   }
   const { tryClose } = useDirtyClose(form, onClose)
+  const confirm = useConfirm()
 
   const requiereIntervalo = ['oftalmologo', 'optometra', 'anestesiologo', 'tecnico', 'fonoaudiologa'].includes(form.type)
   // Especialidad y multi-consultorio aplican solo a oftalmólogos (sub-especialidad
@@ -208,11 +210,11 @@ function RecursoModal({ recurso, onClose, onSaved }) {
   const cambiaEstado = !isNew && form.active !== recurso.active
 
   const { mutate, isPending } = useMutation({
-    mutationFn: () => {
+    mutationFn: (extra = {}) => {
       // Sep-2026 · perf [6]: si el usuario NO toco la firma, no la reenviamos.
       // Prisma trata `undefined` como "no cambiar el campo", asi que la firma
       // en la BD queda intacta. Para nuevos, siempre incluir (puede ser '').
-      const payload = { ...form }
+      const payload = { ...form, ...extra }
       if (!isNew && !firmaTocada) delete payload.signature_url
       return isNew ? recursoService.create(payload) : recursoService.update(recurso.id, payload)
     },
@@ -223,8 +225,107 @@ function RecursoModal({ recurso, onClose, onSaved }) {
       }
       onSaved()
     },
-    onError: (err) => toast.error(err?.message ?? 'Error'),
+    onError: async (err) => {
+      // Sep-2026 · El backend avisa si ya existe alguien con ese nombre. No lo
+      // prohíbe —dos personas pueden llamarse igual— así que se pregunta y se
+      // reenvía confirmado. Sin esto nacieron 5 duplicados en producción: el
+      // control de correo repetido no los atrapa, cada carga usó otro correo.
+      if (err?.code === 'nombre_duplicado' && !form.allow_duplicate_name) {
+        const existentes = err.existentes ?? []
+        const ok = await confirm({
+          title: '¿Ya existe alguien con ese nombre?',
+          message: (
+            <div className="space-y-2 text-sm">
+              <p>Hay {existentes.length === 1 ? 'un recurso' : `${existentes.length} recursos`} llamado <strong>{form.name}</strong>:</p>
+              <ul className="text-xs text-gray-600 list-disc pl-5">
+                {existentes.map((e) => (
+                  <li key={e.id}>
+                    {TIPOS_RECURSO.find((t) => t.value === e.type)?.label ?? e.type}
+                    {e.active ? '' : ' (inactivo)'} — {e.user?.email ?? 'sin usuario'}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-amber-700">
+                Si es la <strong>misma persona</strong>, cancela y edita el recurso que ya existe.
+                Crear una copia parte su historial en dos.
+              </p>
+            </div>
+          ),
+          confirmLabel: 'Es otra persona, crear',
+          variant: 'danger',
+        })
+        if (ok) mutate({ allow_duplicate_name: true })
+        return
+      }
+      toast.error(err?.message ?? 'Error')
+    },
   })
+
+  const [eliminando, setEliminando] = useState(false)
+
+  /**
+   * Borrado definitivo. Se consulta primero cuánto historial tiene: si lo hay,
+   * ni siquiera se ofrece borrar — se explica qué lo retiene y se recomienda
+   * desactivar, que es lo que conserva los informes de meses pasados.
+   *
+   * Si son dos cargas de la misma persona, lo correcto no es borrar sino
+   * fusionar (el historial vive en la copia, no siempre en la que parece buena).
+   */
+  const eliminarDefinitivo = async () => {
+    setEliminando(true)
+    try {
+      const dep = await recursoService.dependencias(recurso.id)
+      if (dep.total > 0) {
+        await confirm({
+          title: 'No se puede eliminar',
+          message: (
+            <div className="space-y-2 text-sm">
+              <p><strong>{recurso.name}</strong> tiene historial en el sistema:</p>
+              <ul className="text-xs text-gray-600 list-disc pl-5">
+                {dep.asignaciones > 0 && <li>{dep.asignaciones} asignación(es) en el programador</li>}
+                {dep.ausencias > 0 && <li>{dep.ausencias} ausencia(s) registrada(s)</li>}
+                {dep.backoffice > 0 && <li>{dep.backoffice} tarea(s) de backoffice</li>}
+                {dep.solicitudes > 0 && <li>{dep.solicitudes} solicitud(es) de recurso</li>}
+              </ul>
+              <p className="text-xs text-gray-600">
+                Borrarlo dejaría huecos en los informes de semanas ya cerradas. Desactívalo:
+                deja de aparecer para programar y el historial se conserva.
+              </p>
+            </div>
+          ),
+          confirmLabel: 'Entendido',
+          variant: 'default',
+        })
+        return
+      }
+
+      const ok = await confirm({
+        title: '¿Eliminar definitivamente?',
+        message: (
+          <div className="space-y-2 text-sm">
+            <p>Vas a borrar a <strong>{recurso.name}</strong> del catálogo.</p>
+            <p className="text-xs text-gray-600">
+              No tiene ninguna asignación, ausencia ni tarea asociada, así que no se pierde
+              nada de los informes.
+              {dep.tiene_usuario && <> Su usuario <strong>{dep.usuario_email}</strong> quedará sin recurso vinculado.</>}
+            </p>
+            <p className="text-xs text-red-700">Esta acción no se puede deshacer.</p>
+          </div>
+        ),
+        confirmLabel: '🗑️ Eliminar definitivamente',
+        variant: 'danger',
+      })
+      if (!ok) return
+
+      await recursoService.remove(recurso.id)
+      toast.success(`${recurso.name} eliminado definitivamente`)
+      onSaved()
+    } catch (err) {
+      toast.error(err?.message ?? 'No se pudo eliminar')
+    } finally {
+      setEliminando(false)
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && tryClose()}>
@@ -470,6 +571,20 @@ function RecursoModal({ recurso, onClose, onSaved }) {
           )}
         </div>
         <div className="px-5 py-4 border-t border-gray-100 flex gap-2 flex-shrink-0">
+          {/* Sep-2026 · Antes no había forma de borrar un recurso: solo se podía
+              desactivar, y los que no tienen usuario vinculado quedaban fuera de
+              todo alcance. El backend se niega si tiene historial y responde con
+              el detalle; aquí se consulta ANTES para no ofrecer algo imposible. */}
+          {!isNew && (
+            <button
+              className="btn text-red-700 border-red-200 hover:bg-red-50"
+              onClick={eliminarDefinitivo}
+              disabled={eliminando || isPending}
+              title="Eliminar definitivamente (solo si no tiene historial)"
+            >
+              {eliminando ? <Spinner size="sm" /> : '🗑️'}
+            </button>
+          )}
           <button className="btn flex-1 justify-center" onClick={tryClose}>Cancelar</button>
           <button
             className="btn-primary flex-1 justify-center"

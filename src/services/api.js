@@ -272,6 +272,19 @@ export const recursoService = {
     _recursos[i] = { ..._recursos[i], ...data }
     return ok(_recursos[i])
   },
+  /** Cuánto historial tiene el recurso. Se consulta ANTES de ofrecer borrarlo. */
+  dependencias: async (id) => {
+    if (!DEMO_MODE) return api.get(`/resources/${id}/dependencies`)
+    return ok({ asignaciones: 0, ausencias: 0, backoffice: 0, solicitudes: 0, total: 0, puedeEliminarse: true })
+  },
+  /** Borrado DEFINITIVO. El backend responde 409 si el recurso tiene historial. */
+  remove: async (id) => {
+    if (!DEMO_MODE) return api.delete(`/resources/${id}`)
+    const i = _recursos.findIndex((r) => r.id === id)
+    if (i === -1) return fail('Recurso no encontrado', 404)
+    _recursos.splice(i, 1)
+    return ok({ ok: true })
+  },
   horario: async (recursoId, semanaId) => {
     if (!DEMO_MODE) return api.get(`/resources/${recursoId}/schedule`, { params: { week_id: semanaId } })
     return ok(_asignaciones.filter((a) =>

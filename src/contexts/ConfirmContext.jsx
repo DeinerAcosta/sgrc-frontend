@@ -10,9 +10,15 @@ import { createContext, useContext, useState, useCallback } from 'react'
  *     message: 'La información no se guardará.',
  *     confirmLabel: 'Aceptar',   // opcional, default 'Aceptar'
  *     cancelLabel: 'Cancelar',   // opcional, default 'Cancelar'
+ *     extraLabel: 'Otra acción', // opcional: tercer botón, resuelve 'extra'
  *     variant: 'warning',        // 'warning' (ámbar) | 'danger' (rojo) | 'info' (azul)
  *   })
- *   if (ok) doSomething()
+ *   if (ok === 'extra') otraCosa()
+ *   else if (ok) doSomething()
+ *
+ * Ojo con el nombre: es `variant`, NO `tono`. Varias llamadas pasaban `tono` y
+ * el diálogo caía al ámbar por defecto aunque la acción fuera destructiva.
+ * Corregido en sep-2026; vale saberlo al agregar llamadas nuevas.
  *
  * El provider va una sola vez en el árbol (main.jsx). El diálogo se renderiza
  * globalmente, sin importar dónde se haga la llamada.
@@ -37,6 +43,7 @@ export function ConfirmProvider({ children }) {
         title: options.title ?? '¿Está seguro?',
         message: options.message ?? 'Esta acción no se puede deshacer.',
         confirmLabel: options.confirmLabel ?? 'Aceptar',
+        extraLabel: options.extraLabel ?? null,
         cancelLabel: options.cancelLabel ?? 'Cancelar',
         variant: options.variant ?? 'warning',
         resolve,
@@ -57,9 +64,11 @@ export function ConfirmProvider({ children }) {
           title={state.title}
           message={state.message}
           confirmLabel={state.confirmLabel}
+          extraLabel={state.extraLabel}
           cancelLabel={state.cancelLabel}
           variant={state.variant}
           onConfirm={() => finish(true)}
+          onExtra={() => finish('extra')}
           onCancel={() => finish(false)}
         />
       )}
@@ -67,7 +76,7 @@ export function ConfirmProvider({ children }) {
   )
 }
 
-function ConfirmDialog({ title, message, confirmLabel, cancelLabel, variant, onConfirm, onCancel }) {
+function ConfirmDialog({ title, message, confirmLabel, cancelLabel, extraLabel, variant, onConfirm, onCancel, onExtra }) {
   // Variantes visuales del círculo del icono
   const variants = {
     warning: {
@@ -108,23 +117,52 @@ function ConfirmDialog({ title, message, confirmLabel, cancelLabel, variant, onC
             <span className={`text-3xl font-bold ${v.icon}`}>!</span>
           </div>
           <h2 className="text-lg font-semibold text-gray-900 mb-1.5">{title}</h2>
-          <p className="text-sm text-gray-500 leading-relaxed">{message}</p>
+          {/* div y no p: varias llamadas pasan JSX con listas y párrafos, que
+              dentro de un <p> es HTML inválido y React lo advierte en consola. */}
+          <div className="text-sm text-gray-500 leading-relaxed text-left">{message}</div>
         </div>
 
-        <div className="px-6 pb-6 flex gap-3">
-          <button
-            onClick={onCancel}
-            className="flex-1 px-4 py-2.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-sm transition-colors"
-          >
-            {cancelLabel}
-          </button>
-          <button
-            onClick={onConfirm}
-            className={`flex-1 px-4 py-2.5 rounded-lg font-medium text-sm transition-colors ${v.confirm}`}
-          >
-            {confirmLabel}
-          </button>
-        </div>
+        {/* Sin tercer botón, el orden de siempre: Cancelar a la izquierda.
+            Con tercer botón se apilan en vertical — tres en fila no caben
+            legibles en el ancho del diálogo, y menos en móvil — y ahí manda
+            arriba la acción recomendada. */}
+        {extraLabel ? (
+          <div className="px-6 pb-6 flex flex-col gap-2">
+            <button
+              onClick={onConfirm}
+              className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-colors ${v.confirm}`}
+            >
+              {confirmLabel}
+            </button>
+            <button
+              onClick={onExtra}
+              className="px-4 py-2.5 rounded-lg border border-red-200 text-red-700 hover:bg-red-50 font-medium text-sm transition-colors"
+            >
+              {extraLabel}
+            </button>
+            <button
+              onClick={onCancel}
+              className="px-4 py-2 rounded-lg text-gray-500 hover:bg-gray-100 font-medium text-sm transition-colors"
+            >
+              {cancelLabel}
+            </button>
+          </div>
+        ) : (
+          <div className="px-6 pb-6 flex gap-3">
+            <button
+              onClick={onCancel}
+              className="flex-1 px-4 py-2.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-sm transition-colors"
+            >
+              {cancelLabel}
+            </button>
+            <button
+              onClick={onConfirm}
+              className={`flex-1 px-4 py-2.5 rounded-lg font-medium text-sm transition-colors ${v.confirm}`}
+            >
+              {confirmLabel}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

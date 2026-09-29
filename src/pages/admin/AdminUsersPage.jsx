@@ -414,9 +414,40 @@ function UsuarioModal({ usuario, onClose, onSaved }) {
   const confirm = useConfirm()
 
   const { mutate, isPending } = useMutation({
-    mutationFn: () => isNew ? usuarioService.create(form) : usuarioService.update(usuario.id, form),
+    mutationFn: (extra = {}) => isNew
+      ? usuarioService.create({ ...form, ...extra })
+      : usuarioService.update(usuario.id, { ...form, ...extra }),
     onSuccess: () => { toast.success(isNew ? 'Usuario creado' : 'Usuario actualizado'); onSaved() },
-    onError: (err) => toast.error(err?.message ?? 'Error'),
+    onError: async (err) => {
+      // Sep-2026 · El chequeo de correo repetido NO atrapa los duplicados
+      // reales: en producción aparecieron 5 personas cargadas dos o tres veces
+      // (Ruby Celeste Guerrero ×3) y cada carga usó un correo distinto, así que
+      // el índice de email las dejó pasar. Ahora el backend avisa por nombre.
+      if (err?.code === 'nombre_duplicado') {
+        const existentes = err.existentes ?? []
+        const ok = await confirm({
+          title: '¿Ya existe alguien con ese nombre?',
+          message: (
+            <div className="space-y-2 text-sm">
+              <p>Hay {existentes.length === 1 ? 'un recurso' : `${existentes.length} recursos`} llamado <strong>{form.name}</strong>:</p>
+              <ul className="text-xs text-gray-600 list-disc pl-5">
+                {existentes.map((e) => (
+                  <li key={e.id}>{e.type}{e.active ? '' : ' (inactivo)'} — {e.user?.email ?? 'sin usuario'}</li>
+                ))}
+              </ul>
+              <p className="text-xs text-amber-700">
+                Si es la <strong>misma persona</strong>, cancela: crear una copia parte su historial en dos.
+              </p>
+            </div>
+          ),
+          confirmLabel: 'Es otra persona, crear',
+          variant: 'danger',
+        })
+        if (ok) mutate({ allow_duplicate_name: true })
+        return
+      }
+      toast.error(err?.message ?? 'Error')
+    },
   })
 
   const { mutate: doRemove, isPending: removing } = useMutation({
@@ -428,22 +459,40 @@ function UsuarioModal({ usuario, onClose, onSaved }) {
     onError: (err) => toast.error(err?.message ?? 'Error al eliminar'),
   })
 
+  /**
+   * Sep-2026 · Antes este diálogo solo desactivaba: llamaba `doRemove(false)` y
+   * no ofrecía otra cosa, aunque el borrado real ya existía en el backend
+   * (`DELETE /users/:id?hard=true`). Quedaba la impresión de que "eliminar" no
+   * funcionaba. Ahora se ofrecen las dos, con la recomendada de primera.
+   *
+   * El borrado real solo prospera si la persona no tiene historial; si lo
+   * tiene, el backend conserva el recurso y desactiva. Por eso el texto no
+   * promete lo que no puede cumplir.
+   */
   const confirmarEliminar = async () => {
     const ok = await confirm({
-      title: '¿Eliminar usuario?',
+      title: '¿Qué quieres hacer con este usuario?',
       message: (
         <div className="space-y-2 text-sm">
-          <p>Vas a eliminar a <strong>{usuario.name}</strong> ({usuario.email}).</p>
+          <p><strong>{usuario.name}</strong> ({usuario.email})</p>
           <p className="text-xs text-gray-600">
-            <strong>Por seguridad</strong>, se desactivará en el sistema (no podrá iniciar sesión)
-            pero se conservará el historial de asignaciones y reportes. Esto es lo recomendado.
+            <strong>Desactivar</strong> es lo recomendado: no podrá iniciar sesión y desaparece
+            de las listas para programar, pero su historial de asignaciones, ausencias e
+            informes se conserva intacto.
+          </p>
+          <p className="text-xs text-gray-600">
+            <strong>Eliminar definitivamente</strong> borra el usuario del sistema. Solo es
+            posible si no tiene historial; si lo tiene, se desactivará de todas formas para no
+            dejar huecos en los informes de semanas ya cerradas.
           </p>
         </div>
       ),
-      confirmLabel: '🚫 Desactivar usuario',
-      tono: 'danger',
+      confirmLabel: '🚫 Desactivar (recomendado)',
+      extraLabel: '🗑️ Eliminar definitivamente',
+      variant: 'danger',
     })
-    if (ok) doRemove(false)
+    if (ok === 'extra') doRemove(true)
+    else if (ok) doRemove(false)
   }
 
   const requiereMotivo = !isNew && (form.active !== usuario.active)
