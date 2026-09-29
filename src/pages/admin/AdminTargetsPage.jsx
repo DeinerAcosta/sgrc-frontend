@@ -73,6 +73,27 @@ export default function AdminMetasPage() {
         </div>
       </div>
 
+      {/* Sep-2026 · El aviso diario al coordinador se disparaba con "más de 4h
+          libres", que con topes de 44h marcaba al 76% de la gente: hasta 31
+          correos diarios por persona. Ahora el umbral se edita desde aquí. */}
+      <div className="card mb-4">
+        <SectionHeader title="Aviso diario al coordinador" />
+        <Meta
+          label="Avisar por debajo de esta utilización"
+          descripcion="Cada mañana el coordinador recibe UN correo con los recursos de su equipo que estén por debajo de este porcentaje de su tope semanal. Los que no tienen ninguna asignación van en un bloque aparte. Si la lista no cambió desde el día anterior, no se envía nada."
+          value={form.alerta_utilizacion_min_pct}
+          onChange={(v) => setForm({ ...form, alerta_utilizacion_min_pct: v })}
+        />
+        <div className="text-xs text-gray-500 mt-3 border-t border-gray-100 pt-3">
+          Más alto = avisa de más gente. Más bajo = solo los casos graves.
+          {form.alerta_utilizacion_min_pct >= 90 && (
+            <span className="block mt-1 text-amber-700">
+              ⚠️ Con {form.alerta_utilizacion_min_pct}% vas a marcar a casi todo el equipo y el correo deja de ser útil.
+            </span>
+          )}
+        </div>
+      </div>
+
       <div className="card mb-4">
         <SectionHeader title="Configuración del semáforo" />
         <div>
