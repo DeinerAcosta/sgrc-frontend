@@ -61,7 +61,53 @@ export const TIPOS_RECURSO = [
  * dos cosas fue lo que dejó 94 oftalmólogos en un estado del que la interfaz no
  * permitía salir.
  */
-export const TIPOS_POR_PACIENTE = ['oftalmologo', 'fonoaudiologa']
+export const TIPOS_POR_PACIENTE = ['oftalmologo', 'fonoaudiologa', 'otorrino']
+
+/**
+ * TIPOS CON AGENDA PROPIA DE PACIENTES — espejo de TIPOS_QUE_IMPACTAN_PACIENTES
+ * en el backend (src/lib/resourceTypes.js).
+ */
+export const TIPOS_QUE_IMPACTAN_PACIENTES = [
+  'oftalmologo', 'anestesiologo', 'otorrino', 'tecnico', 'fonoaudiologa', 'optometra',
+]
+
+/**
+ * MULTI-CONSULTORIO — espejo de TIPOS_MULTI_CONSULTORIO en el backend.
+ *
+ * El médico rota entre 2-3 consultorios y en cada uno hay una auxiliar
+ * manejando la sala. Al activarlo, el programador permite asignaciones
+ * simultáneas y cuenta las horas del día por UNIÓN DE INTERVALOS, no por suma.
+ *
+ * Oct-2026 · se agrega 'otorrino'. La regla estaba escrita a mano como
+ * `type === 'oftalmologo'` acá y en tres sitios del backend, así que no había
+ * forma de activarla para un otorrino: la casilla no se renderizaba.
+ */
+export const TIPOS_MULTI_CONSULTORIO = ['oftalmologo', 'otorrino']
+
+/**
+ * ¿Necesita "intervalo por paciente"? Es el mismo conjunto que tener agenda
+ * propia, y no una lista aparte: el intervalo divide la franja para calcular la
+ * capacidad de la agenda.
+ *
+ * Oct-2026 · eran dos listas separadas y se desincronizaron. 'otorrino' estaba
+ * en la de impacto pero faltaba en la del formulario, así que el campo no se
+ * mostraba — y el formulario seguía enviando el valor por defecto. Cada
+ * otorrino quedaba con 10 min por paciente que nadie eligió ni podía cambiar.
+ */
+export const requiereIntervaloPorPaciente = (tipo) => TIPOS_QUE_IMPACTAN_PACIENTES.includes(tipo)
+
+/**
+ * ¿Tiene subespecialidad? El campo es TEXTO LIBRE, no una lista cerrada: el
+ * oftalmólogo escribe Retina o Córnea, el otorrino escribiría Otología o
+ * Rinología. Lo único que cambia por tipo es el ejemplo que sugiere el campo.
+ */
+export const TIPOS_CON_SUBESPECIALIDAD = ['oftalmologo', 'otorrino']
+
+/** Ejemplos de subespecialidad para el placeholder, según el tipo. */
+export const EJEMPLO_SUBESPECIALIDAD = {
+  oftalmologo: 'Ej: Retina, Córnea, Glaucoma',
+  otorrino: 'Ej: Otología, Rinología, Laringología',
+}
 
 export const ESPECIALIDADES = [
   { value: 'oftalmologia',         label: 'Oftalmología' },

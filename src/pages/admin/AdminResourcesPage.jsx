@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { recursoService, usuarioService } from '@/services/api'
 import { Avatar, Badge, Spinner, EmptyState } from '@/components/ui'
-import { TIPOS_RECURSO, TIPOS_POR_PACIENTE } from '@/utils/helpers'
+import { TIPOS_RECURSO, TIPOS_POR_PACIENTE, TIPOS_MULTI_CONSULTORIO, requiereIntervaloPorPaciente, TIPOS_CON_SUBESPECIALIDAD, EJEMPLO_SUBESPECIALIDAD} from '@/utils/helpers'
 import { useDirtyClose } from '@/hooks/useDirtyClose'
 import { useConfirm } from '@/contexts/ConfirmContext'
 
@@ -194,11 +194,15 @@ function RecursoModal({ recurso, onClose, onSaved }) {
   const { tryClose } = useDirtyClose(form, onClose)
   const confirm = useConfirm()
 
-  const requiereIntervalo = ['oftalmologo', 'optometra', 'anestesiologo', 'tecnico', 'fonoaudiologa'].includes(form.type)
-  // Especialidad y multi-consultorio aplican solo a oftalmólogos (sub-especialidad
-  // médica como Retina/Glaucoma/Córnea/etc., y rotación entre consultorios).
-  const requiereEspecialidad = form.type === 'oftalmologo'
-  const puedeMultiConsultorio = form.type === 'oftalmologo'
+  // Oct-2026 · Las tres reglas salen de utils/helpers.js, espejo de
+  // lib/resourceTypes.js en el backend. Antes estaban escritas a mano acá, y así
+  // fue como 'otorrino' quedó fuera de las tres aunque opera igual que el
+  // oftalmólogo: agenda propia y auxiliar obligatoria en consultorio.
+  const requiereIntervalo = requiereIntervaloPorPaciente(form.type)
+  const puedeMultiConsultorio = TIPOS_MULTI_CONSULTORIO.includes(form.type)
+  // La subespecialidad es TEXTO LIBRE, no una lista cerrada; lo único que cambia
+  // por tipo es el ejemplo del placeholder.
+  const requiereEspecialidad = TIPOS_CON_SUBESPECIALIDAD.includes(form.type)
   // Sep-2026 · SE DECIDE POR EL ESQUEMA, NO POR EL TIPO.
   // Antes esto era `form.type === 'oftalmologo' || form.type === 'fonoaudiologa'`,
   // y ese era el motivo por el que los 94 oftalmólogos con esquema 'fijo' y tope
@@ -350,13 +354,14 @@ function RecursoModal({ recurso, onClose, onSaved }) {
                 // cobran por paciente), y el esquema decide el tope semanal. Quien
                 // quiera un oftalmólogo de salario fijo cambia el esquema abajo y la
                 // casilla de horas aparece — antes ese camino no existía.
-                // Multi-consultorio y subespecialidad: solo oftalmólogos.
+                // Multi-consultorio y subespecialidad: los tipos de sus listas
+                // en utils/helpers.js (hoy oftalmólogo y otorrino).
                 const nuevoEsquema = TIPOS_POR_PACIENTE.includes(nuevoTipo) ? 'por_paciente' : 'fijo'
                 setForm({
                   ...form,
                   type: nuevoTipo,
-                  multi_room: nuevoTipo === 'oftalmologo' ? form.multi_room : false,
-                  specialty: nuevoTipo === 'oftalmologo' ? form.specialty : '',
+                  multi_room: TIPOS_MULTI_CONSULTORIO.includes(nuevoTipo) ? form.multi_room : false,
+                  specialty: TIPOS_CON_SUBESPECIALIDAD.includes(nuevoTipo) ? form.specialty : '',
                   pay_scheme: nuevoEsquema,
                   max_hours_per_week: nuevoEsquema === 'por_paciente' ? null : (form.max_hours_per_week ?? 44),
                 })
@@ -376,7 +381,12 @@ function RecursoModal({ recurso, onClose, onSaved }) {
           {requiereEspecialidad && (
             <div>
               <label className="label">Subespecialidad</label>
-              <input className="input" value={form.specialty} onChange={(e) => setForm({ ...form, specialty: e.target.value })} placeholder="Ej: Retina, Córnea, Glaucoma" />
+              <input
+                className="input"
+                value={form.specialty}
+                onChange={(e) => setForm({ ...form, specialty: e.target.value })}
+                placeholder={EJEMPLO_SUBESPECIALIDAD[form.type] ?? 'Subespecialidad'}
+              />
             </div>
           )}
           {/* PROYECTOS-3255 #5.1 · Firma escaneada para el PDF F-AA-126 */}
