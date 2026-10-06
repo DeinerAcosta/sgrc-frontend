@@ -55,6 +55,7 @@ export default function AusenciaFormModal({ recursoId, tipoRecurso, onClose, hor
     affected_company: '',
     wants_makeup: '',
     makeup_notes: '',
+    makeup_date: '',
   })
   const { tryClose } = useDirtyClose(form, onClose)
 
@@ -68,6 +69,14 @@ export default function AusenciaFormModal({ recursoId, tipoRecurso, onClose, hor
   const anticip = form.start_date
     ? differenceInDays(parseFechaLocal(form.start_date), new Date())
     : null
+
+  // Momento del registro: se fija al ABRIR el modal, no en cada repintado. Si
+  // se recalculara en cada render, el reloj iría cambiando mientras la persona
+  // llena el formulario y el valor mostrado no sería el que se guarda.
+  const [momentoRegistro] = useState(() => new Date())
+  const momentoRegistroTxt = momentoRegistro.toLocaleString('es-CO', {
+    dateStyle: 'long', timeStyle: 'short', timeZone: 'America/Bogota',
+  })
 
   const alertaAnticip = REQUIEREN_ANTICIPACION.includes(form.type) && anticip !== null && anticip < 30
 
@@ -93,6 +102,7 @@ export default function AusenciaFormModal({ recursoId, tipoRecurso, onClose, hor
       affected_company: form.affected_company || undefined,
       wants_makeup: form.wants_makeup === 'si' ? true : form.wants_makeup === 'no' ? false : undefined,
       makeup_notes: form.wants_makeup === 'si' ? (form.makeup_notes || undefined) : undefined,
+      makeup_date: form.wants_makeup === 'si' ? (form.makeup_date || undefined) : undefined,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['ausencias'] })
@@ -114,6 +124,28 @@ export default function AusenciaFormModal({ recursoId, tipoRecurso, onClose, hor
         </div>
 
         <div className="px-5 py-4 space-y-4">
+          {/* PROYECTOS-3398 §4 · La FECHA Y HORA DE REGISTRO va de primera y se
+              precarga con el momento actual. Es un dato de solo lectura —lo
+              pone el sistema, no la persona— y sirve para que quien reporta vea
+              de entrada con cuánta antelación está avisando.
+              El cálculo ya existía en el backend (`noticeDays`); lo que faltaba
+              era mostrarlo ANTES de llenar el formulario, no después. */}
+          <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5">
+            <div className="text-[11px] uppercase tracking-wide text-gray-400 mb-1">Fecha y hora de registro</div>
+            <div className="text-xs text-gray-800 font-medium">{momentoRegistroTxt}</div>
+            {anticip !== null && (
+              <div className={`text-[11px] mt-1.5 ${
+                anticip < 0 ? 'text-red-700' : anticip <= 2 ? 'text-amber-700' : 'text-green-700'
+              }`}>
+                {anticip < 0
+                  ? `⚠️ Ausencia ya ocurrida — se está reportando ${Math.abs(anticip)} ${Math.abs(anticip) === 1 ? 'día' : 'días'} después`
+                  : anticip === 0
+                    ? '⚠️ Se está reportando el mismo día'
+                    : `Avisando con ${anticip} ${anticip === 1 ? 'día' : 'días'} de antelación`}
+              </div>
+            )}
+          </div>
+
           <div>
             <label className="label">Tipo de ausencia *</label>
             <select
@@ -176,9 +208,12 @@ export default function AusenciaFormModal({ recursoId, tipoRecurso, onClose, hor
             />
           </div>
 
-          {/* ===== Fase 5 · F-AA-126 v04 ===== */}
+          {/* Sep-2026 · Estos campos ya NO alimentan un PDF: el formato oficial se
+              eliminó. Se conservan porque son datos del negocio (la empresa
+              afectada y la reposición) que usan los informes y el flujo de
+              reposición. Solo cambió el rótulo, que nombraba al formato. */}
           <div className="border-t border-gray-100 pt-3">
-            <div className="text-[11px] uppercase tracking-wide text-gray-400 mb-2">Datos para el formato F-AA-126 v04</div>
+            <div className="text-[11px] uppercase tracking-wide text-gray-400 mb-2">Datos de la ausencia</div>
 
             <div>
               <label className="label">¿A qué empresa aplica la ausencia? *</label>
@@ -228,17 +263,38 @@ export default function AusenciaFormModal({ recursoId, tipoRecurso, onClose, hor
                 </div>
 
                 {form.wants_makeup === 'si' && (
-                  <div className="mt-3">
-                    <label className="label">Observaciones de reposición</label>
-                    <textarea
-                      className="input resize-none"
-                      rows={2}
-                      value={form.makeup_notes}
-                      onChange={(e) => set('makeup_notes', e.target.value)}
-                      placeholder="Detalla la fecha, horario y/o modalidad propuesta para la reposición."
-                      maxLength={2000}
-                    />
-                    <div className="text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded p-2 mt-2">
+                  <div className="mt-3 space-y-3">
+                    {/* PROYECTOS-3398 §4 · "Fecha en que repondrá la ausencia".
+                        Era el único campo realmente nuevo de ese bloque: antes
+                        la fecha se pedía dentro del texto libre, así que no se
+                        podía filtrar ni cruzar con la agenda. Ahora es un campo
+                        propio y queda como dato. */}
+                    <div>
+                      <label className="label">Fecha en que repondrá</label>
+                      <input
+                        className="input"
+                        type="date"
+                        value={form.makeup_date}
+                        min={form.end_date || form.start_date}
+                        onChange={(e) => set('makeup_date', e.target.value)}
+                      />
+                      <div className="text-[11px] text-gray-500 mt-1">
+                        Tiene que ser posterior a la ausencia. Si aún no la tienes, déjala vacía
+                        y la acuerdas con tu coordinador.
+                      </div>
+                    </div>
+                    <div>
+                      <label className="label">Describir</label>
+                      <textarea
+                        className="input resize-none"
+                        rows={2}
+                        value={form.makeup_notes}
+                        onChange={(e) => set('makeup_notes', e.target.value)}
+                        placeholder="Horario y modalidad propuesta para la reposición."
+                        maxLength={2000}
+                      />
+                    </div>
+                    <div className="text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded p-2">
                       ℹ️ Cuando el coordinador confirme tu ausencia, podrás proponer formalmente la reposición desde "Mis ausencias".
                     </div>
                   </div>

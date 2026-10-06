@@ -1,142 +1,149 @@
 import { useState, useEffect } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import { Avatar, Badge } from '@/components/ui'
 import NotificacionesPanel from '@/components/layout/NotificationsPanel'
 import { ROLES } from '@/utils/helpers'
+import { NAV_ITEMS, rutaModulo } from '@/config/nav'
 import { useHeartbeat } from '@/hooks/useHeartbeat'
 
-// Sep-2026: menus reorganizados por FUNCION en vez de flat list. Cada item
-// puede ser un link {to,icon,label} o un separador {divider:true,label}.
-// El render pinta los separadores como header sticky del grupo.
-const NAV_ITEMS = {
-  recurso: [
-    { to: '/app/horario',        icon: '📅', label: 'Mi horario' },
-    { to: '/app/mi-ejecucion',   icon: '✅', label: 'Ejecución del día' },
-    { to: '/app/ausencias',      icon: '📋', label: 'Mis ausencias' },
-    { to: '/app/backoffice',     icon: '🗂️', label: 'Backoffice' },
-    { to: '/app/perfil',         icon: '👤', label: 'Mi perfil' },
-  ],
-  coordinador: [
-    { divider: true, label: 'Panel' },
-    { to: '/app/dashboard-coord',      icon: '🏠', label: 'Dashboard' },
 
-    { divider: true, label: 'Operación diaria' },
-    { to: '/app/programador',          icon: '📅', label: 'Programador' },
-    { to: '/app/ejecucion',            icon: '✅', label: 'Ejecución' },
-    { to: '/app/horario-diario',       icon: '📋', label: 'Resumen diario' },
+/**
+ * Item de menú que se despliega, al estilo del menú de Biowel.
+ *
+ * Al pulsar el NOMBRE pasan dos cosas a la vez: se navega a la pantalla del
+ * módulo (las tarjetas, donde se ve todo) y se abren sus opciones debajo. No
+ * hay una opción "ver todo" en el submenú — el propio nombre es esa opción.
+ *
+ * La FLECHA es aparte: solo pliega o despliega, sin moverte de donde estés.
+ *
+ * Este es el patrón a repetir en los demás módulos cuando se reorganicen.
+ *
+ * El resaltado de "activo" se calcula a mano y no con el `NavLink` de siempre:
+ * los hijos se distinguen por la CADENA DE CONSULTA (?grupo=auxiliares), y
+ * NavLink solo mira la ruta. Sin esto, las cuatro opciones saldrían marcadas a
+ * la vez y el padre nunca se apagaría.
+ */
+function GrupoDesplegable({ item, expandido }) {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const rutaDe = (to) => to.split('?')[0]
+  const paramDe = (to) => new URLSearchParams(to.split('?')[1] ?? '').get('grupo')
+  const grupoActual = new URLSearchParams(location.search).get('grupo')
 
-    { divider: true, label: 'Ausencias' },
-    { to: '/app/ausencias-coord',      icon: '⚠️',  label: 'Gestión de ausencias' },
-    { to: '/app/ausencias-cronograma', icon: '🗓️', label: 'Cronograma' },
+  // Sep-2026 · El padre lleva a la PÁGINA DEL MÓDULO, que lista sus opciones —
+  // no a la primera de ellas. Entrar a "Vista ejecutiva" y aterrizar en el
+  // Dashboard sin ver qué más hay dentro confunde; el menú de Biowel abre una
+  // página con sus tablas maestras y es lo que se replica.
+  // `item.raiz` deja que un módulo tenga pantalla propia: Gestión de ausencias
+  // la usa, porque ya tiene sus tarjetas por grupo de personal.
+  const raiz = item.raiz ?? rutaModulo(item.clave)
+  // Se considera "dentro" tanto la página del módulo como cualquiera de sus
+  // opciones: si no, al abrir una opción el padre se apagaría.
+  const enAlgunHijo = item.children.some((h) => rutaDe(h.to) === location.pathname)
+  const dentroDelGrupo = location.pathname === raiz || enAlgunHijo
+  const enLaRaiz = location.pathname === raiz && !grupoActual
+  const [abierto, setAbierto] = useState(dentroDelGrupo)
 
-    { divider: true, label: 'Equipo' },
-    { to: '/app/recursos-coord',       icon: '👥', label: 'Recursos' },
-    { to: '/app/backoffice-coord',     icon: '🗂️', label: 'Backoffice' },
+  // DOS ZONAS EN LA MISMA FILA, como en el menú de Biowel:
+  //
+  //   · el NOMBRE  → entra al módulo y despliega sus opciones
+  //   · la FLECHA  → solo pliega o despliega, sin moverte de donde estés
+  //
+  // El primer intento fue un único clic que hacía las dos cosas y alternaba.
+  // Eso permitía quedar en la pantalla del módulo con su menú plegado, sin
+  // pista de qué opciones hay. El segundo intento lo dejó fijo abierto mientras
+  // estuvieras dentro, pero eso quita el control: no podías cerrarlo ni aunque
+  // quisieras. Separar las dos zonas resuelve ambas cosas y es el patrón que
+  // se va a repetir en los demás módulos.
+  const alternar = () => setAbierto((v) => !v)
 
-    { divider: true, label: 'Solicitudes' },
-    { to: '/app/solicitudes-recurso',  icon: '📨', label: 'Solicitudes de recurso' },
+  // El sidebar NO se vuelve a montar al navegar, así que el estado inicial se
+  // calcula con la ruta del login. Este efecto abre el grupo cuando entras en
+  // él desde fuera (un enlace de notificación, por ejemplo).
+  useEffect(() => {
+    if (dentroDelGrupo) setAbierto(true)
+  }, [dentroDelGrupo])
 
-    { divider: true, label: 'Informes' },
-    { to: '/app/informes/ocupacion',   icon: '📊', label: 'Ocupación' },
+  const esHijoActivo = (h) =>
+    rutaDe(h.to) === location.pathname && (paramDe(h.to) ?? null) === (grupoActual ?? null)
 
-    { divider: true, label: 'Personal' },
-    { to: '/app/perfil',               icon: '👤', label: 'Mi perfil' },
-  ],
-  directivo: [
-    { divider: true, label: 'Panel' },
-    { to: '/app/dashboard',                icon: '📊', label: 'Dashboard ejecutivo' },
+  const pulsarPadre = () => {
+    navigate(raiz)
+    setAbierto(true)
+  }
 
-    { divider: true, label: 'Ocupación' },
-    { to: '/app/informes/ocupacion',          icon: '🏥', label: 'Consultorios' },
-    { to: '/app/informes/ocupacion-asesores', icon: '👥', label: 'Asesores' },
+  // Sidebar colapsado: no hay espacio para el submenú, así que el padre lleva
+  // directo a la pantalla del módulo.
+  if (!expandido) {
+    return (
+      <NavLink
+        to={raiz}
+        end
+        title={item.label}
+        className={({ isActive }) =>
+          `flex items-center justify-center py-2 rounded-lg text-[13px] transition-colors
+           ${isActive ? 'bg-blue-50 text-brand-800 font-semibold' : 'text-gray-600 hover:bg-gray-100'}`
+        }
+      >
+        <span className="text-base flex-shrink-0">{item.icon}</span>
+      </NavLink>
+    )
+  }
 
-    { divider: true, label: 'Productividad' },
-    { to: '/app/informes/productividad',   icon: '📈', label: 'Global' },
-    { to: '/app/productividad-recurso',    icon: '🧑‍⚕️', label: 'Individual' },
-    { to: '/app/informes/horas-prog-ejec', icon: '⏱️', label: 'Programado vs ejecutado' },
+  return (
+    <div>
+      {/* La fila lleva DOS botones hermanos, no uno dentro de otro (eso es HTML
+          inválido y React lo advierte): el nombre entra al módulo, la flecha
+          solo pliega. */}
+      <div
+        className={`flex items-start rounded-lg transition-colors
+          ${enLaRaiz
+            ? 'bg-blue-50 text-brand-800 font-semibold'
+            : dentroDelGrupo
+              ? 'text-brand-800 font-semibold'
+              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`}
+      >
+        <button
+          type="button"
+          onClick={pulsarPadre}
+          className="flex-1 min-w-0 flex items-start gap-2.5 pl-2.5 py-[7px] text-[13px] text-left"
+        >
+          <span className="text-base flex-shrink-0 leading-5">{item.icon}</span>
+          <span className="leading-5">{item.label}</span>
+        </button>
+        <button
+          type="button"
+          onClick={alternar}
+          aria-expanded={abierto}
+          aria-label={abierto ? `Plegar ${item.label}` : `Desplegar ${item.label}`}
+          className="px-2 py-[7px] text-[9px] text-gray-400 hover:text-gray-800 rounded-r-lg"
+        >
+          <span className={`block leading-5 transition-transform ${abierto ? 'rotate-90' : ''}`}>▶</span>
+        </button>
+      </div>
 
-    { divider: true, label: 'Ausentismo' },
-    { to: '/app/informes/ausentismo-impacto', icon: '🚨', label: 'Ausentismo e impacto' },
-    { to: '/app/reprogramaciones',            icon: '🔄', label: 'Reprogramaciones' },
-    { to: '/app/informes/subutilizacion',     icon: '⏰', label: 'Tiempos ociosos' },
-
-    { divider: true, label: 'Cierre y control' },
-    { to: '/app/informes/cierre-semanas',  icon: '🔒', label: 'Cierre de semanas' },
-    { to: '/app/comparativo',              icon: '↔️',  label: 'Comparativo semanal' },
-
-    { divider: true, label: 'Personal' },
-    { to: '/app/perfil',                   icon: '👤', label: 'Mi perfil' },
-  ],
-  supervisor: [
-    { divider: true, label: 'Catálogos maestros' },
-    { to: '/app/admin/sedes',              icon: '🏢', label: 'Sedes y consultorios' },
-    { to: '/app/admin/recursos',           icon: '🩺', label: 'Recursos' },
-    { to: '/app/admin/usuarios',           icon: '👥', label: 'Usuarios' },
-    { to: '/app/admin/motivos-ausencia',   icon: '🩹', label: 'Motivos de ausencia' },
-    { to: '/app/admin/tareas-backoffice',  icon: '🗂️', label: 'Tareas backoffice' },
-
-    { divider: true, label: 'Configuración' },
-    { to: '/app/admin/parametros',         icon: '⚙️',  label: 'Parámetros de costo' },
-    { to: '/app/admin/metas',              icon: '🎯', label: 'Metas del sistema' },
-    { to: '/app/admin/festivos',           icon: '📆', label: 'Festivos' },
-
-    { divider: true, label: 'Solicitudes' },
-    { to: '/app/admin/solicitudes',        icon: '📨', label: 'Solicitudes de registro' },
-    { to: '/app/admin/solicitudes-recurso', icon: '📥', label: 'Solicitudes de recurso' },
-
-    { divider: true, label: 'Gestión operativa' },
-    { to: '/app/ausencias-cronograma',     icon: '🗓️', label: 'Cronograma ausencias' },
-    { to: '/app/programador',              icon: '🔓', label: 'Editar semana cerrada' },
-
-    { divider: true, label: 'Auditoría' },
-    { to: '/app/admin/auditoria',          icon: '🔍', label: 'Auditoría' },
-
-    { divider: true, label: 'Personal' },
-    { to: '/app/perfil',                   icon: '👤', label: 'Mi perfil' },
-  ],
-  gerencia: [
-    { divider: true, label: 'Vista ejecutiva' },
-    { to: '/app/dashboard',                icon: '📊', label: 'Dashboard ejecutivo' },
-    { to: '/app/informes/ocupacion',       icon: '🏥', label: 'Ocupación consultorios' },
-    { to: '/app/informes/ocupacion-asesores', icon: '👥', label: 'Ocupación asesores' },
-    { to: '/app/informes/productividad',   icon: '📈', label: 'Productividad global' },
-    { to: '/app/productividad-recurso',    icon: '🧑‍⚕️', label: 'Productividad individual' },
-    { to: '/app/informes/ausentismo-impacto', icon: '🚨', label: 'Ausentismo e impacto' },
-    { to: '/app/reprogramaciones',         icon: '🔄', label: 'Reprogramaciones' },
-    { to: '/app/informes/subutilizacion',  icon: '⏰', label: 'Tiempos ociosos' },
-    { to: '/app/informes/horas-prog-ejec', icon: '⏱️', label: 'Programado vs ejecutado' },
-    { to: '/app/informes/cierre-semanas',  icon: '🔒', label: 'Cierre de semanas' },
-    { to: '/app/comparativo',              icon: '↔️',  label: 'Comparativo semanal' },
-
-    { divider: true, label: 'Gestión operativa' },
-    { to: '/app/ausencias-coord',          icon: '⚠️',  label: 'Ausencias' },
-    { to: '/app/ausencias-cronograma',     icon: '🗓️', label: 'Cronograma ausencias' },
-    { to: '/app/programador',              icon: '🔓', label: 'Editar semana cerrada' },
-
-    { divider: true, label: 'Catálogos maestros' },
-    { to: '/app/admin/sedes',              icon: '🏢', label: 'Sedes y consultorios' },
-    { to: '/app/admin/recursos',           icon: '🩺', label: 'Recursos' },
-    { to: '/app/admin/usuarios',           icon: '👥', label: 'Usuarios' },
-    { to: '/app/admin/motivos-ausencia',   icon: '🩹', label: 'Motivos de ausencia' },
-    { to: '/app/admin/tareas-backoffice',  icon: '🗂️', label: 'Tareas backoffice' },
-
-    { divider: true, label: 'Configuración' },
-    { to: '/app/admin/parametros',         icon: '⚙️',  label: 'Parámetros de costo' },
-    { to: '/app/admin/metas',              icon: '🎯', label: 'Metas del sistema' },
-    { to: '/app/admin/festivos',           icon: '📆', label: 'Festivos' },
-
-    { divider: true, label: 'Solicitudes' },
-    { to: '/app/admin/solicitudes',        icon: '📨', label: 'Solicitudes de registro' },
-    { to: '/app/admin/solicitudes-recurso', icon: '📥', label: 'Solicitudes de recurso' },
-
-    { divider: true, label: 'Auditoría' },
-    { to: '/app/admin/auditoria',          icon: '🔍', label: 'Auditoría' },
-
-    { divider: true, label: 'Personal' },
-    { to: '/app/perfil',                   icon: '👤', label: 'Mi perfil' },
-  ],
+      {abierto && (
+        <div className="ml-[18px] pl-3 border-l border-gray-200 mt-0.5 space-y-px">
+          {item.children.map((h) => (
+            <NavLink
+              key={h.to}
+              to={h.to}
+              className={`block px-2.5 py-1.5 rounded-md text-[13px] leading-5 transition-colors
+                ${esHijoActivo(h)
+                  ? 'bg-blue-50 text-brand-800 font-semibold'
+                  : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'}`}
+            >
+              {h.label}
+            </NavLink>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
+
+
 
 export default function AppLayout() {
   const { user, logout, refresh } = useAuthStore()
@@ -164,8 +171,10 @@ export default function AppLayout() {
 
   const sidebarBody = (mobile) => (
     <>
-      {/* Brand */}
-      <div className="h-14 flex items-center px-3 border-b border-gray-100 gap-2">
+      {/* Brand — colapsado va centrado, igual que los iconos de abajo. Con
+          `px-3` fijo el cuadro quedaba descuadrado respecto a ellos. */}
+      <div className={`h-14 flex items-center border-b border-gray-100 gap-2
+        ${(sidebarOpen || mobile) ? 'px-3' : 'justify-center px-0'}`}>
         <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center flex-shrink-0">
           <span className="text-white text-xs font-bold">SC</span>
         </div>
@@ -175,13 +184,16 @@ export default function AppLayout() {
             <div className="text-xs text-gray-400 truncate">Recursos clínicos</div>
           </div>
         )}
-        {!mobile && (
+        {/* Colapsado, este botón no cabe: quedaban el logo de 32 px y la flecha
+            peleando por los 56 px de ancho, cortados contra el borde. Ahí se
+            muestra en su propia fila debajo, centrado. */}
+        {!mobile && sidebarOpen && (
           <button
             className="ml-auto text-gray-400 hover:text-gray-600 flex-shrink-0 hidden lg:block"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            aria-label="Toggle sidebar"
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Plegar menú"
           >
-            {sidebarOpen ? '◀' : '▶'}
+            ◀
           </button>
         )}
         {mobile && (
@@ -198,6 +210,19 @@ export default function AppLayout() {
       {/* Nav — soporta dos tipos de item: {to,icon,label} (link) y
           {divider:true,label} (header de grupo). En sidebar colapsado los
           dividers se pintan como una linea horizontal fina sin texto. */}
+      {/* Botón de desplegar, solo cuando el panel está colapsado. Ocupa su
+          propia fila para no pelear con el logo por los 56 px de ancho. */}
+      {!mobile && !sidebarOpen && (
+        <button
+          className="hidden lg:flex items-center justify-center h-8 mx-2 mt-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+          onClick={() => setSidebarOpen(true)}
+          aria-label="Desplegar menú"
+          title="Desplegar menú"
+        >
+          ▶
+        </button>
+      )}
+
       <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
         {navItems.map((item, idx) => {
           if (item.divider) {
@@ -212,18 +237,43 @@ export default function AppLayout() {
               <div key={`div-${idx}`} className={`border-t border-gray-100 mx-2 ${idx > 0 ? 'my-2' : 'mb-1'}`} />
             )
           }
+          // Grupo desplegable: al pulsarlo abre sus opciones debajo en vez de
+          // navegar. Con el sidebar colapsado no hay sitio para el submenú, así
+          // que se comporta como un enlace directo al primer hijo.
+          if (item.children) {
+            return (
+              <GrupoDesplegable
+                key={`grp-${item.label}`}
+                item={item}
+                expandido={!!(sidebarOpen || mobile)}
+              />
+            )
+          }
           return (
             <NavLink
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
-                `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors cursor-pointer
-                 ${isActive ? 'bg-blue-50 text-brand-800 font-medium' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`
+                // Colapsado: el icono va CENTRADO y sin hueco para texto. Con
+                // `items-start gap-2.5 px-2.5` —que es lo que necesita el modo
+                // abierto para que la segunda línea alinee con el icono— los
+                // iconos quedaban pegados a la izquierda de una columna de
+                // 56 px, descuadrados respecto al logo de arriba.
+                `flex rounded-lg text-[13px] transition-colors cursor-pointer
+                 ${(sidebarOpen || mobile)
+                   ? 'items-start gap-2.5 px-2.5 py-[7px]'
+                   : 'items-center justify-center px-0 py-2'}
+                 ${isActive ? 'bg-blue-50 text-brand-800 font-semibold' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`
               }
               title={!sidebarOpen && !mobile ? item.label : undefined}
             >
-              <span className="text-base flex-shrink-0">{item.icon}</span>
-              {(sidebarOpen || mobile) && <span className="truncate">{item.label}</span>}
+              {/* Sep-2026 · El nombre va COMPLETO. Antes llevaba `truncate`
+                  sobre un panel de 208 px y media app quedaba en "Programado
+                  vs ej…" o "Dashboard ejecuti…": había que adivinar o pasar el
+                  ratón por encima. Ahora el panel es más ancho y lo que no
+                  quepa baja a una segunda línea, alineada con el icono. */}
+              <span className="text-base flex-shrink-0 leading-5">{item.icon}</span>
+              {(sidebarOpen || mobile) && <span className="leading-5">{item.label}</span>}
             </NavLink>
           )
         })}
@@ -253,7 +303,7 @@ export default function AppLayout() {
     <div className="flex h-screen overflow-hidden bg-gray-50">
       {/* Sidebar desktop (lg+) — fijo en el flujo */}
       <aside
-        className={`${sidebarOpen ? 'lg:w-52' : 'lg:w-14'} hidden lg:flex flex-shrink-0 bg-white border-r border-gray-100 flex-col transition-all duration-200`}
+        className={`${sidebarOpen ? 'lg:w-64' : 'lg:w-14'} hidden lg:flex flex-shrink-0 bg-white border-r border-gray-100 flex-col transition-all duration-200`}
       >
         {sidebarBody(false)}
       </aside>

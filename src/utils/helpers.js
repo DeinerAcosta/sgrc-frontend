@@ -61,7 +61,7 @@ export const TIPOS_RECURSO = [
  * dos cosas fue lo que dejó 94 oftalmólogos en un estado del que la interfaz no
  * permitía salir.
  */
-export const TIPOS_POR_PACIENTE = ['oftalmologo', 'fonoaudiologa']
+export const TIPOS_POR_PACIENTE = ['oftalmologo', 'fonoaudiologa', 'otorrino']
 
 export const ESPECIALIDADES = [
   { value: 'oftalmologia',         label: 'Oftalmología' },
@@ -90,12 +90,128 @@ export const ESPECIALIDADES = [
 export const ESPECIALIDADES_EXIGEN_APOYO = ['oftalmologia', 'anestesiologia', 'otorrinolaringologia']
 export const ESPECIALIDADES_PERMITEN_APOYO = [...ESPECIALIDADES_EXIGEN_APOYO, 'diagnostico']
 
+/**
+ * GRUPOS DE PERSONAL — las tarjetas de Gestión de ausencias.
+ *
+ * El módulo se entra por una pantalla de tarjetas, una por grupo, y dentro de
+ * cada una van las ausencias de ese personal. Sep-2026, definido con Hector.
+ *
+ * Cubren los 8 tipos de recurso sin dejar ninguno fuera; si se agrega un tipo
+ * nuevo hay que meterlo aquí o sus ausencias no aparecerían en ninguna tarjeta.
+ * Por eso `tiposSinGrupo()` existe: la pantalla avisa en vez de esconderlas.
+ *
+ * Los asesores no atienden pacientes, así que sus ausencias no generan impacto
+ * ni reposición — su tarjeta es más simple que las otras tres.
+ */
+export const GRUPOS_AUSENCIAS = [
+  {
+    key: 'profesionales',
+    label: 'Profesionales',
+    descripcion: 'Oftalmología, optometría, anestesiología, otorrino y fonoaudiología',
+    icono: '🩺',
+    color: 'teal',
+    tipos: ['oftalmologo', 'optometra', 'anestesiologo', 'otorrino', 'fonoaudiologa'],
+  },
+  {
+    key: 'auxiliares',
+    label: 'Auxiliares',
+    descripcion: 'Auxiliares de enfermería',
+    icono: '💉',
+    color: 'green',
+    tipos: ['auxiliar'],
+  },
+  {
+    key: 'tecnicos',
+    label: 'Técnicos',
+    descripcion: 'Técnicos de métodos diagnósticos',
+    icono: '🔬',
+    color: 'gray',
+    tipos: ['tecnico'],
+  },
+  {
+    key: 'asesores',
+    label: 'Asesores',
+    descripcion: 'Asesores de servicios — no atienden pacientes',
+    icono: '💬',
+    color: 'amber',
+    tipos: ['asesor_servicios'],
+  },
+]
+
+/**
+ * Tipos con AGENDA PROPIA de pacientes. Espejo de TIPOS_QUE_IMPACTAN_PACIENTES
+ * en el backend (src/services/absenceService.js).
+ *
+ * Solo la ausencia de estos deja pacientes sin atender, así que solo a ellos se
+ * les muestra "Pacientes impactados" y "Costo de oportunidad". Una auxiliar
+ * acompaña al médico pero no tiene agenda suya: atribuirle los pacientes de él
+ * es contar dos veces el mismo daño.
+ */
+export const TIPOS_QUE_IMPACTAN_PACIENTES = [
+  'oftalmologo', 'anestesiologo', 'otorrino', 'tecnico', 'fonoaudiologa', 'optometra',
+]
+
+/**
+ * MULTI-CONSULTORIO — espejo de TIPOS_MULTI_CONSULTORIO en el backend
+ * (src/lib/resourceTypes.js).
+ *
+ * El médico rota entre 2-3 consultorios y en cada uno hay una auxiliar
+ * manejando la sala. Al activarlo, el programador permite asignaciones
+ * simultáneas y cuenta las horas del día por UNIÓN DE INTERVALOS, no por suma.
+ *
+ * Oct-2026 · se agrega 'otorrino'. La regla estaba escrita a mano como
+ * `type === 'oftalmologo'` acá y en tres sitios del backend, así que no había
+ * forma de activarla para un otorrino: la casilla no se renderizaba.
+ *
+ * Solo vale para quien de verdad rota entre salas. Si atiende una sala a la
+ * vez, la unión de intervalos le dejaría registrar horas que no trabajó.
+ */
+export const TIPOS_MULTI_CONSULTORIO = ['oftalmologo', 'otorrino']
+
+/**
+ * ¿Tiene subespecialidad? Espejo de TIPOS_CON_SUBESPECIALIDAD en el backend.
+ *
+ * El campo es TEXTO LIBRE, no una lista cerrada: el oftalmólogo escribe Retina
+ * o Córnea, el otorrino escribiría Otología o Rinología. Lo único que cambia
+ * por tipo es el ejemplo que sugiere el formulario.
+ */
+export const TIPOS_CON_SUBESPECIALIDAD = ['oftalmologo', 'otorrino']
+
+/** Ejemplos de subespecialidad para el placeholder, según el tipo. */
+export const EJEMPLO_SUBESPECIALIDAD = {
+  oftalmologo: 'Ej: Retina, Córnea, Glaucoma',
+  otorrino: 'Ej: Otología, Rinología, Laringología',
+}
+
+/**
+ * ¿Necesita "intervalo por paciente"? Es el mismo conjunto que
+ * TIPOS_QUE_IMPACTAN_PACIENTES, y no una lista aparte: el intervalo divide la
+ * franja para calcular la capacidad de la agenda, así que lo necesita
+ * exactamente quien tiene agenda propia.
+ *
+ * Oct-2026 · eran dos listas separadas y se desincronizaron. 'otorrino' estaba
+ * en la de impacto pero faltaba en la del formulario, así que el campo no se
+ * mostraba — y el formulario seguía enviando el valor por defecto. Cada
+ * otorrino quedaba con 10 min por paciente que nadie eligió ni podía cambiar.
+ */
+export const requiereIntervaloPorPaciente = (tipo) => TIPOS_QUE_IMPACTAN_PACIENTES.includes(tipo)
+
+/** Tipos de recurso que no quedaron en ninguna tarjeta. Debería ser vacío. */
+export const tiposSinGrupo = () => {
+  const cubiertos = new Set(GRUPOS_AUSENCIAS.flatMap((g) => g.tipos))
+  return TIPOS_RECURSO.map((t) => t.value).filter((t) => !cubiertos.has(t))
+}
+
 export const ROLES = {
   recurso:     { label: 'Recurso',             color: 'green' },
   coordinador: { label: 'Coordinador',         color: 'blue' },
   directivo:   { label: 'Directivo',           color: 'purple' },
   supervisor:  { label: 'Supervisor',          color: 'amber' },
   gerencia:    { label: 'Gerencia',            color: 'red' },
+  // Sep-2026 · Quien reprograma las agendas caídas por una ausencia. Hoy es una
+  // sola persona. Ve únicamente ausencias de profesionales y su módulo de
+  // reprogramaciones; el recorte real lo hace el backend, no esta pantalla.
+  reprogramador: { label: 'Reprogramación',    color: 'teal' },
 }
 
 // Rotativos / agenda intensa: solo 30 min de almuerzo (versus 60 min del resto).
@@ -259,3 +375,40 @@ const FAMILIA_LABELS = {
   sin_familia: 'Sin motivo',
 }
 export const formatFamiliaLabel = (v) => FAMILIA_LABELS[v] ?? titleCase(v ?? 'sin_familia')
+
+/**
+ * UTILIZACIÓN SEMANAL DE UN RECURSO — fuente única para la pantalla y sus KPIs.
+ *
+ * Existe porque los dos sitios que la calculaban no coincidían. Los KPIs de
+ * cabecera dividían por `max_hours_per_week ?? 42` y las filas por
+ * `max_effective_hours ?? max_hours_per_week ?? 42`: en una semana con festivo
+ * el contador decía "3 por debajo del 60%" y en la lista solo 1 traía la
+ * etiqueta, porque el tope ajustado por festivos no entraba en la cuenta de
+ * arriba.
+ *
+ * Y el `?? 42` era peor de lo que parece: a quien cobra POR PACIENTE el backend
+ * le deja `max_hours_per_week` en null a propósito — no tiene tope semanal. El
+ * fallback le inventaba uno de 42 horas y lo medía contra él, que es la misma
+ * confusión que dejó a 94 oftalmólogos en un estado del que no se salía. Para
+ * ellos `aplica` sale en false y la pantalla muestra las horas sin porcentaje.
+ */
+export function utilizacionSemanal(r = {}) {
+  const horas = r.assigned_hours ?? 0
+  const sinTope = r.pay_scheme === 'por_paciente' || r.max_hours_per_week == null
+  if (sinTope) {
+    return { horas, tope: null, pct: null, aplica: false, ociosa: false, cerca: false, festivos: r.festivos_en_semana ?? 0 }
+  }
+  const topeNominal = r.max_hours_per_week
+  const tope = r.max_effective_hours ?? topeNominal
+  const pct = tope > 0 ? Math.min(100, Math.round((horas / tope) * 100)) : 0
+  return {
+    horas,
+    tope,
+    topeNominal,
+    pct,
+    aplica: true,
+    ociosa: pct < 60,
+    cerca: pct >= 90 && !r.is_overtime,
+    festivos: r.festivos_en_semana ?? 0,
+  }
+}

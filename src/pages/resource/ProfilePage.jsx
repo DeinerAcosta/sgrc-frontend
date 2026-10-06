@@ -7,7 +7,7 @@ import { useAuthStore } from '@/store/authStore'
 import { Avatar, Spinner, SectionHeader, Badge } from '@/components/ui'
 import { ROLES } from '@/utils/helpers'
 
-// Tipos de recurso que firman el formato F-AA-126. Solo estos ven la sección
+// Tipos de recurso que firman el formato de ausencia. Solo estos ven la sección
 // "Mi firma" en el perfil — al resto no le sirve subir una firma.
 const TIPOS_CON_FIRMA = new Set(['oftalmologo', 'optometra', 'anestesiologo', 'otorrino', 'fonoaudiologa'])
 // Límite razonable para el archivo original (antes de base64). La firma se
@@ -45,7 +45,7 @@ export default function PerfilPage() {
   const { mutate: guardarFirma, isPending: guardandoFirma } = useMutation({
     mutationFn: (dataUrl) => usuarioService.actualizarMiFirma(dataUrl),
     onSuccess: (_res, dataUrl) => {
-      toast.success(dataUrl ? 'Firma actualizada. Aparecerá en tu próximo formato F-AA-126.' : 'Firma eliminada.')
+      toast.success(dataUrl ? 'Firma actualizada.' : 'Firma eliminada.')
       setNuevaFirma(null)
       qc.invalidateQueries({ queryKey: ['mi-firma'] })
     },
@@ -157,7 +157,7 @@ export default function PerfilPage() {
           <div className="mt-6 pt-4 border-t border-gray-100">
             <SectionHeader title="Mi firma" />
             <p className="text-xs text-gray-500 mb-3">
-              Esta firma aparece en tu formato F-AA-126 (Continuidad del servicio) cuando registrás una ausencia.
+              Esta firma acompaña el formato de tus ausencias cuando registrás una ausencia.
               Subí una imagen PNG o JPG de tu firma escaneada — máx {Math.round(MAX_FIRMA_BYTES / 1024)} KB.
             </p>
             {cargandoFirma ? (
@@ -177,7 +177,7 @@ export default function PerfilPage() {
                   </div>
                 ) : (
                   <div className="border border-dashed border-gray-300 rounded-lg p-6 text-center text-xs text-gray-400 bg-gray-50">
-                    Aún no tenés firma cargada — tu formato F-AA-126 va a salir con el nombre en texto.
+                    Aún no tenés firma cargada — el formato va a salir con tu nombre en texto.
                   </div>
                 )}
                 <div className="flex flex-col sm:flex-row gap-2">
@@ -212,7 +212,7 @@ export default function PerfilPage() {
                     <button
                       className="btn-danger sm:flex-none justify-center"
                       onClick={() => {
-                        if (window.confirm('¿Eliminar tu firma? El próximo F-AA-126 saldrá con el nombre en texto.')) {
+                        if (window.confirm('¿Eliminar tu firma? El formato saldrá con tu nombre en texto.')) {
                           guardarFirma(null)
                         }
                       }}

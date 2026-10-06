@@ -9,6 +9,7 @@ import { DIAS_LABEL, DIAS, semanaLabel, diasDeSemana, parseFechaLocal, normaliza
 import AsignacionModal from '@/pages/coordinator/AssignmentModal'
 import CerrarSemanaModal from '@/pages/coordinator/CloseWeekModal'
 import AsignarBackofficeModal from '@/pages/coordinator/AssignBackofficeModal'
+import AvisoAusentesSemanaAnterior from '@/pages/coordinator/PreviousAbsencesModal'
 import { useConfirm } from '@/contexts/ConfirmContext'
 
 const SLOT_COLOR = {
@@ -221,6 +222,35 @@ export default function ProgramadorPage() {
     enabled: !!semanaActual,
   })
 
+  // ===== §7 · AUSENCIAS DE LA SEMANA ANTERIOR =====
+  // Se consulta siempre que haya semana visible, no solo al copiar: el ticket
+  // dice "al seleccionar o traer la semana anterior", y seleccionar una semana
+  // ya copiada es igual de válido. El aviso se abre solo después de copiar
+  // (que es cuando el coordinador acaba de arrastrar el problema) y queda
+  // disponible en un botón para el resto de los casos.
+  const { data: ausentesPrev, isLoading: loadAusentesPrev } = useQuery({
+    queryKey: ['ausentes-semana-anterior', semanaActual?.id, sedeId],
+    queryFn: () => semanaService.ausentesSemanaAnterior(semanaActual.id, { siteId: sedeId || undefined }),
+    enabled: !!semanaActual,
+    staleTime: 60_000,
+  })
+  const [verAvisoAusentes, setVerAvisoAusentes] = useState(false)
+  // Se memoiza sobre `ausentesPrev`, no sobre la lista derivada: `?? []` crea un
+  // array nuevo en cada render y eso recalculaba el Set en cada pintada de la
+  // grilla, que es lo único de esta pantalla que se pinta cientos de veces.
+  const { ausentesPrevLista, ausentesSinProgramar, recursosQueFaltaron } = useMemo(() => {
+    const lista = ausentesPrev?.ausentes ?? []
+    return {
+      ausentesPrevLista: lista,
+      ausentesSinProgramar: lista.filter((a) => a.pendiente).length,
+      // Para teñir casillas van TODOS los que faltaron, no solo los pendientes.
+      // Quien está pendiente no tiene casilla que teñir — justamente por eso el
+      // aviso existe. El resaltado sirve para el otro caso: la copia ya le puso
+      // turnos y hay que mirar si ahí repone lo que se cayó.
+      recursosQueFaltaron: new Set(lista.map((a) => a.resource.id)),
+    }
+  }, [ausentesPrev])
+
   // BÚSQUEDA GLOBAL (sup/ger): cuando el rol tiene acceso multi-sede y abre el
   // panel de búsqueda, cargamos TODAS las asignaciones de la semana visible sin
   // filtro de sede. El endpoint `/asignaciones?semana_id=X` sin sede_id ya trae
@@ -309,6 +339,13 @@ export default function ProgramadorPage() {
       } else {
         toast.success(`${copiadas} asignaciones copiadas${reemplazo}`)
       }
+
+      // §7 · Acabamos de arrastrar la semana anterior tal como se programó, no
+      // como ocurrió. Si alguien faltó, este es el momento de decirlo: después
+      // nadie vuelve a mirar. Se refresca primero para que el aviso no muestre
+      // como "sin programar" a quien la copia acaba de programar.
+      qc.invalidateQueries({ queryKey: ['ausentes-semana-anterior'] })
+      setVerAvisoAusentes(true)
     },
     onError: (err) => toast.error(err?.message ?? 'Error al copiar'),
   })
@@ -533,6 +570,19 @@ export default function ProgramadorPage() {
                 : 'Copia las asignaciones de la semana anterior a esta'}
             >
               📋 Copiar semana anterior
+            </button>
+          )}
+
+          {/* §7 · Queda a mano para cuando el coordinador entra a una semana ya
+              copiada: el aviso automático solo salta al momento de copiar. */}
+          {ausentesPrevLista.length > 0 && (
+            <button
+              className={ausentesSinProgramar > 0 ? 'btn-warning' : 'btn'}
+              onClick={() => setVerAvisoAusentes(true)}
+              title="Quién faltó la semana anterior y qué hay que recuperar en esta programación"
+            >
+              🔶 Faltaron la semana pasada ({ausentesPrevLista.length})
+              {ausentesSinProgramar > 0 && ` · ${ausentesSinProgramar} sin programar`}
             </button>
           )}
           {semanaActual && !isCerrada && (
@@ -809,7 +859,16 @@ export default function ProgramadorPage() {
                             key={a.id}
                             data-asig-id={a.id}
                             className={`${SLOT_COLOR[a.resource?.type] ?? 'slot-teal'} group relative ${canEdit ? '' : 'cursor-default'} ${
-                              asigResaltada === a.id ? 'ring-2 ring-brand-500 ring-offset-1 shadow-md animate-pulse' : ''
+                              asigResaltada === a.id
+                                ? 'ring-2 ring-brand-500 ring-offset-1 shadow-md animate-pulse'
+                                : recursosQueFaltaron.has(a.resource?.id)
+                                  /* §7 · Faltó la semana pasada: el borde ámbar
+                                     marca la casilla que hay que revisar. El
+                                     resaltado de la búsqueda tiene prioridad —
+                                     ese es un salto que el usuario acaba de
+                                     pedir y no puede quedar tapado. */
+                                  ? 'ring-2 ring-amber-400 ring-offset-1'
+                                  : ''
                             }`}
                             title={[
                               `${a.resource?.name} · ${a.start_time}–${a.end_time}`,
@@ -817,6 +876,9 @@ export default function ProgramadorPage() {
                               a.assistant2 ? `Aux 2: ${a.assistant2.name}` : null,
                               // PROYECTOS-3255 #2.1: asesores no muestran capacidad de pacientes.
                               a.resource?.type !== 'asesor_servicios' ? `Capacidad: ${a.patient_capacity} pacientes` : null,
+                              recursosQueFaltaron.has(a.resource?.id)
+                                ? '🔶 Faltó la semana anterior — revisa si repone aquí'
+                                : null,
                               canEdit ? '👆 Click para editar' : null,
                             ].filter(Boolean).join('\n')}
                             onClick={() => canEdit && setModalData({
@@ -950,6 +1012,14 @@ export default function ProgramadorPage() {
           sedeId={sedeId}
           onClose={() => setModalData(null)}
           onSaved={() => { qc.invalidateQueries({ queryKey: ['asignaciones'] }); setModalData(null) }}
+        />
+      )}
+
+      {verAvisoAusentes && (
+        <AvisoAusentesSemanaAnterior
+          datos={ausentesPrev}
+          cargando={loadAusentesPrev}
+          onClose={() => setVerAvisoAusentes(false)}
         />
       )}
 

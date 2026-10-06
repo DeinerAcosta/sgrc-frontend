@@ -60,6 +60,7 @@ const AdminMetasPage            = lazy(() => import('@/pages/admin/AdminTargetsP
 const AdminSolicitudesPage      = lazy(() => import('@/pages/admin/AdminRequestsPage'))
 const AdminSolicitudesRecursoPage = lazy(() => import('@/pages/admin/AdminResourceRequestsPage'))
 const AdminMotivosAusenciaPage  = lazy(() => import('@/pages/admin/AdminAbsenceReasonsPage'))
+const ModuloHomePage            = lazy(() => import('@/pages/ModuleHomePage'))
 
 /** Se muestra mientras se descarga el trozo de la página pedida. */
 function CargandoPagina() {
@@ -87,6 +88,8 @@ function RoleRedirect() {
     directivo:   '/app/dashboard',
     supervisor:  '/app/admin/sedes',
     gerencia:    '/app/dashboard',  // gerencia aterriza en el dashboard ejecutivo
+    // Sep-2026 · Aterriza en su módulo, que es lo único que hace.
+    reprogramador: '/app/reprogramaciones',
   }
   return <Navigate to={routes[user?.role] ?? '/app/horario'} replace />
 }
@@ -111,13 +114,16 @@ export default function App() {
           <Route path="mi-ejecucion" element={<RequireAuth roles={['recurso']}><MiEjecucionPage /></RequireAuth>} />
           <Route path="ausencias" element={<RequireAuth roles={['recurso']}><AusenciasRecursoPage /></RequireAuth>} />
           <Route path="perfil" element={<RequireAuth><PerfilPage /></RequireAuth>} />
+          {/* Sep-2026 · Página de un módulo: lista sus opciones. Una sola ruta
+              para todos — el contenido sale de config/nav.js según el rol. */}
+          <Route path="modulo/:clave" element={<RequireAuth><ModuloHomePage /></RequireAuth>} />
           <Route path="backoffice" element={<RequireAuth roles={['recurso']}><BackofficeRecursoPage /></RequireAuth>} />
 
           {/* COORDINADOR */}
           <Route path="dashboard-coord" element={<RequireAuth roles={['coordinador', 'supervisor']}><DashboardCoordPage /></RequireAuth>} />
-          <Route path="programador" element={<RequireAuth roles={['coordinador', 'supervisor']}><ProgramadorPage /></RequireAuth>} />
-          <Route path="ausencias-coord" element={<RequireAuth roles={['coordinador']}><AusenciasCoordPage /></RequireAuth>} />
-          <Route path="ausencias-cronograma" element={<RequireAuth roles={['coordinador', 'supervisor']}><AusenciasCronogramaPage /></RequireAuth>} />
+          <Route path="programador" element={<RequireAuth roles={['coordinador', 'supervisor', 'reprogramador']}><ProgramadorPage /></RequireAuth>} />
+          <Route path="ausencias-coord" element={<RequireAuth roles={['coordinador', 'reprogramador']}><AusenciasCoordPage /></RequireAuth>} />
+          <Route path="ausencias-cronograma" element={<RequireAuth roles={['coordinador', 'supervisor', 'reprogramador']}><AusenciasCronogramaPage /></RequireAuth>} />
           <Route path="ejecucion" element={<RequireAuth roles={['coordinador', 'supervisor']}><EjecucionPage /></RequireAuth>} />
           <Route path="recursos-coord" element={<RequireAuth roles={['coordinador', 'supervisor']}><RecursosCoordPage /></RequireAuth>} />
           <Route path="backoffice-coord" element={<RequireAuth roles={['coordinador']}><BackofficeCoordPage /></RequireAuth>} />
@@ -129,7 +135,7 @@ export default function App() {
           <Route path="informes/:tipo" element={<RequireAuth roles={['coordinador', 'directivo', 'supervisor']}><InformePage /></RequireAuth>} />
           <Route path="comparativo" element={<RequireAuth roles={['directivo']}><ComparativoPage /></RequireAuth>} />
           <Route path="productividad-recurso" element={<RequireAuth roles={['directivo']}><ProductividadRecursoPage /></RequireAuth>} />
-          <Route path="reprogramaciones" element={<RequireAuth roles={['directivo', 'supervisor']}><ReprogramacionesPage /></RequireAuth>} />
+          <Route path="reprogramaciones" element={<RequireAuth roles={['directivo', 'supervisor', 'reprogramador']}><ReprogramacionesPage /></RequireAuth>} />
 
           {/* SUPERVISOR */}
           <Route path="admin/sedes" element={<RequireAuth roles={['supervisor']}><AdminSedesPage /></RequireAuth>} />

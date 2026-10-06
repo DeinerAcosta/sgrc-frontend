@@ -4,14 +4,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { ausenciaService, sedeService, reposicionService } from '@/services/api'
 import { useAuthStore } from '@/store/authStore'
-import { Badge, Spinner, EmptyState, Avatar } from '@/components/ui'
-import { TIPOS_AUSENCIA, formatCOP, parseFechaLocal } from '@/utils/helpers'
+import { Badge, Spinner, EmptyState, Avatar, usePaginacion, Paginacion } from '@/components/ui'
+import { TIPOS_AUSENCIA, formatCOP, parseFechaLocal, GRUPOS_AUSENCIAS, tiposSinGrupo, TIPOS_QUE_IMPACTAN_PACIENTES } from '@/utils/helpers'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import RegistrarAusenciaCoordModal from '@/pages/coordinator/CoordLogAbsenceModal'
 import SugeridorReemplazosModal from '@/pages/coordinator/ReplacementSuggesterModal'
 import RegistrarReposicionModal from '@/pages/resource/LogMakeupModal'
 import { useSedeActiva } from '@/hooks/useActiveSite'
+import VistaFormatoAusencia from '@/pages/absences/AbsenceFormView'
 
 const TIPO_LABEL = Object.fromEntries(TIPOS_AUSENCIA.map((t) => [t.value, t.label]))
 
@@ -25,10 +26,39 @@ export default function AusenciasCoordPage() {
   const [notaConfirm, setNotaConfirm] = useState('')
   const [showRegistrar, setShowRegistrar] = useState(false)
   const [showSugerir, setShowSugerir] = useState(null)
+  // Ausencia abierta en el modal de gestión (§6.1). null = cerrado.
+  const [gestionando, setGestionando] = useState(null)
+  // §1 · Ausencia abierta en el formato de solo lectura (el que reemplazó al
+  // PDF). Guardamos solo el id: el formato se pide aparte porque trae la firma
+  // escaneada, que ya no viaja en el listado.
+  const [verFormato, setVerFormato] = useState(null)
   // Fase 5 · F-AA-126 v04: si la ausencia confirmada trae desea_reponer=true,
   // abrimos automáticamente el modal de proponer reposición (Fase 3) con la
   // ausencia preseleccionada para no obligar al coord a ir a otro sitio.
   const [autoReposicion, setAutoReposicion] = useState(null)
+  // Grupo de personal elegido. Vive en la URL (?grupo=auxiliares) y no en
+  // estado interno, para que el menú lateral pueda enlazar directo a cada uno
+  // y para que la pantalla se pueda compartir o recargar sin perderse.
+  // Sin ?grupo → se muestran las tarjetas.
+  const grupoKey = searchParams.get('grupo')
+  const grupo = GRUPOS_AUSENCIAS.find((g) => g.key === grupoKey) ?? null
+  const setGrupoKey = (key) => {
+    const p = new URLSearchParams(searchParams)
+    if (key) p.set('grupo', key)
+    else p.delete('grupo')
+    setSearchParams(p)
+  }
+
+  // Ausencias de TODOS los grupos, para los contadores de las tarjetas. Va sin
+  // filtro de estado ni de sede a propósito: la pantalla de entrada debe decir
+  // cuánto hay en cada grupo antes de que elijas sede, y el backend ya recorta
+  // por el alcance de quien consulta.
+  const { data: ausenciasHub = [], isLoading: cargandoHub } = useQuery({
+    queryKey: ['ausencias-hub'],
+    queryFn: () => ausenciaService.list({}),
+    enabled: !grupoKey,
+    staleTime: 30 * 1000,
+  })
 
   // Cargar sede para obtener ciudad (para el sugeridor de reemplazos)
   const { data: sedes = [] } = useQuery({
@@ -67,10 +97,17 @@ export default function AusenciasCoordPage() {
   }, [ausencias, searchParams, tab, setSearchParams])
 
   const { mutate: confirmar, isPending: confirmando } = useMutation({
-    mutationFn: (id) => ausenciaService.confirmar(id, { nota_coordinador: notaConfirm }),
+    // La nota llega del modal de gestión: lleva qué se hizo con la agenda, no
+    // solo un comentario suelto.
+    mutationFn: ({ id, nota, accion }) => ausenciaService.confirmar(id, {
+      nota_coordinador: nota ?? notaConfirm,
+      action_taken: accion ?? undefined,
+    }),
     onSuccess: (actualizada) => {
       qc.invalidateQueries({ queryKey: ['ausencias-coord'] })
-      toast.success('Ausencia confirmada. Recursos notificados.')
+      qc.invalidateQueries({ queryKey: ['ausencias-hub'] })
+      setGestionando(null)
+      toast.success('Ausencia gestionada. Recursos notificados.')
       // Fase 5 · v04: si el profesional marcó "desea reponer=SÍ" en el formulario
       // original, encadenamos inmediatamente el modal de proponer reposición.
       // La ausencia actualizada viene del backend con la bandera desea_reponer.
@@ -82,23 +119,65 @@ export default function AusenciasCoordPage() {
     onError: (err) => toast.error(err?.message ?? 'Error al confirmar'),
   })
 
-  const { mutate: rechazar } = useMutation({
+  const { mutate: rechazar, isPending: rechazando } = useMutation({
     mutationFn: ({ id, reason: motivo }) => ausenciaService.rechazar(id, motivo),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['ausencias-coord'] })
-      toast('Ausencia rechazada. El recurso fue notificado.', { icon: 'ℹ️' })
+      qc.invalidateQueries({ queryKey: ['ausencias-hub'] })
+      setGestionando(null)
+      toast('Ausencia marcada como no procedente. El recurso fue notificado.', { icon: 'ℹ️' })
       setSelected(null)
     },
+    onError: (err) => toast.error(err?.message ?? 'Error al guardar'),
   })
 
-  const pendientes = ausencias.filter((a) => a.status === 'pendiente')
-  const sel = ausencias.find((a) => a.id === selected)
+  // Solo las del grupo elegido. El backend no filtra por tipo de recurso, así
+  // que se recorta aquí: la respuesta ya trae `resource.type` anidado.
+  const ausenciasGrupo = grupo
+    ? ausencias.filter((a) => grupo.tipos.includes(a.resource?.type))
+    : ausencias
+
+  const pendientes = ausenciasGrupo.filter((a) => a.status === 'pendiente')
+  const sel = ausenciasGrupo.find((a) => a.id === selected)
+  const pag = usePaginacion(ausenciasGrupo, 10)
+
+  // Sep-2026 · El módulo se entra por una pantalla de tarjetas, una por grupo de
+  // personal. Mientras no se elija grupo se muestran las tarjetas; al entrar en
+  // una, el listado de siempre pero acotado a ese personal.
+  if (!grupo) {
+    return (
+      <HubAusencias
+        ausencias={ausenciasHub}
+        cargando={cargandoHub}
+        Selector={Selector}
+        onElegir={setGrupoKey}
+        onRegistrar={() => setShowRegistrar(true)}
+      >
+        {showRegistrar && (
+          <RegistrarAusenciaCoordModal
+            sedeId={sedeId}
+            onClose={() => setShowRegistrar(false)}
+            onSaved={() => { setShowRegistrar(false); qc.invalidateQueries({ queryKey: ['ausencias-hub'] }) }}
+          />
+        )}
+      </HubAusencias>
+    )
+  }
 
   return (
     <div className="p-3 sm:p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-4">
         <div>
-          <h1 className="text-base font-semibold text-gray-900">Gestión de ausencias</h1>
+          <button
+            className="text-xs text-gray-500 hover:text-gray-900 mb-1.5 flex items-center gap-1"
+            onClick={() => { setGrupoKey(null); setSelected(null) }}
+          >
+            ← Gestión de ausencias
+          </button>
+          <h1 className="text-base font-semibold text-gray-900">
+            <span className="mr-1.5">{grupo.icono}</span>Ausencias · {grupo.label}
+          </h1>
+          <p className="text-xs text-gray-500 mt-0.5">{grupo.descripcion}</p>
           <Selector className="mt-2" />
         </div>
         <div className="flex items-center gap-3 flex-wrap">
@@ -124,42 +203,78 @@ export default function AusenciasCoordPage() {
       {tab === 'reposiciones' ? (
         <ReposicionesTab reposiciones={reposicionesPend} qc={qc} />
       ) : (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Lista */}
-        <div className="space-y-2">
+      <div className="grid grid-cols-1 xl:grid-cols-[1.4fr,1fr] gap-4">
+        {/* GRILLA (PROYECTOS-3398 §5) — antes era una lista de tarjetas, una por
+            ausencia. Con 131 registros había que ir bajando a ciegas: no se
+            podía comparar fechas ni antelación de un vistazo, ni ordenar.
+            Mismo patrón que el resto del sistema: encabezado fijo, 10 por
+            página y conteo total. */}
+        <div className="card p-0 overflow-hidden">
           {isLoading ? (
-            <div className="flex justify-center py-8"><Spinner /></div>
-          ) : ausencias.length === 0 ? (
+            <div className="flex justify-center py-10"><Spinner /></div>
+          ) : ausenciasGrupo.length === 0 ? (
             <EmptyState icon="✅" title="Sin ausencias" description="No hay ausencias en este estado" />
           ) : (
-            ausencias.map((a) => (
-              <div
-                key={a.id}
-                onClick={() => setSelected(a.id)}
-                className={`card cursor-pointer hover:border-brand-400 transition-colors ${selected === a.id ? 'border-brand-400 ring-1 ring-brand-400' : ''}`}
-              >
-                <div className="flex items-start gap-2.5">
-                  <Avatar nombre={a.resource?.name} size="sm" color="blue" />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-medium text-gray-900 truncate">{a.resource?.name}</div>
-                    <div className="text-xs text-gray-500">{TIPO_LABEL[a.type] ?? a.type}</div>
-                    <div className="text-xs text-gray-400 mt-0.5">
-                      {format(parseFechaLocal(a.start_date), 'd MMM', { locale: es })}
-                      {a.end_date !== a.start_date && ` – ${format(parseFechaLocal(a.end_date), 'd MMM', { locale: es })}`}
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <Badge variant={a.status === 'pendiente' ? 'amber' : a.status === 'confirmada' ? 'green' : 'red'}>
-                      {a.status}
-                    </Badge>
-                    {a.patients_affected > 0 && (
-                      <Badge variant="red">{a.patients_affected} pac.</Badge>
-                    )}
-                    {a.is_partial && <Badge variant="blue">Parcial</Badge>}
-                  </div>
-                </div>
+            <>
+              <div className="overflow-auto max-h-[calc(100vh-290px)]">
+                <table className="w-full text-xs border-separate border-spacing-0 min-w-[620px]">
+                  <thead>
+                    <tr>
+                      {['Recurso', 'Motivo', 'Fechas', 'Antelación', 'Clasificación', 'Estado'].map((c) => (
+                        <th key={c} className="sticky top-0 z-10 bg-brand-800 text-white text-left font-semibold px-3 py-2 whitespace-nowrap">
+                          {c}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pag.visibles.map((a) => (
+                      <tr
+                        key={a.id}
+                        onClick={() => setSelected(a.id)}
+                        className={`cursor-pointer transition-colors ${
+                          selected === a.id ? 'bg-blue-50' : 'hover:bg-gray-50'
+                        }`}
+                      >
+                        <td className="px-3 py-2 border-b border-gray-100">
+                          <div className="flex items-center gap-2">
+                            <Avatar nombre={a.resource?.name} size="sm" color="blue" />
+                            <div className="min-w-0">
+                              <div className="font-medium text-gray-900 truncate">{a.resource?.name}</div>
+                              <div className="text-[11px] text-gray-400 capitalize">{a.resource?.type}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 border-b border-gray-100 text-gray-700">
+                          {TIPO_LABEL[a.type] ?? a.type}
+                          {a.is_partial && <Badge variant="blue" className="ml-1">Parcial</Badge>}
+                        </td>
+                        <td className="px-3 py-2 border-b border-gray-100 text-gray-600 whitespace-nowrap">
+                          {format(parseFechaLocal(a.start_date), 'd MMM yyyy', { locale: es })}
+                          {a.end_date !== a.start_date && (
+                            <span className="text-gray-400"> – {format(parseFechaLocal(a.end_date), 'd MMM', { locale: es })}</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 border-b border-gray-100 text-gray-600 whitespace-nowrap">
+                          {a.notice_days ?? 0} d
+                        </td>
+                        <td className="px-3 py-2 border-b border-gray-100">
+                          <Badge variant={a.is_planned ? 'green' : 'amber'}>
+                            {a.is_planned ? 'Programada' : 'Imprevista'}
+                          </Badge>
+                        </td>
+                        <td className="px-3 py-2 border-b border-gray-100">
+                          <Badge variant={a.status === 'pendiente' ? 'amber' : a.status === 'confirmada' ? 'green' : 'red'}>
+                            {a.status}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            ))
+              <Paginacion estado={pag} etiqueta="ausencias" />
+            </>
           )}
         </div>
 
@@ -222,36 +337,31 @@ export default function AusenciasCoordPage() {
                 </div>
               )}
 
+              {/* PROYECTOS-3398 §6.1 · GESTIONAR reemplaza a Confirmar/Rechazar.
+                  Antes los dos botones estaban sueltos en el panel: el caso se
+                  resolvía con un clic y sin obligar a decidir nada más, así que
+                  quedaban colgados. En producción había 6 pendientes de hasta
+                  106 días — ausencias reales que ya ocurrieron y seguían sin
+                  revisar. Ahora se abre un paso explícito donde hay que elegir
+                  qué pasó con la agenda, no solo aceptar o negar. */}
+              {/* §1 · El formato se consulta en cualquier estado: es el registro de
+                  lo que el profesional diligenció, no un paso del trámite. Antes
+                  el botón del PDF solo salía en las confirmadas, así que de una
+                  pendiente o una rechazada no quedaba forma de ver qué decía. */}
+              <button
+                className="btn w-full justify-center"
+                onClick={() => setVerFormato(sel.id)}
+              >
+                Ver formato F-AA-126
+              </button>
+
               {sel.status === 'pendiente' && (
-                <div className="space-y-2">
-                  <label className="label">Nota / Motivo (obligatorio si rechazas — RN-20)</label>
-                  <textarea
-                    className="input resize-none text-xs"
-                    rows={2}
-                    value={notaConfirm}
-                    onChange={(e) => setNotaConfirm(e.target.value)}
-                    placeholder="Si confirmas: acción tomada (opcional). Si rechazas: motivo (mínimo 5 caracteres)"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      className="btn-danger flex-1 justify-center"
-                      onClick={() => {
-                        if (!notaConfirm || notaConfirm.trim().length < 5) {
-                          toast.error('El motivo de rechazo es obligatorio (mínimo 5 caracteres)')
-                          return
-                        }
-                        rechazar({ id: sel.id, reason: notaConfirm })
-                      }}
-                    >Rechazar</button>
-                    <button
-                      className="btn-success flex-1 justify-center"
-                      onClick={() => confirmar(sel.id)}
-                      disabled={confirmando}
-                    >
-                      {confirmando ? <Spinner size="sm" /> : '✓ Confirmar'}
-                    </button>
-                  </div>
-                </div>
+                <button
+                  className="btn-primary w-full justify-center"
+                  onClick={() => { setNotaConfirm(''); setGestionando(sel) }}
+                >
+                  ⚙️ GESTIONAR
+                </button>
               )}
 
               {sel.status === 'confirmada' && (
@@ -265,41 +375,29 @@ export default function AusenciasCoordPage() {
                   <div className="text-xs text-gray-400 text-center">
                     Sugiere recursos disponibles de cualquier sede de la ciudad
                   </div>
-                  {/* Formato F-AA-126: solo para recursos médicos
-                      (oftalmólogo, optómetra, anestesiólogo, otorrino, fonoaudiologa). */}
-                  {['oftalmologo','optometra','anestesiologo','otorrino','fonoaudiologa'].includes(sel.resource?.type) && (
-                    <>
-                      <button
-                        className="btn w-full justify-center"
-                        onClick={async () => {
-                          try {
-                            const blob = await ausenciaService.descargarFormatoFAA126(sel.id)
-                            const url = URL.createObjectURL(blob)
-                            const a = document.createElement('a')
-                            a.href = url
-                            const nombreSafe = (sel.resource?.name ?? 'profesional').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-                            a.download = `F-AA-126_${nombreSafe}_${sel.id.slice(0, 8)}.pdf`
-                            a.click()
-                            URL.revokeObjectURL(url)
-                            toast.success('Formato F-AA-126 descargado')
-                          } catch (err) {
-                            toast.error(err?.message ?? 'Error al generar el formato')
-                          }
-                        }}
-                      >
-                        📄 Descargar formato F-AA-126
-                      </button>
-                      <div className="text-xs text-gray-400 text-center">
-                        Formato oficial de continuidad del servicio (PDF)
-                      </div>
-                    </>
-                  )}
+                  {/* Sep-2026 · Se eliminó el botón "Descargar formato F-AA-126".
+                      El PDF sale del sistema por completo: el formato pasa a verse
+                      como formulario de solo lectura dentro del detalle. */}
                 </div>
               )}
             </div>
           )}
         </div>
       </div>
+      )}
+
+      {verFormato && (
+        <VistaFormatoAusencia ausenciaId={verFormato} onClose={() => setVerFormato(null)} />
+      )}
+
+      {gestionando && (
+        <GestionarAusenciaModal
+          ausencia={gestionando}
+          onClose={() => setGestionando(null)}
+          onConfirmar={confirmar}
+          onRechazar={rechazar}
+          procesando={confirmando || rechazando}
+        />
       )}
 
       {showRegistrar && (
@@ -343,6 +441,238 @@ const TIPO_REPOSICION_LABEL = {
   otra_sede:     'Otra sede / consultorio',
   doble_jornada: 'Doble jornada',
   otro:          'Otro',
+}
+
+/**
+ * Modal de GESTIÓN de una ausencia (PROYECTOS-3398 §6.1).
+ *
+ * Reemplaza a los botones sueltos de Confirmar y Rechazar. La diferencia no es
+ * cosmética: antes el caso se cerraba con un clic, sin obligar a decir qué pasó
+ * con la agenda. Por eso en producción había 6 ausencias pendientes de hasta
+ * 106 días — reales, ya ocurridas, nunca revisadas.
+ *
+ * Ahora son dos decisiones separadas:
+ *
+ *   1. ¿Procede la ausencia?            aceptar / no aceptar
+ *   2. ¿Qué se hizo con la agenda?      solo si procede y el recurso atiende
+ *                                       pacientes — a un auxiliar no se le
+ *                                       reprograma nada
+ *
+ * La segunda es la que faltaba. "Confirmada" decía que la ausencia era válida,
+ * pero no si los pacientes se reubicaron, si otro profesional cubrió o si la
+ * agenda simplemente se perdió. Ese dato es el que necesita Duarte para su
+ * trabajo y el que no existe en ningún informe.
+ *
+ * Lo elegido se guarda en `actionTaken`, que ya estaba en el modelo y nadie
+ * escribía.
+ */
+const ACCIONES_AGENDA = [
+  { value: 'reprogramada',   label: 'Se reprogramaron los pacientes', help: 'Pasan a otro día u otro profesional' },
+  { value: 'cubierta',       label: 'Otro profesional cubrió',        help: 'La agenda se atendió igual' },
+  { value: 'perdida',        label: 'La agenda se perdió',            help: 'No se pudo reubicar a nadie' },
+  { value: 'sin_agenda',     label: 'No tenía agenda ese día',        help: 'No había pacientes programados' },
+]
+
+function GestionarAusenciaModal({ ausencia, onClose, onConfirmar, onRechazar, procesando }) {
+  const [decision, setDecision] = useState('')      // 'procede' | 'no_procede'
+  const [accion, setAccion] = useState('')
+  const [nota, setNota] = useState('')
+
+  const atiendePacientes = TIPOS_QUE_IMPACTAN_PACIENTES.includes(ausencia.resource?.type)
+  const pideAccion = decision === 'procede' && atiendePacientes
+  const faltaMotivo = decision === 'no_procede' && nota.trim().length < 5
+  const puedeGuardar = decision && !faltaMotivo && (!pideAccion || accion)
+
+  const guardar = () => {
+    if (decision === 'no_procede') return onRechazar({ id: ausencia.id, reason: nota.trim() })
+    const detalle = pideAccion
+      ? `${ACCIONES_AGENDA.find((a) => a.value === accion)?.label}${nota.trim() ? ` — ${nota.trim()}` : ''}`
+      : nota.trim()
+    onConfirmar({ id: ausencia.id, nota: detalle, accion: pideAccion ? accion : null })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900">Gestionar ausencia</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {ausencia.resource?.name} · {format(parseFechaLocal(ausencia.start_date), 'd MMM yyyy', { locale: es })}
+            </p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+        </div>
+
+        <div className="px-5 py-4 space-y-5">
+          <div>
+            <div className="label mb-2">1 · ¿Procede la ausencia?</div>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { v: 'procede',    l: 'Sí, procede',  c: 'border-green-300 bg-green-50 text-green-800' },
+                { v: 'no_procede', l: 'No procede',   c: 'border-red-300 bg-red-50 text-red-800' },
+              ].map((o) => (
+                <button
+                  key={o.v}
+                  onClick={() => { setDecision(o.v); setAccion(''); }}
+                  className={`px-3 py-2.5 rounded-lg border text-xs font-medium transition-colors ${
+                    decision === o.v ? o.c : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >{o.l}</button>
+              ))}
+            </div>
+          </div>
+
+          {pideAccion && (
+            <div>
+              <div className="label mb-2">2 · ¿Qué pasó con su agenda?</div>
+              <div className="space-y-1.5">
+                {ACCIONES_AGENDA.map((a) => (
+                  <label
+                    key={a.value}
+                    className={`flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-colors ${
+                      accion === a.value ? 'border-brand-400 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    <input
+                      type="radio" name="accion" className="mt-0.5"
+                      checked={accion === a.value}
+                      onChange={() => setAccion(a.value)}
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-xs font-medium text-gray-800">{a.label}</span>
+                      <span className="block text-[11px] text-gray-500">{a.help}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {decision === 'procede' && !atiendePacientes && (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-2.5 text-[11px] text-gray-600">
+              {ausencia.resource?.name} no tiene agenda propia de pacientes, así que no hay nada
+              que reprogramar. Solo se registra la ausencia.
+            </div>
+          )}
+
+          {decision && (
+            <div>
+              <label className="label">
+                {decision === 'no_procede' ? 'Motivo del rechazo *' : 'Observaciones (opcional)'}
+              </label>
+              <textarea
+                className="input resize-none text-xs"
+                rows={3}
+                value={nota}
+                onChange={(e) => setNota(e.target.value)}
+                placeholder={decision === 'no_procede'
+                  ? 'Por qué no procede (mínimo 5 caracteres). Queda registrado y el recurso es notificado.'
+                  : 'Lo que el equipo deba saber sobre cómo se resolvió.'}
+              />
+              {faltaMotivo && nota.length > 0 && (
+                <div className="text-[11px] text-red-600 mt-1">Mínimo 5 caracteres.</div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="px-5 py-4 border-t border-gray-100 flex gap-2">
+          <button className="btn flex-1 justify-center" onClick={onClose}>Cancelar</button>
+          <button
+            className={`flex-1 justify-center ${decision === 'no_procede' ? 'btn-danger' : 'btn-primary'}`}
+            onClick={guardar}
+            disabled={!puedeGuardar || procesando}
+          >
+            {procesando ? <Spinner size="sm" /> : 'Guardar gestión'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Pantalla de entrada del módulo: una tarjeta por grupo de personal.
+ *
+ * Sep-2026 · Antes se entraba directo a un listado plano con todo mezclado. La
+ * división por grupo existe porque las ausencias se gestionan distinto según
+ * quién falta: un profesional que no viene deja pacientes sin atender y puede
+ * reponer; un asesor no atiende pacientes, así que ni genera impacto ni repone.
+ *
+ * Cada tarjeta muestra el total y, aparte, las que están por revisar — que es
+ * lo único que exige acción hoy. Si no hay ninguna pendiente se dice "al día"
+ * en vez de un cero suelto, para que se lea de un vistazo cuál mirar primero.
+ */
+function HubAusencias({ ausencias, cargando, Selector, onElegir, onRegistrar, children }) {
+  const conteos = (tipos) => {
+    const delGrupo = ausencias.filter((a) => tipos.includes(a.resource?.type))
+    return {
+      total: delGrupo.length,
+      pendientes: delGrupo.filter((a) => a.status === 'pendiente').length,
+    }
+  }
+  // Si alguien agrega un tipo de recurso y olvida meterlo en un grupo, sus
+  // ausencias no saldrían en ninguna tarjeta. Mejor avisarlo que esconderlas.
+  const huerfanos = tiposSinGrupo()
+
+  return (
+    <div className="p-3 sm:p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5">
+        <div>
+          <h1 className="text-base font-semibold text-gray-900">Gestión de ausencias</h1>
+          <p className="text-xs text-gray-500 mt-0.5">Elige el grupo de personal que vas a gestionar</p>
+          <Selector className="mt-2" />
+        </div>
+        <button className="btn-danger" onClick={onRegistrar}>+ Registrar ausencia</button>
+      </div>
+
+      {huerfanos.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 mb-4">
+          ⚠️ Hay tipos de recurso sin grupo asignado ({huerfanos.join(', ')}). Sus ausencias no
+          aparecen en ninguna tarjeta — hay que agregarlos en <code>GRUPOS_AUSENCIAS</code>.
+        </div>
+      )}
+
+      {cargando ? (
+        <div className="flex justify-center py-12"><Spinner /></div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {GRUPOS_AUSENCIAS.map((g) => {
+            const { total, pendientes } = conteos(g.tipos)
+            const hayQueMirar = pendientes > 0
+            return (
+              <button
+                key={g.key}
+                onClick={() => onElegir(g.key)}
+                className={`card text-left transition-all hover:shadow-md hover:-translate-y-0.5 ${
+                  hayQueMirar ? 'border-l-4 border-l-red-500' : ''
+                }`}
+              >
+                <div className="text-3xl mb-2">{g.icono}</div>
+                <div className="text-sm font-semibold text-gray-900">{g.label}</div>
+                <div className="text-xs text-gray-500 mt-0.5 leading-snug min-h-[2.4em]">{g.descripcion}</div>
+
+                <div className="mt-3 pt-3 border-t border-gray-100 flex items-end justify-between">
+                  <div>
+                    <div className="text-2xl font-semibold text-gray-900 leading-none">{total}</div>
+                    <div className="text-[11px] text-gray-500 mt-1">ausencias</div>
+                  </div>
+                  {hayQueMirar ? (
+                    <Badge variant="red">{pendientes} por revisar</Badge>
+                  ) : (
+                    <span className="text-[11px] text-green-700">✓ al día</span>
+                  )}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {children}
+    </div>
+  )
 }
 
 function ReposicionesTab({ reposiciones, qc }) {

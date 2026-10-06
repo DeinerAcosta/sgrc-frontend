@@ -121,39 +121,9 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, onCreated
     }),
     onSuccess: (creada) => {
       qc.invalidateQueries({ queryKey: ['ausencias-coord'] })
-      // Si el recurso es de los tipos que emiten formato F-AA-126, mostramos un
-      // toast con boton para descargarlo YA — evita que el coord tenga que
-      // buscar la ausencia en la lista para bajar el PDF.
-      const emiteFormato = TIPOS_QUE_REPONEN.has(categoria)
-      if (emiteFormato && creada?.id) {
-        toast((t) => (
-          <div className="flex flex-col gap-2 min-w-[240px]">
-            <div className="text-sm font-medium text-gray-800">✅ Ausencia registrada.</div>
-            <button
-              className="text-xs bg-brand-600 text-white rounded px-3 py-1.5 hover:bg-brand-700 self-start"
-              onClick={async () => {
-                toast.dismiss(t.id)
-                try {
-                  const blob = await ausenciaService.descargarFormatoFAA126(creada.id)
-                  const url = URL.createObjectURL(blob)
-                  const a = document.createElement('a')
-                  a.href = url
-                  const nombreSafe = (creada.resource?.name ?? 'profesional').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-                  a.download = `F-AA-126_${nombreSafe}_${creada.id.slice(0, 8)}.pdf`
-                  a.click()
-                  URL.revokeObjectURL(url)
-                } catch (err) {
-                  toast.error(err?.message ?? 'No se pudo generar el formato')
-                }
-              }}
-            >
-              📄 Descargar F-AA-126
-            </button>
-          </div>
-        ), { duration: 12000 })
-      } else {
-        toast.success('Ausencia registrada. El sistema calculó el impacto.')
-      }
+      // Sep-2026 · Se eliminó el atajo para descargar el F-AA-126 tras crear
+      // la ausencia. El PDF sale del sistema por completo.
+      toast.success('Ausencia registrada. El sistema calculó el impacto.')
       // Fase 5 · v04: si vino desea_reponer=SÍ, notificamos al padre para que
       // encadene el modal de proponer reposición (Fase 3).
       if (creada?.wants_makeup === true && typeof onCreated === 'function') {
@@ -307,9 +277,12 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, onCreated
             <textarea className="input resize-none" rows={2} value={form.reason} onChange={(e) => set('reason', e.target.value)} placeholder="Ej: No se presentó al consultorio y no avisó" />
           </div>
 
-          {/* ===== Fase 5 · F-AA-126 v04 ===== */}
+          {/* Sep-2026 · Estos campos ya NO alimentan un PDF: el formato oficial se
+              eliminó. Se conservan porque son datos del negocio (la empresa
+              afectada y la reposición) que usan los informes y el flujo de
+              reposición. Solo cambió el rótulo, que nombraba al formato. */}
           <div className="border-t border-gray-100 pt-3">
-            <div className="text-[11px] uppercase tracking-wide text-gray-400 mb-2">Datos para el formato F-AA-126 v04</div>
+            <div className="text-[11px] uppercase tracking-wide text-gray-400 mb-2">Datos de la ausencia</div>
 
             <div>
               <label className="label">¿A qué empresa aplica la ausencia? *</label>
@@ -384,11 +357,11 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, onCreated
             </div>
           )}
 
-          {/* Advertencia F-AA-126 (formato oficial oftalmología/optometría):
+          {/* Advertencia de anticipación (política interna, no el PDF — ese se eliminó):
               recomienda informar con 20 días antes. Solo advertencia — NO bloquea. */}
           {['oftalmologo','optometra','anestesiologo','otorrino','fonoaudiologa'].includes(categoria) && anticip !== null && anticip < 20 && anticip >= 0 && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
-              📄 <strong>Formato F-AA-126</strong>: la política interna recomienda informar las ausencias médicas con <strong>al menos 20 días de anticipación</strong>. Estás registrando con solo <strong>{anticip} {anticip === 1 ? 'día' : 'días'}</strong>. Puedes continuar, pero quedará registrado.
+              ⏱️ <strong>Anticipación</strong>: la política interna recomienda informar las ausencias médicas con <strong>al menos 20 días de anticipación</strong>. Estás registrando con solo <strong>{anticip} {anticip === 1 ? 'día' : 'días'}</strong>. Puedes continuar, pero quedará registrado.
             </div>
           )}
 

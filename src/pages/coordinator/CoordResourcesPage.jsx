@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { recursoService, backofficeService } from '@/services/api'
 import { useAuthStore } from '@/store/authStore'
-import { Badge, BarProgress, Spinner, EmptyState, SectionHeader, Avatar } from '@/components/ui'
-import { TIPOS_RECURSO, formatHoras } from '@/utils/helpers'
+import { Badge, BarProgress, Spinner, EmptyState, SectionHeader, Avatar, usePaginacion, Paginacion } from '@/components/ui'
+import { TIPOS_RECURSO, formatHoras, utilizacionSemanal } from '@/utils/helpers'
 import AsignarBackofficeModal from '@/pages/coordinator/AssignBackofficeModal'
 import { useSedeActiva } from '@/hooks/useActiveSite'
 
@@ -53,10 +53,18 @@ export default function RecursosCoordPage() {
   })
   const tareaSugerida = [...tareasActivas].sort((a, b) => (a.estimated_minutes ?? 60) - (b.estimated_minutes ?? 60))[0]
 
-  const ociosos = recursos.filter((r) => ((r.assigned_hours ?? 0) / (r.max_hours_per_week ?? 42)) < 0.6).length
-  const limite = recursos.filter((r) => ((r.assigned_hours ?? 0) / (r.max_hours_per_week ?? 42)) >= 0.9).length
+  // §6 · Los KPIs y las filas salen del MISMO cálculo (utilizacionSemanal).
+  // Antes cada uno tenía su fórmula y en semanas con festivo el contador de
+  // arriba y las etiquetas de abajo daban números distintos.
+  const util = recursos.map((r) => ({ r, u: utilizacionSemanal(r) }))
+  const ociosos = util.filter(({ u }) => u.ociosa).length
+  const limite = util.filter(({ u }) => u.aplica && u.pct >= 90).length
   const liberadas = recursos.filter((r) => r.status_badge === 'liberada').length
   const extras = recursos.filter((r) => r.is_overtime).length
+  const sinTope = util.filter(({ u }) => !u.aplica).length
+
+  // Lista larga → se pagina, igual que la grilla de Gestión de ausencias.
+  const pag = usePaginacion(util, 15)
 
   return (
     <div className="p-3 sm:p-4">
@@ -100,70 +108,135 @@ export default function RecursosCoordPage() {
         </div>
       </div>
 
+      {/* ====================================================================
+          §6 · PROYECTOS-3398 — LA CONFIRMACIÓN DE RECURSOS EN SEDE VA EN LISTA.
+
+          Antes era una pila de tarjetas: cada recurso ocupaba un bloque con
+          avatar, badges y barra de progreso, así que un coordinador con 30
+          personas tenía que bajar la rueda del mouse para repasarlas. Lo que
+          hace cada mañana es un repaso de arriba abajo — quién está, cuántas
+          horas tiene, a quién le falta carga — y para eso una tabla deja
+          comparar la columna de una ojeada. La barra se queda, pero dentro de
+          su celda.
+          ==================================================================== */}
       <div className="card">
-        <SectionHeader title={`Recursos (${recursos.length})`} />
+        <SectionHeader
+          title={`Recursos (${recursos.length})`}
+          subtitle={sinTope > 0 ? `${sinTope} cobra${sinTope === 1 ? '' : 'n'} por paciente — sin tope semanal` : undefined}
+        />
 
         {isLoading ? (
           <div className="flex justify-center py-8"><Spinner /></div>
         ) : recursos.length === 0 ? (
           <EmptyState icon="👥" title="Sin recursos" description="No hay recursos asignados a esta sede" />
         ) : (
-          <div className="space-y-3">
-            {recursos.map((r) => {
-              const horas = r.assigned_hours ?? 0
-              // Usa el tope ajustado por festivos si viene del backend, sino el nominal.
-              const maxNominal = r.max_hours_per_week ?? 42
-              const max = r.max_effective_hours ?? maxNominal
-              const festivos = r.festivos_en_semana ?? 0
-              const pct = Math.min(100, Math.round((horas / max) * 100))
-              const ociosa = pct < 60
-              const cerca = pct >= 90 && !r.is_overtime
-              const tipoInfo = TIPOS_RECURSO.find((t) => t.value === r.type)
-              return (
-                <div key={r.id} className="border border-gray-100 rounded-lg p-3">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Avatar nombre={r.name} size="sm" color={tipoInfo?.color ?? 'blue'} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-medium text-gray-800">{r.name}</span>
-                        <Badge variant={tipoInfo?.color ?? 'gray'}>{tipoInfo?.label ?? r.type}</Badge>
-                        {r.specialty && <span className="text-xs text-gray-500">· {r.specialty}</span>}
-                        {ociosa && <Badge variant="amber">ociosa</Badge>}
-                        {cerca && <Badge variant="red">cerca del límite</Badge>}
-                        {r.is_overtime && <Badge variant="red">horas extras</Badge>}
-                        {r.status_badge === 'liberada' && <Badge variant="yellow">liberada — disponible</Badge>}
-                      </div>
-                      <div className="text-xs text-gray-400 mt-0.5">
-                        {formatHoras(horas)} / {formatHoras(max)} · {pct}%
-                        {festivos > 0 && (
-                          <span className="text-blue-600 ml-1" title={`${festivos} festivo${festivos>1?'s':''} esta semana — tope ajustado de ${formatHoras(maxNominal)} a ${formatHoras(max)}`}>
-                            · 🎉 {festivos} festivo{festivos>1?'s':''} (tope ajustado)
-                          </span>
-                        )}
-                      </div>
-                      {/* Sugerencia de backoffice para auxiliares y asesores ociosas o liberadas */}
-                      {(r.type === 'auxiliar' || r.type === 'auxiliar_admin' || r.type === 'asesor_servicios') && (ociosa || r.status_badge === 'liberada') && tareaSugerida && (
-                        <div className="text-xs text-blue-700 mt-1 italic">
-                          💡 Sugerencia: <strong>{tareaSugerida.name}</strong> ({tareaSugerida.estimated_minutes} min/u)
-                        </div>
-                      )}
-                    </div>
-                    {(r.status_badge === 'liberada' ||
-                      ((r.type === 'auxiliar' || r.type === 'auxiliar_admin' || r.type === 'asesor_servicios') && ociosa)) && (
-                      <button
-                        className="btn text-xs whitespace-nowrap"
-                        onClick={() => setBoAux(r)}
-                        title={r.status_badge === 'liberada' ? 'Persona liberada por ausencia' : 'Persona con horas libres'}
-                      >
-                        🗂️ Asignar backoffice
-                      </button>
-                    )}
-                  </div>
-                  <BarProgress value={horas} max={max} color={r.is_overtime ? 'red' : ociosa ? 'amber' : 'green'} />
-                </div>
-              )
-            })}
-          </div>
+          <>
+            <div className="overflow-x-auto -mx-4 px-4">
+              <table className="w-full text-xs min-w-[760px]">
+                <thead className="sticky top-0 bg-white z-10">
+                  <tr className="text-left text-gray-500 border-b border-gray-200">
+                    <th className="px-3 py-2 font-medium">Recurso</th>
+                    <th className="px-3 py-2 font-medium">Tipo</th>
+                    <th className="px-3 py-2 font-medium">Especialidad</th>
+                    <th className="px-3 py-2 font-medium whitespace-nowrap">Horas semana</th>
+                    <th className="px-3 py-2 font-medium w-40">Utilización</th>
+                    <th className="px-3 py-2 font-medium">Estado</th>
+                    <th className="px-3 py-2 font-medium"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pag.visibles.map(({ r, u }) => {
+                    const tipoInfo = TIPOS_RECURSO.find((t) => t.value === r.type)
+                    const esApoyo = r.type === 'auxiliar' || r.type === 'auxiliar_admin' || r.type === 'asesor_servicios'
+                    const puedeBackoffice = r.status_badge === 'liberada' || (esApoyo && u.ociosa)
+                    return (
+                      <tr key={r.id} className="hover:bg-gray-50/70">
+                        <td className="px-3 py-2 border-b border-gray-100">
+                          <div className="flex items-center gap-2">
+                            <Avatar nombre={r.name} size="sm" color={tipoInfo?.color ?? 'blue'} />
+                            <div className="min-w-0">
+                              <div className="font-medium text-gray-900 leading-5">{r.name}</div>
+                              {/* La sugerencia de backoffice se queda pegada al
+                                  nombre: es un consejo sobre esa persona, no una
+                                  columna que tenga sentido comparar. */}
+                              {esApoyo && (u.ociosa || r.status_badge === 'liberada') && tareaSugerida && (
+                                <div className="text-[11px] text-blue-700 italic leading-4">
+                                  Sugerencia: {tareaSugerida.name} ({tareaSugerida.estimated_minutes} min/u)
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 border-b border-gray-100">
+                          <Badge variant={tipoInfo?.color ?? 'gray'}>{tipoInfo?.label ?? r.type}</Badge>
+                        </td>
+                        <td className="px-3 py-2 border-b border-gray-100 text-gray-600">
+                          {r.specialty ?? <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-3 py-2 border-b border-gray-100 text-gray-700 whitespace-nowrap">
+                          {formatHoras(u.horas)}
+                          {u.aplica ? (
+                            <span className="text-gray-400"> / {formatHoras(u.tope)}</span>
+                          ) : (
+                            <span className="text-gray-400"> · sin tope</span>
+                          )}
+                          {u.festivos > 0 && u.aplica && (
+                            <span
+                              className="text-blue-600 ml-1"
+                              title={`${u.festivos} festivo${u.festivos > 1 ? 's' : ''} esta semana — tope ajustado de ${formatHoras(u.topeNominal)} a ${formatHoras(u.tope)}`}
+                            >
+                              🎉
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 border-b border-gray-100">
+                          {u.aplica ? (
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 min-w-[72px]">
+                                <BarProgress
+                                  value={u.horas}
+                                  max={u.tope}
+                                  color={r.is_overtime ? 'red' : u.ociosa ? 'amber' : 'green'}
+                                />
+                              </div>
+                              <span className="text-gray-500 tabular-nums w-9 text-right">{u.pct}%</span>
+                            </div>
+                          ) : (
+                            /* Quien cobra por paciente no tiene tope semanal, así
+                               que un porcentaje aquí sería un número inventado. */
+                            <span className="text-gray-400">Por paciente</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 border-b border-gray-100">
+                          <div className="flex flex-wrap gap-1">
+                            {u.ociosa && <Badge variant="amber">ociosa</Badge>}
+                            {u.cerca && <Badge variant="red">cerca del límite</Badge>}
+                            {r.is_overtime && <Badge variant="red">horas extras</Badge>}
+                            {r.status_badge === 'liberada' && <Badge variant="yellow">liberada</Badge>}
+                            {!u.ociosa && !u.cerca && !r.is_overtime && r.status_badge !== 'liberada' && (
+                              <span className="text-gray-300">—</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 border-b border-gray-100 text-right">
+                          {puedeBackoffice && (
+                            <button
+                              className="btn text-[11px] whitespace-nowrap"
+                              onClick={() => setBoAux(r)}
+                              title={r.status_badge === 'liberada' ? 'Persona liberada por ausencia' : 'Persona con horas libres'}
+                            >
+                              Asignar backoffice
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <Paginacion estado={pag} etiqueta="recursos" />
+          </>
         )}
       </div>
 

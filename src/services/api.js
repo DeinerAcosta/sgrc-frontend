@@ -362,6 +362,12 @@ export const semanaService = {
     })
     return ok({ id: uid(), start_date: nuevaFecha, status: 'abierta', copiada_de: id })
   },
+  // §7 · Quién faltó la semana anterior y todavía no tiene horas en la que se
+  // está armando. Alimenta el aviso del Programador y el resaltado de casillas.
+  ausentesSemanaAnterior: async (id, { siteId: sedeId } = {}) => {
+    if (!DEMO_MODE) return api.get(`/weeks/${id}/previous-absences`, { params: sedeId ? { site_id: sedeId } : {} })
+    return ok({ semana_anterior: null, semana_destino: null, ausentes: [], recursos_pendientes: [] })
+  },
 }
 
 // ============ ASIGNACIONES ============
@@ -586,12 +592,53 @@ export const ausenciaService = {
     if (params.resource_id) list = list.filter((a) => a.resource_id === params.resource_id)
     return ok(list)
   },
-  /** Descargar el formato oficial F-AA-126 en PDF para una ausencia confirmada
-   *  de un recurso médico (oftalmólogo, optómetra, anestesiólogo, otorrino,
-   *  fonoaudiólogo). Devuelve un Blob que se descarga desde el frontend. */
-  descargarFormatoFAA126: async (id) => {
-    const res = await api.get(`/absences/${id}/faa126-form.pdf`, { responseType: 'blob' })
-    return res.data ?? res
+  // Sep-2026 · Se eliminó descargarFormatoFAA126(): el PDF del formato oficial
+  // salió del sistema por completo (PROYECTOS-3398 §1). Lo reemplaza formato(),
+  // que trae el mismo contenido para verse en pantalla.
+  //
+  // Va aparte del listado a propósito: la respuesta incluye la firma escaneada
+  // del profesional (base64, hasta ~6 MB) y el nombre de quien dio el Vo Bo,
+  // que vive en `usuarios`. Se pide solo cuando alguien abre el formato.
+  formato: async (id) => {
+    if (!DEMO_MODE) return api.get(`/absences/${id}/form`)
+    const a = _ausencias.find((x) => x.id === id)
+    if (!a) return fail('No encontrada', 404)
+    return ok({
+      codigo: 'F-AA-126',
+      version: '05',
+      empresa: a.affected_company ?? null,
+      empresa_label: { foca: 'FOCA', viu: 'VIU', ambas: 'AMBAS' }[a.affected_company] ?? null,
+      razon_social: a.affected_company === 'foca'
+        ? 'FUNDACIÓN OFTALMOLÓGICA DEL CARIBE'
+        : 'CLÍNICA OFTALMOLÓGICA DEL CARIBE',
+      subtitulo: 'CONTINUIDAD DEL SERVICIO CON LOS PRESTADORES DE SERVICIO',
+      especialidades: 'OFTALMOLOGÍA - OTORRINOLARINGOLOGÍA',
+      ausencia: {
+        id: a.id, estado: a.status, tipo: a.type,
+        motivo_catalogo: a.reason_ref?.name ?? null, motivo_texto: a.reason ?? null,
+        fecha_salida: a.start_date, fecha_entrada: a.end_date,
+        es_parcial: a.is_partial, hora_inicio: a.absence_start_time, hora_fin: a.absence_end_time,
+        ciudad_regional: a.regional_city ?? null,
+        es_programada: a.is_planned, anticipacion_dias: a.notice_days,
+        desea_reponer: a.wants_makeup ?? null,
+        fecha_reposicion_propuesta: a.makeup_date ?? null,
+        observaciones_reposicion: a.makeup_notes ?? null,
+        accion_agenda: a.agenda_action ?? null, accion_tomada: a.action_taken ?? null,
+        motivo_rechazo: a.rejection_reason ?? null,
+        pacientes_impactados: a.patients_affected ?? null,
+        impacto_por_dia: a.daily_impact ?? null,
+      },
+      profesional: {
+        nombre: a.resource?.name, tipo: a.resource?.type,
+        especialidad: a.resource?.specialty, correo: null, firma_url: null,
+      },
+      diligenciamiento: {
+        fecha: a.reported_at, por: null, rol: null,
+        registrado_por_coordinador: a.recorded_by_coordinator ?? false,
+      },
+      vo_bo: a.confirmed_at ? { nombre: null, fecha: a.confirmed_at } : null,
+      nota: 'Las ausencias deben ser informadas con 20 días de anticipación.',
+    })
   },
   create: async (data) => {
     if (!DEMO_MODE) return api.post('/absences', data)

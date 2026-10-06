@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { recursoService, usuarioService } from '@/services/api'
 import { Avatar, Badge, Spinner, EmptyState } from '@/components/ui'
-import { TIPOS_RECURSO, TIPOS_POR_PACIENTE } from '@/utils/helpers'
+import { TIPOS_RECURSO, TIPOS_POR_PACIENTE, TIPOS_MULTI_CONSULTORIO, requiereIntervaloPorPaciente, TIPOS_CON_SUBESPECIALIDAD, EJEMPLO_SUBESPECIALIDAD} from '@/utils/helpers'
 import { useDirtyClose } from '@/hooks/useDirtyClose'
 import { useConfirm } from '@/contexts/ConfirmContext'
 
@@ -194,11 +194,16 @@ function RecursoModal({ recurso, onClose, onSaved }) {
   const { tryClose } = useDirtyClose(form, onClose)
   const confirm = useConfirm()
 
-  const requiereIntervalo = ['oftalmologo', 'optometra', 'anestesiologo', 'tecnico', 'fonoaudiologa'].includes(form.type)
-  // Especialidad y multi-consultorio aplican solo a oftalmólogos (sub-especialidad
-  // médica como Retina/Glaucoma/Córnea/etc., y rotación entre consultorios).
-  const requiereEspecialidad = form.type === 'oftalmologo'
-  const puedeMultiConsultorio = form.type === 'oftalmologo'
+  // Oct-2026 · Las dos reglas salen de utils/helpers.js, que es espejo de
+  // lib/resourceTypes.js en el backend. Antes estaban escritas a mano acá, y
+  // así fue como 'otorrino' quedó fuera de las dos aunque opera igual que el
+  // oftalmólogo: con agenda propia y con auxiliar obligatoria en consultorio.
+  const requiereIntervalo = requiereIntervaloPorPaciente(form.type)
+  const puedeMultiConsultorio = TIPOS_MULTI_CONSULTORIO.includes(form.type)
+  // La subespecialidad es TEXTO LIBRE, no una lista cerrada, así que el
+  // otorrino la tiene igual que el oftalmólogo; lo único que cambia es el
+  // ejemplo del placeholder.
+  const requiereEspecialidad = TIPOS_CON_SUBESPECIALIDAD.includes(form.type)
   // Sep-2026 · SE DECIDE POR EL ESQUEMA, NO POR EL TIPO.
   // Antes esto era `form.type === 'oftalmologo' || form.type === 'fonoaudiologa'`,
   // y ese era el motivo por el que los 94 oftalmólogos con esquema 'fijo' y tope
@@ -350,13 +355,14 @@ function RecursoModal({ recurso, onClose, onSaved }) {
                 // cobran por paciente), y el esquema decide el tope semanal. Quien
                 // quiera un oftalmólogo de salario fijo cambia el esquema abajo y la
                 // casilla de horas aparece — antes ese camino no existía.
-                // Multi-consultorio y subespecialidad: solo oftalmólogos.
+                // Multi-consultorio: los tipos de TIPOS_MULTI_CONSULTORIO. La
+                // subespecialidad sigue siendo solo de oftalmología.
                 const nuevoEsquema = TIPOS_POR_PACIENTE.includes(nuevoTipo) ? 'por_paciente' : 'fijo'
                 setForm({
                   ...form,
                   type: nuevoTipo,
-                  multi_room: nuevoTipo === 'oftalmologo' ? form.multi_room : false,
-                  specialty: nuevoTipo === 'oftalmologo' ? form.specialty : '',
+                  multi_room: TIPOS_MULTI_CONSULTORIO.includes(nuevoTipo) ? form.multi_room : false,
+                  specialty: TIPOS_CON_SUBESPECIALIDAD.includes(nuevoTipo) ? form.specialty : '',
                   pay_scheme: nuevoEsquema,
                   max_hours_per_week: nuevoEsquema === 'por_paciente' ? null : (form.max_hours_per_week ?? 44),
                 })
@@ -376,14 +382,22 @@ function RecursoModal({ recurso, onClose, onSaved }) {
           {requiereEspecialidad && (
             <div>
               <label className="label">Subespecialidad</label>
-              <input className="input" value={form.specialty} onChange={(e) => setForm({ ...form, specialty: e.target.value })} placeholder="Ej: Retina, Córnea, Glaucoma" />
+              <input
+                className="input"
+                value={form.specialty}
+                onChange={(e) => setForm({ ...form, specialty: e.target.value })}
+                placeholder={EJEMPLO_SUBESPECIALIDAD[form.type] ?? 'Subespecialidad'}
+              />
             </div>
           )}
-          {/* PROYECTOS-3255 #5.1 · Firma escaneada para el PDF F-AA-126 */}
+          {/* PROYECTOS-3255 #5.1 · Firma escaneada del profesional.
+              Sep-2026: el PDF que la imprimía se eliminó. La firma se conserva —hay
+              137 cargadas en producción— a la espera de decidir si aparece en el
+              formato de solo lectura que reemplaza al PDF. */}
           <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
             <div className="text-xs font-medium text-gray-700 mb-1">Firma escaneada (opcional)</div>
             <div className="text-xs text-gray-500 mb-2">
-              PNG o JPG de la firma del profesional. Se imprime al pie del PDF F-AA-126 en la caja "Firma del prestador". Máximo 1 MB (se guarda en base64 en la BD).
+              PNG o JPG de la firma del profesional. Acompaña el formato de sus ausencias en la caja "Firma del prestador". Máximo 1 MB (se guarda en base64 en la BD).
             </div>
             {/* Sep-2026 · perf [5]: si el recurso tiene firma en BD pero aun
                 no llego el detalle, muestra un placeholder para que el user no

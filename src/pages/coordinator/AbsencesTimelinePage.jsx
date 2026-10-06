@@ -6,7 +6,7 @@ import {
 } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { ausenciaService, festivoService } from '@/services/api'
-import { parseFechaLocal, DIAS_LABEL } from '@/utils/helpers'
+import { parseFechaLocal, DIAS_LABEL, TIPOS_QUE_IMPACTAN_PACIENTES } from '@/utils/helpers'
 import { useSedeActiva } from '@/hooks/useActiveSite'
 import { Badge } from '@/components/ui'
 
@@ -478,9 +478,18 @@ function DetalleAusencia({ data, porDia, onClose, onPickOne, onSeeDay }) {
         {a.regional_city && <Kv k="Ciudad regional" v={a.regional_city} />}
         <Kv k="Anticipación" v={`${a.notice_days ?? 0} días`} />
         <Kv k="Programada" v={a.is_planned ? 'Sí' : 'No (imprevista)'} />
-        {a.patients_affected != null && <Kv k="Pacientes impactados" v={a.patients_affected} />}
-        {a.opportunity_cost != null && (
-          <Kv k="Costo oportunidad" v={new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Number(a.opportunity_cost))} />
+        {/* Sep-2026 · Solo para quien TIENE AGENDA PROPIA. La condición era
+            `!= null`, así que a una auxiliar le salía "Pacientes impactados: 0"
+            y "Costo oportunidad: $0" — campos que no le aplican. Con datos
+            viejos llegó a mostrarle 414 pacientes y 62 millones, que eran los
+            del médico al que acompaña. */}
+        {TIPOS_QUE_IMPACTAN_PACIENTES.includes(a.resource?.type) && (
+          <>
+            {a.patients_affected != null && <Kv k="Pacientes impactados" v={a.patients_affected} />}
+            {a.opportunity_cost != null && (
+              <Kv k="Costo oportunidad" v={new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Number(a.opportunity_cost))} />
+            )}
+          </>
         )}
         {a.reason && <Kv k="Observación" v={a.reason} />}
       </div>

@@ -8,6 +8,7 @@ import { Badge, KpiCard, Spinner, EmptyState, SectionHeader } from '@/components
 import { TIPOS_AUSENCIA, parseFechaLocal } from '@/utils/helpers'
 import AusenciaFormModal from '@/pages/resource/AbsenceFormModal'
 import RegistrarReposicionModal from '@/pages/resource/LogMakeupModal'
+import VistaFormatoAusencia from '@/pages/absences/AbsenceFormView'
 
 const TIPO_LABEL = Object.fromEntries(TIPOS_AUSENCIA.map((t) => [t.value, t.label]))
 
@@ -16,6 +17,10 @@ export default function AusenciasRecursoPage() {
   const [filtroTipo, setFiltroTipo] = useState('')
   const [showAusencia, setShowAusencia] = useState(false)
   const [reponerAusencia, setReponerAusencia] = useState(null)  // ausencia seleccionada para proponer reposición
+  // §1 · El profesional puede releer el formato que diligenció, en cualquier
+  // estado. Reemplaza al PDF que antes se bajaba desde el panel del coordinador
+  // — él nunca tuvo forma de ver su propio formato.
+  const [verFormato, setVerFormato] = useState(null)
 
   const { data = [], isLoading, refetch } = useQuery({
     queryKey: ['historial-ausencias', user?.resource_id],
@@ -128,6 +133,13 @@ export default function AusenciasRecursoPage() {
                         🔁 Proponer reposición
                       </button>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => setVerFormato(a.id)}
+                      className="text-[11px] px-2 py-1 rounded border border-gray-200 text-gray-600 hover:bg-gray-50 transition"
+                    >
+                      Ver formato
+                    </button>
                   </div>
                 </div>
               </div>
@@ -144,6 +156,10 @@ export default function AusenciasRecursoPage() {
           onClose={() => { setShowAusencia(false); refetch() }}
           horarioSemana={[]}
         />
+      )}
+
+      {verFormato && (
+        <VistaFormatoAusencia ausenciaId={verFormato} onClose={() => setVerFormato(null)} />
       )}
 
       {reponerAusencia && (
