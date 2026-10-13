@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { format, parseISO } from 'date-fns'
+import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { parametroService } from '@/services/api'
 import { Spinner, EmptyState, SectionHeader } from '@/components/ui'
-import { formatCOP } from '@/utils/helpers'
+import { formatCOP, parseFechaLocal } from '@/utils/helpers'
 import { useDirtyClose } from '@/hooks/useDirtyClose'
 
 // Etiquetas legibles para los tipos "clásicos". Los tipos personalizados
@@ -85,7 +85,7 @@ export default function AdminParametrosPage() {
                     <div className="text-lg font-semibold text-gray-900">{formatCOP(vigente.reschedule_cost)}</div>
                   </div>
                   <div className="text-xs text-gray-500">
-                    Vigente desde {format(parseISO(vigente.effective_from), 'd MMM yyyy', { locale: es })}
+                    Vigente desde {format(parseFechaLocal(vigente.effective_from), 'd MMM yyyy', { locale: es })}
                   </div>
                 </>
               ) : (
@@ -98,7 +98,7 @@ export default function AdminParametrosPage() {
                   <div className="mt-2 space-y-1">
                     {historial.map((p) => (
                       <div key={p.id} className="flex items-center justify-between text-xs text-gray-500 py-1">
-                        <span>{format(parseISO(p.effective_from), 'd MMM yyyy', { locale: es })}</span>
+                        <span>{format(parseFechaLocal(p.effective_from), 'd MMM yyyy', { locale: es })}</span>
                         <span>{formatCOP(p.reschedule_cost)}</span>
                       </div>
                     ))}

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { format, parseISO } from 'date-fns'
+import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { backofficeService, recursoService } from '@/services/api'
 import { useAuthStore } from '@/store/authStore'
@@ -8,6 +8,7 @@ import { Badge, Spinner, EmptyState, SectionHeader, Avatar } from '@/components/
 import AsignarBackofficeModal from '@/pages/coordinator/AssignBackofficeModal'
 import SolicitarTareaBackofficeModal from '@/pages/coordinator/RequestBackofficeTaskModal'
 import { useSedeActiva } from '@/hooks/useActiveSite'
+import { parseFechaLocal } from '@/utils/helpers'
 
 /**
  * Módulo de Backoffice del coordinador (HU-C-17, RN-36/37).
@@ -137,7 +138,7 @@ export default function BackofficeCoordPage() {
                         {a.task?.name}{a.site?.name ? ` · ${a.site.name}` : ''}
                       </div>
                       <div className="text-xs text-gray-400 mt-0.5">
-                        {a.day ? format(parseISO(a.day), "EEEE d 'de' MMMM", { locale: es }) : ''} · {a.start_time}–{a.end_time}
+                        {a.day ? format(parseFechaLocal(a.day), "EEEE d 'de' MMMM", { locale: es }) : ''} · {a.start_time}–{a.end_time}
                       </div>
                     </div>
                   </div>

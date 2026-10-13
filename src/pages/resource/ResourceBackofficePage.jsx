@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { format, parseISO } from 'date-fns'
+import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { backofficeService } from '@/services/api'
 import { useAuthStore } from '@/store/authStore'
+import { parseFechaLocal } from '@/utils/helpers'
 import { Badge, Spinner, EmptyState, SectionHeader } from '@/components/ui'
 
 export default function BackofficeRecursoPage() {
@@ -72,7 +73,7 @@ function AsignacionCard({ asignacion, onSaved }) {
         <div>
           <div className="text-sm font-medium text-gray-900">{asignacion.task?.name}</div>
           <div className="text-xs text-gray-500 mt-0.5">
-            {asignacion.site?.name} · {format(parseISO(asignacion.day), "EEEE d 'de' MMMM", { locale: es })}
+            {asignacion.site?.name} · {format(parseFechaLocal(asignacion.day), "EEEE d 'de' MMMM", { locale: es })}
           </div>
           <div className="text-xs text-gray-500">
             Horario: {asignacion.start_time} – {asignacion.end_time}
