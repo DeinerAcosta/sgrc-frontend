@@ -104,8 +104,15 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
   // Si el coord marca "sin auxiliar", la exigencia se cae. La sección de apoyo
   // sigue mostrándose como opcional (o ni siquiera, ver más abajo) por si
   // luego cambian de idea durante la edición.
-  const requiereAuxAdicional = _exigeApoyoPorEspecialidad && !sinAuxiliar
+  // En una reprogramación no se pide auxiliar: eso lo asigna el coordinador
+  // de la sede, que es quien conoce a su equipo. Quien reubica la agenda
+  // decide QUIÉN atiende, no CON QUIÉN.
+  const esReprogramacion = !!cubreAusenciaId && !editando
+  const requiereAuxAdicional = _exigeApoyoPorEspecialidad && !sinAuxiliar && !esReprogramacion
   const [conflicto, setConflicto] = useState(null)
+  // Mensaje del servidor cuando el profesional elegido ya tiene turno en esa
+  // franja. Null = no hay nada que preguntar.
+  const [avisoAsumir, setAvisoAsumir] = useState(null)
   const { tryClose } = useDirtyClose(form, onClose)
 
   const set = (k, v) => { setForm((f) => ({ ...f, [k]: v })); setConflicto(null) }
@@ -185,7 +192,10 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
   })
 
   const { mutate, isPending } = useMutation({
-    mutationFn: () => {
+    // `extra` fuerza banderas en un reenvío puntual sin esperar a que el estado
+    // se actualice: el aviso de "ya tiene turno a esa hora" reenvía en el mismo
+    // tick en que la persona acepta, y ahí setForm todavía no se aplicó.
+    mutationFn: (extra = {}) => {
       const payload = {
         week_id:      semanaId,
         room_id: consultorioId,
@@ -214,7 +224,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
         // el movimiento sale del mismo hecho y así se puede contar después.
         is_replacement:     cubreAusenciaId ? true : undefined,
         covered_absence_id: cubreAusenciaId || undefined,
-        assume_overlap:     cubreAusenciaId && form.assume_overlap ? true : undefined,
+        assume_overlap:     cubreAusenciaId && (form.assume_overlap || extra.assume_overlap) ? true : undefined,
       }
       return editando
         ? asignacionService.update(asignacion.id, payload)
@@ -222,6 +232,13 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
     },
     onSuccess: () => { toast.success(editando ? 'Asignación actualizada' : 'Asignación guardada'); onSaved() },
     onError: (err) => {
+      // En una reprogramación, que el profesional ya tenga turno en esa franja
+      // no es un error: es el caso de "se hace cargo también de esta agenda".
+      // Se le explica y se le deja seguir, en vez de dejarlo contra la pared.
+      if (esReprogramacion && /^Conflicto:/.test(err?.message ?? '')) {
+        setAvisoAsumir(err.message)
+        return
+      }
       if (err?.code === 'CONFLICTO_HORARIO') setConflicto(err.detalle)
       else toast.error(err?.message ?? 'Error al guardar la asignación')
     },
@@ -309,27 +326,6 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
               </div>
             </div>
           )}
-          {/* La excepción a RN-08, explícita. No se ofrece fuera de una
-              reprogramación: ahí sí tiene sentido que alguien atienda su propia
-              agenda y además la del que falto. */}
-          {cubreAusenciaId && !editando && (
-            <label className="flex items-start gap-2 cursor-pointer bg-amber-50 border border-amber-200 rounded-lg p-2.5">
-              <input
-                type="checkbox"
-                className="mt-0.5 rounded"
-                checked={form.assume_overlap}
-                onChange={(e) => set('assume_overlap', e.target.checked)}
-              />
-              <span className="text-xs text-amber-900">
-                Se hace cargo <strong>aunque ya tenga turno</strong> en esta franja
-                <span className="block text-[11px] text-amber-700 mt-0.5">
-                  Se le crea un turno adicional encima del suyo, con los pacientes
-                  de {recursoPrecargadoNombre ?? 'quien se ausentó'}. Le llega aviso y queda en auditoría.
-                </span>
-              </span>
-            </label>
-          )}
-
           {/* Recurso principal — buscable */}
           <div>
             <label className="label">Recurso principal * <span className="text-gray-400 font-normal">({recursos.length} disponibles)</span></label>
@@ -411,7 +407,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
           {/* Toggle "servicio sin auxiliar": solo aplica a especialidades que
               normalmente la EXIGEN (oftalmo/anestesio). El coord lo marca cuando
               el doctor realiza el servicio solo (consulta simple, control, etc.). */}
-          {_exigeApoyoPorEspecialidad && (
+          {_exigeApoyoPorEspecialidad && !esReprogramacion && (
             <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
               <label className="flex items-start gap-2 cursor-pointer">
                 <input
@@ -454,7 +450,15 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
               En oftalmo/anestesio es OBLIGATORIO (asterisco).
               En diagnóstico es OPCIONAL (segundo técnico que puede salir antes).
               Se oculta cuando el coord marca "sin auxiliar". */}
-          {permiteApoyoOpcional && !sinAuxiliar && (
+          {/* En reprogramación este bloque entero no sale: el auxiliar lo pone
+              después el coordinador de la sede. */}
+          {esReprogramacion && _exigeApoyoPorEspecialidad && (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-600">
+              El auxiliar de enfermería lo asigna el coordinador de la sede, no desde aquí.
+            </div>
+          )}
+
+          {permiteApoyoOpcional && !sinAuxiliar && !esReprogramacion && (
             <>
               <div>
                 <label className="label">
@@ -660,6 +664,49 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
               />
               <div className="text-[11px] text-red-700 mt-1">
                 ⚠️ Esta sede ya cerró su semana. Como supervisor/gerencia puedes editar, pero el cambio queda registrado en auditoría con tu identificación y el motivo.
+              </div>
+            </div>
+          )}
+
+          {/* Lo que antes era una casilla que todos tenían que entender de
+              entrada, y ahora aparece solo cuando de verdad pasa. */}
+          {avisoAsumir && (
+            <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && setAvisoAsumir(null)}>
+              <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden">
+                <div className="px-5 py-4 border-b border-gray-100">
+                  <h3 className="text-sm font-semibold text-gray-900">Ya tiene un turno a esa hora</h3>
+                </div>
+                <div className="px-5 py-4 space-y-3 text-xs text-gray-700">
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 text-amber-900">
+                    {avisoAsumir}
+                  </div>
+                  <p>
+                    Si continúas, <strong>se hará cargo de las dos agendas dentro de su turno</strong>:
+                    el suyo se queda como está y se le suma un turno adicional con los pacientes
+                    de {recursoPrecargadoNombre ?? 'quien se ausentó'}.
+                  </p>
+                  <p className="text-gray-500">
+                    Le llega un aviso y la excepción queda registrada en auditoría con quién la autorizó.
+                  </p>
+                </div>
+                <div className="px-5 py-4 border-t border-gray-100 flex gap-2">
+                  <button className="btn flex-1 justify-center" onClick={() => setAvisoAsumir(null)}>
+                    Elegir a otro
+                  </button>
+                  <button
+                    className="btn-primary flex-1 justify-center"
+                    disabled={isPending}
+                    onClick={() => {
+                      setAvisoAsumir(null)
+                      setForm((f) => ({ ...f, assume_overlap: true }))
+                      // El estado no está aplicado todavía en este tick, así que
+                      // el flag va directo en el payload de este envío.
+                      mutate({ assume_overlap: true })
+                    }}
+                  >
+                    {isPending ? <Spinner size="sm" /> : 'Sí, se hace cargo'}
+                  </button>
+                </div>
               </div>
             </div>
           )}
