@@ -536,14 +536,35 @@ function Candidato({ r, onAsignar, disabled, alerta }) {
   const max = r.max_hours_per_week ?? 42
   const pct = max ? Math.round((horas / max) * 100) : 0
   return (
-    <div className="border border-gray-100 rounded-lg p-3 flex items-center gap-3 bg-white">
+    <div className="border border-gray-100 rounded-lg p-3 flex items-start gap-3 bg-white">
       <Avatar nombre={r.name} size="sm" color={tipo?.color ?? 'blue'} />
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium text-gray-800 truncate">{r.name}</div>
         <div className="text-xs text-gray-500">
-          {tipo?.label}{r.specialty ? ` · ${r.specialty}` : ''} · {horas}h de {max}h ({pct}%)
+          {tipo?.label}{r.specialty ? ' · ' + r.specialty : ''} · {horas}h de {max}h en la semana ({pct}%)
         </div>
-        {alerta && <div className="text-xs text-amber-700 mt-1">⚠ Tiene que desplazarse a esta sede</div>}
+
+        {/* Dónde está ese día. Es el dato que faltaba: "tiene que desplazarse"
+            sin decir desde dónde no alcanza para decidir si es viable. */}
+        {(r.ocupacion_ese_dia ?? []).length === 0 ? (
+          <div className="text-xs text-emerald-700 mt-1">✓ Tiene el día libre</div>
+        ) : (
+          <div className="text-xs text-gray-600 mt-1">
+            <span className="text-gray-400">Ese día ya está en:</span>
+            {(r.ocupacion_ese_dia ?? []).map((o, i) => (
+              <div key={i} className="ml-1">
+                · {o.start_time}–{o.end_time} · <strong>{o.site}</strong> / {o.room}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {alerta && (
+          <div className="text-xs text-amber-700 mt-1">
+            ⚠ Tiene que desplazarse
+            {(r.ocupacion_ese_dia ?? [])[0]?.city ? ' desde ' + r.ocupacion_ese_dia[0].city : ''} a esta sede
+          </div>
+        )}
       </div>
       <button className="btn-primary text-xs flex-shrink-0" onClick={onAsignar} disabled={disabled}>
         Asignar

@@ -595,6 +595,19 @@ export default function ProgramadorPage() {
                 .join(' · ')}</strong></>
             ) : caso.ausencia.dias?.length ? <> · ausente el <strong>{caso.ausencia.dias.join(', ')}</strong></> : null}
             {caso.ausencia.patients_affected ? <> · <strong>{caso.ausencia.patients_affected} pacientes</strong> por reubicar</> : null}
+            {caso.franjas?.length > 0 && (
+              <div className="mt-1 text-amber-800">
+                Se cayeron {caso.franjas.length} franja{caso.franjas.length === 1 ? '' : 's'}:{' '}
+                {caso.franjas.map((f, i) => (
+                  <span key={f.assignment_id}>
+                    {i > 0 && ' · '}
+                    <strong>{f.site?.name}</strong> / {f.room?.name} {f.start_time}–{f.end_time}
+                    {f.patient_capacity ? ' (' + f.patient_capacity + ' pac.)' : ''}
+                    {f.reemplazo ? ' ✓ cubierta' : ''}
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="text-amber-700 mt-0.5">
               {quienAtiende === 'mismo'
                 ? 'Va precargado al asignar. Cambia de sede arriba para ver dónde hay espacio.'
@@ -1105,6 +1118,37 @@ export default function ProgramadorPage() {
                                 Aux2: {nombreCorto(a.assistant2?.name)}
                               </div>
                             )}
+
+                            {/* EL DETALLE, AL PASAR EL MOUSE.
+                                La casilla se mantiene chica y pareja con el resto;
+                                al pasar por encima crece dentro de su propia celda
+                                y muestra todo. Crece la casilla en vez de abrir un
+                                globo flotante porque la grilla vive en un
+                                contenedor con scroll horizontal y cualquier
+                                elemento absoluto que se salga queda cortado. */}
+                            <div className="hidden group-hover:block mt-1 pt-1 border-t border-black/10 text-[10px] leading-snug">
+                              <div className="font-medium text-gray-800">{a.resource?.name}</div>
+                              <div className="text-gray-600">{cons.name} · {cons.specialty}</div>
+                              {a.assistant && <div className="text-gray-600">Aux 1: {a.assistant.name}</div>}
+                              {a.assistant2 && <div className="text-gray-600">Aux 2: {a.assistant2.name}</div>}
+                              {a.resource?.type !== 'asesor_servicios' && (
+                                <div className="text-gray-600">Capacidad: {a.patient_capacity} pacientes</div>
+                              )}
+                              {ausente && (
+                                <div className="text-red-800 mt-0.5">
+                                  ⛔ Ausente · {ausente.motivo_catalogo ?? ausente.type}
+                                  {ausente.status === 'pendiente' ? ' (sin confirmar)' : ''}
+                                  {ausente.patients_affected ? ' · ' + ausente.patients_affected + ' pac. afectados' : ''}
+                                </div>
+                              )}
+                              {esReemplazo && (
+                                <div className="text-indigo-800 mt-0.5">
+                                  🔄 Reprogramación
+                                  {ausenciaQueCubre ? ' — pacientes de ' + ausenciaQueCubre.resource?.name : ''}
+                                  {seMontaEncima ? '. Se suma a su turno propio de esta franja.' : ''}
+                                </div>
+                              )}
+                            </div>
                             {/* PROYECTOS-3255 #2.1: asesores no muestran # pacientes en el badge. */}
                             {a.resource?.type !== 'asesor_servicios' && (
                               <div className="text-teal-600 text-xs">{a.patient_capacity} pac.</div>
