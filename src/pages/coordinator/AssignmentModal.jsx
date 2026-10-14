@@ -110,9 +110,10 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
   const esReprogramacion = !!cubreAusenciaId && !editando
   const requiereAuxAdicional = _exigeApoyoPorEspecialidad && !sinAuxiliar && !esReprogramacion
   const [conflicto, setConflicto] = useState(null)
-  // Mensaje del servidor cuando el profesional elegido ya tiene turno en esa
-  // franja. Null = no hay nada que preguntar.
-  const [avisoAsumir, setAvisoAsumir] = useState(null)
+  // El resumen previo a guardar. null = cerrado. { conflicto } se llena solo
+  // si el servidor rechazo por turno solapado, y entonces el mismo resumen
+  // ofrece seguir asumiendo las dos agendas.
+  const [resumen, setResumen] = useState(null)
   const { tryClose } = useDirtyClose(form, onClose)
 
   const set = (k, v) => { setForm((f) => ({ ...f, [k]: v })); setConflicto(null) }
@@ -236,7 +237,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
       // no es un error: es el caso de "se hace cargo también de esta agenda".
       // Se le explica y se le deja seguir, en vez de dejarlo contra la pared.
       if (esReprogramacion && /^Conflicto:/.test(err?.message ?? '')) {
-        setAvisoAsumir(err.message)
+        setResumen({ conflicto: err.message })
         return
       }
       if (err?.code === 'CONFLICTO_HORARIO') setConflicto(err.detalle)
@@ -282,7 +283,12 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
       })
       if (!ok) return
     }
-    mutate()
+    // Antes guardaba directo. Ahora, al crear, pasa primero por el resumen: la
+    // persona ve qué va a quedar registrado —quién, qué día, a qué hora, dónde
+    // y a cuánta gente— antes de que exista. Al EDITAR no se interpone: ahí ya
+    // se está mirando lo que hay y el resumen sería un clic de más.
+    if (editando) { mutate(); return }
+    setResumen({ conflicto: null })
   }
 
   const diaLabel = DIAS_FULL[DIAS.indexOf(dia)] ?? dia
@@ -668,43 +674,74 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
             </div>
           )}
 
-          {/* Lo que antes era una casilla que todos tenían que entender de
-              entrada, y ahora aparece solo cuando de verdad pasa. */}
-          {avisoAsumir && (
-            <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && setAvisoAsumir(null)}>
+          {/* UN SOLO POPUP, AL FINAL, CON TODO EL DETALLE.
+              Antes había uno titulado "Ya tiene un turno a esa hora" que salía
+              a mitad de camino, cuando el servidor rechazaba. Hector lo pidió
+              fuera: el aviso va al final, al ir a guardar, diciendo QUÉ se está
+              asignando — quién, qué día, a qué hora, dónde y a cuánta gente.
+              Si además resulta que esa persona ya tenía turno, eso es un
+              párrafo más de ESTE mismo resumen, no una segunda ventana. */}
+          {resumen && (
+            <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && setResumen(null)}>
               <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden">
                 <div className="px-5 py-4 border-b border-gray-100">
-                  <h3 className="text-sm font-semibold text-gray-900">Ya tiene un turno a esa hora</h3>
+                  <h3 className="text-sm font-semibold text-gray-900">
+                    {cubreAusenciaId ? 'Confirma la reprogramación' : 'Confirma la asignación'}
+                  </h3>
                 </div>
+
                 <div className="px-5 py-4 space-y-3 text-xs text-gray-700">
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 text-amber-900">
-                    {avisoAsumir}
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-1">
+                    <div className="text-sm font-semibold text-gray-900">
+                      {recursos.find((r) => r.id === form.resource_id)?.name ?? '—'}
+                    </div>
+                    <div><span className="text-gray-400">Día:</span> <strong className="capitalize">{diaLabel}</strong></div>
+                    <div><span className="text-gray-400">Hora:</span> <strong>{form.start_time} – {form.end_time}</strong></div>
+                    <div><span className="text-gray-400">Dónde:</span> <strong>{consultorio?.site?.name ?? consultorio?.site_name ?? ''} {consultorio?.name}</strong></div>
+                    <div>
+                      <span className="text-gray-400">Pacientes:</span>{' '}
+                      <strong>{form.expected_patients === '' ? capacidad : form.expected_patients}</strong>
+                    </div>
+                    {form.assistant_id && (
+                      <div>
+                        <span className="text-gray-400">{labelApoyo}:</span>{' '}
+                        <strong>{auxiliares.find((a) => a.id === form.assistant_id)?.name ?? '—'}</strong>
+                      </div>
+                    )}
                   </div>
-                  <p>
-                    Si continúas, <strong>se hará cargo de las dos agendas dentro de su turno</strong>:
-                    el suyo se queda como está y se le suma un turno adicional con los pacientes
-                    de {recursoPrecargadoNombre ?? 'quien se ausentó'}.
-                  </p>
-                  <p className="text-gray-500">
-                    Le llega un aviso y la excepción queda registrada en auditoría con quién la autorizó.
-                  </p>
+
+                  {cubreAusenciaId && (
+                    <p className="text-blue-800">
+                      Queda registrado como la reprogramación de la ausencia
+                      {recursoPrecargadoNombre ? <> de <strong>{recursoPrecargadoNombre}</strong></> : null}.
+                    </p>
+                  )}
+
+                  {/* El caso del turno solapado: ya no es una ventana aparte. */}
+                  {resumen.conflicto && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 space-y-2 text-amber-900">
+                      <div className="font-medium">Esta persona ya tiene un turno a esa hora</div>
+                      <div className="text-[11px]">{resumen.conflicto}</div>
+                      <div className="text-[11px]">
+                        Si continúas <strong>se hace cargo de las dos agendas dentro de su turno</strong>:
+                        el suyo se queda igual y se le suma este. Le llega aviso y queda en auditoría.
+                      </div>
+                    </div>
+                  )}
                 </div>
+
                 <div className="px-5 py-4 border-t border-gray-100 flex gap-2">
-                  <button className="btn flex-1 justify-center" onClick={() => setAvisoAsumir(null)}>
-                    Elegir a otro
+                  <button className="btn flex-1 justify-center" onClick={() => setResumen(null)}>
+                    {resumen.conflicto ? 'Elegir a otro' : 'Volver'}
                   </button>
                   <button
                     className="btn-primary flex-1 justify-center"
                     disabled={isPending}
-                    onClick={() => {
-                      setAvisoAsumir(null)
-                      setForm((f) => ({ ...f, assume_overlap: true }))
-                      // El estado no está aplicado todavía en este tick, así que
-                      // el flag va directo en el payload de este envío.
-                      mutate({ assume_overlap: true })
-                    }}
+                    onClick={() => mutate(resumen.conflicto ? { assume_overlap: true } : {})}
                   >
-                    {isPending ? <Spinner size="sm" /> : 'Sí, se hace cargo'}
+                    {isPending
+                      ? <Spinner size="sm" />
+                      : resumen.conflicto ? 'Sí, se hace cargo' : 'Confirmar'}
                   </button>
                 </div>
               </div>

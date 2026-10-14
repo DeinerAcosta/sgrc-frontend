@@ -296,7 +296,15 @@ export default function AusenciasCoordPage() {
               <div className="space-y-2 text-xs">
                 <Row label="Tipo" value={TIPO_LABEL[sel.type] ?? sel.type} />
                 <Row label="Fechas" value={`${format(parseFechaLocal(sel.start_date), 'd MMM yyyy', { locale: es })} ${sel.end_date !== sel.start_date ? `— ${format(parseFechaLocal(sel.end_date), 'd MMM yyyy', { locale: es })}` : ''}`} />
-                {sel.is_partial && <Row label="Horario ausencia" value={`${sel.absence_start_time} – ${sel.absence_end_time}`} />}
+                <Row
+                  label="Horario ausencia"
+                  value={sel.is_partial ? `${sel.absence_start_time} – ${sel.absence_end_time}` : 'Día completo'}
+                />
+                {/* La hora a la que ESTABA PROGRAMADO, que es distinta de la
+                    hora de la ausencia: en una de día completo no había hora, y
+                    aun así la agenda que se cayó tiene la suya. Sin esto el
+                    panel decía el día pero no a qué hora atendía. */}
+                <FranjasAfectadas ausenciaId={sel.id} />
                 {sel.reason && <Row label="Motivo" value={sel.reason} />}
                 <Row label="Reportado" value={format(parseISO(sel.reported_at ?? sel.created_at), 'd MMM HH:mm', { locale: es })} />
                 <Row label="Anticipación" value={`${sel.notice_days ?? '?'} días`} warn={(sel.notice_days ?? Infinity) < 30 && ['academico','vacaciones'].includes(sel.type)} />
@@ -344,17 +352,7 @@ export default function AusenciasCoordPage() {
                   respuesta que todavía no puede saber. Ahora GESTIONAR lleva
                   directo a la pantalla, y qué pasa con la agenda se decide ahí,
                   franja por franja, con los candidatos a la vista. */}
-              <div className="pt-3 border-t border-gray-100 space-y-2">
-                <button
-                  className="btn-primary w-full justify-center"
-                  onClick={() => navigate(`/app/reemplazo/${sel.id}`)}
-                >
-                  ⚙️ GESTIONAR
-                </button>
-                <div className="text-xs text-gray-400 text-center">
-                  Abre la pantalla con las franjas que se cayeron: día, hora, sede y coordinador
-                </div>
-              </div>
+              <AccionDelCaso ausencia={sel} onIr={() => navigate(`/app/reemplazo/${sel.id}`)} />
             </div>
           )}
         </div>
@@ -640,6 +638,100 @@ function ReposicionesTab({ reposiciones, qc }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * El botón del panel, según en qué punto está el caso.
+ *
+ * Hector: "si esta ya está realizada y confirmada, ¿por qué aparece Gestionar?
+ * Debe salir Ver Detalles solamente, y que muestre que todo se realizó."
+ *
+ * Tiene razón: GESTIONAR invita a hacer algo que ya está hecho. Y el estado de
+ * la AUSENCIA no sirve para decidirlo —puede estar confirmada y con la agenda
+ * sin reubicar— así que se mira la cuenta del caso: si todos los pacientes
+ * tienen dónde ir, el caso está cerrado y lo que queda es consultarlo.
+ *
+ * Comparte la consulta con FranjasAfectadas (misma queryKey), así que no hay
+ * una segunda petición.
+ */
+function AccionDelCaso({ ausencia, onIr }) {
+  const { data } = useQuery({
+    queryKey: ['contexto-reemplazo', ausencia.id],
+    queryFn: () => ausenciaService.contextoReemplazo(ausencia.id),
+    enabled: !!ausencia.id,
+    staleTime: 30_000,
+  })
+  const cuenta = data?.cuenta
+  const resuelto = !!cuenta?.resuelto
+
+  return (
+    <div className="pt-3 border-t border-gray-100 space-y-2">
+      {resuelto && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-xs text-emerald-900">
+          <div className="font-semibold">✅ Agenda reubicada</div>
+          <div className="mt-0.5">
+            Los {cuenta.pacientes_impactados} pacientes tienen dónde ir.
+          </div>
+          {cuenta.quienes_cubren.map((q, i) => (
+            <div key={i} className="mt-0.5">
+              · <strong>{q.nombre}</strong> — {q.dia} {q.desde}–{q.hasta} · {q.pacientes} pac.
+            </div>
+          ))}
+        </div>
+      )}
+
+      <button
+        className={`w-full justify-center ${resuelto ? 'btn' : 'btn-primary'}`}
+        onClick={onIr}
+      >
+        {resuelto ? '🔍 Ver detalles' : '⚙️ GESTIONAR'}
+      </button>
+
+      <div className="text-xs text-gray-400 text-center">
+        {resuelto
+          ? 'Abre el caso para revisar cómo quedó o reasignar'
+          : 'Abre la pantalla con las franjas que se cayeron: día, hora, sede y coordinador'}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Las franjas que se cayeron, con su hora y su sede.
+ *
+ * Hector: "en la página principal debe aparecer la hora también de la ausencia".
+ * Y antes: "dice el día pero no la hora a la que está programado".
+ *
+ * La hora de la AUSENCIA y la hora de la AGENDA son dos cosas distintas: en una
+ * ausencia de día completo no hay hora de ausencia, y aun así el profesional
+ * tenía turnos con su horario. Lo que hace falta ver es el segundo.
+ *
+ * Se pide solo cuando hay una ausencia abierta en el panel —una por vez— y
+ * reusa el contexto que ya alimenta la pantalla de gestión, así que no hay
+ * endpoint nuevo ni consulta extra en el listado.
+ */
+function FranjasAfectadas({ ausenciaId }) {
+  const { data } = useQuery({
+    queryKey: ['contexto-reemplazo', ausenciaId],
+    queryFn: () => ausenciaService.contextoReemplazo(ausenciaId),
+    enabled: !!ausenciaId,
+    staleTime: 30_000,
+  })
+  const franjas = data?.franjas ?? []
+  if (franjas.length === 0) return null
+  return (
+    <div className="pt-1">
+      <div className="text-gray-400 mb-1">Agenda que se cayó</div>
+      {franjas.map((f) => (
+        <div key={f.assignment_id} className="text-gray-800 font-medium leading-snug">
+          <span className="capitalize">{f.weekday}</span> {f.start_time}–{f.end_time}
+          <span className="font-normal text-gray-500"> · {f.site?.name} / {f.room?.name}</span>
+          {f.patient_capacity ? <span className="font-normal text-gray-500"> · {f.patient_capacity} pac.</span> : null}
+          {f.reemplazo && <span className="text-blue-700"> · cubre {f.reemplazo.resource?.name}</span>}
+        </div>
+      ))}
     </div>
   )
 }
