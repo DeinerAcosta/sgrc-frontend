@@ -340,7 +340,7 @@ function rangoFechas(a) {
  */
 function TarjetaFranja({ franja, ausencia }) {
   // null = sin elegir · 'medico' = otro profesional cubre esta misma franja
-  // · (mover agenda no deja estado: navega al Programador)
+  // · 'mover' = se despliega la pregunta de quién atiende esos pacientes
   const [camino, setCamino] = useState(null)
   const navigate = useNavigate()
   const yaResuelta = !!franja.reemplazo
@@ -396,8 +396,12 @@ function TarjetaFranja({ franja, ausencia }) {
                 👤 Cambiar de médico
               </button>
               <button
-                className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 font-medium transition-colors"
-                onClick={() => navigate(`/app/programador?caso=${ausencia.id}`)}
+                className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors ${
+                  camino === 'mover'
+                    ? 'border-brand-400 bg-blue-50 text-brand-700'
+                    : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+                }`}
+                onClick={() => setCamino((c) => (c === 'mover' ? null : 'mover'))}
               >
                 🔀 Mover la agenda
               </button>
@@ -408,6 +412,34 @@ function TarjetaFranja({ franja, ausencia }) {
 
       {camino === 'medico' && !yaResuelta && (
         <Candidatos franja={franja} ausencia={ausencia} onListo={() => setCamino(null)} />
+      )}
+
+      {camino === 'mover' && !yaResuelta && (
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          <div className="text-xs font-medium text-gray-700 mb-2">
+            ¿Quién va a atender esos pacientes en el día nuevo?
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button
+              className="text-left px-3 py-2.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+              onClick={() => navigate(`/app/programador?caso=${ausencia.id}&quien=mismo`)}
+            >
+              <div className="text-xs font-semibold text-gray-800">El mismo {ausencia.resource?.name}</div>
+              <div className="text-[11px] text-gray-500 mt-0.5">
+                Recupera su propia agenda otro día. Va precargado en el Programador.
+              </div>
+            </button>
+            <button
+              className="text-left px-3 py-2.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+              onClick={() => navigate(`/app/programador?caso=${ausencia.id}&quien=otro`)}
+            >
+              <div className="text-xs font-semibold text-gray-800">Otro profesional</div>
+              <div className="text-[11px] text-gray-500 mt-0.5">
+                Se hace cargo de esos pacientes. Lo eliges en el Programador.
+              </div>
+            </button>
+          </div>
+        </div>
       )}
     </div>
   )

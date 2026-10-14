@@ -445,6 +445,9 @@ export default function ProgramadorPage() {
   // cómo volver a asignar el reprogramador, que es donde termina el proceso.
   const [paramsCaso] = useSearchParams()
   const casoId = paramsCaso.get('caso')
+  // 'mismo' = el ausente recupera su agenda otro día · 'otro' = alguien más se
+  // hace cargo. Decide si el profesional viene puesto o se deja elegir.
+  const quienAtiende = paramsCaso.get('quien') ?? 'mismo'
   const navegar = useNavigate()
   const { data: caso } = useQuery({
     queryKey: ['contexto-reemplazo', casoId],
@@ -585,7 +588,9 @@ export default function ProgramadorPage() {
             ) : caso.ausencia.dias?.length ? <> · ausente el <strong>{caso.ausencia.dias.join(', ')}</strong></> : null}
             {caso.ausencia.patients_affected ? <> · <strong>{caso.ausencia.patients_affected} pacientes</strong> por reubicar</> : null}
             <div className="text-amber-700 mt-0.5">
-              Cambia de sede arriba para ver dónde hay espacio. Las casillas rojas son sus franjas caídas.
+              {quienAtiende === 'mismo'
+                ? 'Va precargado al asignar. Cambia de sede arriba para ver dónde hay espacio.'
+                : 'Se hace cargo OTRO profesional: elígelo al asignar. Cambia de sede arriba para ver dónde hay espacio.'}
             </div>
           </div>
           <button
@@ -1040,8 +1045,8 @@ export default function ProgramadorPage() {
                                 if (encima) {
                                   setModalData({
                                     roomId: cons.id, room: cons, day: dia, weekId: semanaActual.id,
-                                    recursoPrecargado: caso.ausencia.resource?.id,
-                                    recursoPrecargadoNombre: caso.ausencia.resource?.name,
+                                    recursoPrecargado: quienAtiende === 'mismo' ? caso.ausencia.resource?.id : undefined,
+                                    recursoPrecargadoNombre: quienAtiende === 'mismo' ? caso.ausencia.resource?.name : undefined,
                                     cubreAusenciaId: caso.ausencia.id,
                                   })
                                   return
@@ -1140,11 +1145,11 @@ export default function ProgramadorPage() {
                             onClick={() => {
                               const ctx = {
                                 roomId: cons.id, room: cons, day: dia, weekId: semanaActual.id,
-                                // Viniendo de "Mover la agenda": el médico que se
-                                // está reubicando viene puesto, y el turno nuevo
-                                // queda atado a su ausencia.
-                                recursoPrecargado: caso?.ausencia?.resource?.id,
-                                recursoPrecargadoNombre: caso?.ausencia?.resource?.name,
+                                // Viniendo de "Mover la agenda". Solo se precarga
+                                // cuando es el mismo médico el que recupera su
+                                // agenda; si se hace cargo otro, se deja elegir.
+                                recursoPrecargado: quienAtiende === 'mismo' ? caso?.ausencia?.resource?.id : undefined,
+                                recursoPrecargadoNombre: quienAtiende === 'mismo' ? caso?.ausencia?.resource?.name : undefined,
                                 cubreAusenciaId: caso?.ausencia?.id,
                               }
                               // Si tiene servicio alternativo, primero pedir cuál usar
