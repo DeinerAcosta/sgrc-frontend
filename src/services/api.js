@@ -595,6 +595,16 @@ export const ausenciaService = {
     if (params.resource_id) list = list.filter((a) => a.resource_id === params.resource_id)
     return ok(list)
   },
+  /** La líder asigna la reprogramación a un reprogramador. */
+  asignarReprogramador: async (id, { reschedulerId, notes }) => {
+    if (!DEMO_MODE) return api.put(`/absences/${id}/rescheduler`, { rescheduler_id: reschedulerId, notes })
+    return ok({ ok: true })
+  },
+  /** El reprogramador da su caso por terminado. */
+  resolverReprogramacion: async (id) => {
+    if (!DEMO_MODE) return api.put(`/absences/${id}/rescheduler/done`)
+    return ok({ ok: true })
+  },
   /** Contexto completo para la pantalla de reemplazo: las franjas que se
    *  cayeron, con sede, consultorio, coordinador y el reemplazo si ya existe. */
   contextoReemplazo: async (id) => {
@@ -1039,6 +1049,11 @@ export const usuarioService = {
   },
   /** Sep-2026 · Ley 2101 · Lista de directivos + gerencia activos para el
    *  modal de asignación cuando un aux va a trabajar sáb+dom (autorización). */
+  /** Los reprogramadores activos, para el select de 'asignar a'. */
+  listReprogramadores: async () => {
+    if (!DEMO_MODE) return api.get('/users/reschedulers')
+    return ok([])
+  },
   listDirectivos: async () => {
     if (!DEMO_MODE) return api.get('/users/directivos')
     return ok(_usuarios_lista.filter((u) => ['directivo', 'gerencia'].includes(u.role) && u.active))

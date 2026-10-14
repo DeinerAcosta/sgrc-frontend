@@ -4,7 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import toast from 'react-hot-toast'
-import { ausenciaService, recursoService, asignacionService } from '@/services/api'
+import { ausenciaService, recursoService, asignacionService, usuarioService } from '@/services/api'
+import { useAuthStore } from '@/store/authStore'
 import { Avatar, Spinner, EmptyState, Badge } from '@/components/ui'
 import { TIPOS_RECURSO, parseFechaLocal } from '@/utils/helpers'
 
@@ -99,6 +100,151 @@ export default function ReemplazoPage() {
             ))}
           </div>
         </>
+      )}
+
+      <AsignarReprogramador ausencia={ausencia} />
+    </div>
+  )
+}
+
+/**
+ * EL ULTIMO PASO: a quien se le pasa el caso.
+ *
+ * Hector: "ella selecciona el dia de la reprogramacion o el remplazo (...)
+ * entonces asigna al reprogramador y asi despues que lo reprograme ya los
+ * reprogramadores comienzan a llamar uno a uno a los pacientes".
+ *
+ * Las llamadas NO viven aqui: el SGRC no tiene pacientes, solo cuantos quedaron
+ * impactados. Lo que queda registrado es quien decidio, a quien se lo paso,
+ * cuando, con que indicaciones, y cuando esa persona lo dio por terminado.
+ * Hasta ahi llega la cadena, que es exactamente lo que se pidio.
+ */
+function AsignarReprogramador({ ausencia }) {
+  const qc = useQueryClient()
+  const { user } = useAuthStore()
+  const [elegido, setElegido] = useState(ausencia.rescheduler_id ?? '')
+  const [notas, setNotas] = useState(ausencia.reschedule_notes ?? '')
+
+  const asignada = ausencia.reschedule_status === 'asignada'
+  const resuelta = ausencia.reschedule_status === 'resuelta'
+  const puedeAsignar = ['coordinador', 'supervisor', 'gerencia'].includes(user?.role)
+  // Lo cierra quien lo tiene asignado; supervision tambien, para destrabarlo
+  // si esa persona no esta.
+  const puedeCerrar = asignada && (ausencia.rescheduler_id === user?.id || ['supervisor', 'gerencia'].includes(user?.role))
+
+  const { data: reprogramadores = [] } = useQuery({
+    queryKey: ['reprogramadores'],
+    queryFn: () => usuarioService.listReprogramadores(),
+    enabled: puedeAsignar,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const refrescar = () => {
+    qc.invalidateQueries({ queryKey: ['contexto-reemplazo', ausencia.id] })
+    qc.invalidateQueries({ queryKey: ['ausencias-coord'] })
+  }
+
+  const { mutate: asignar, isPending: asignando } = useMutation({
+    mutationFn: () => ausenciaService.asignarReprogramador(ausencia.id, {
+      reschedulerId: elegido,
+      notes: notas.trim() || undefined,
+    }),
+    onSuccess: () => { toast.success('Reprogramación asignada. La persona fue notificada.'); refrescar() },
+    onError: (err) => toast.error(err?.message ?? 'No se pudo asignar'),
+  })
+
+  const { mutate: cerrar, isPending: cerrando } = useMutation({
+    mutationFn: () => ausenciaService.resolverReprogramacion(ausencia.id),
+    onSuccess: () => { toast.success('Reprogramación marcada como resuelta.'); refrescar() },
+    onError: (err) => toast.error(err?.message ?? 'No se pudo cerrar'),
+  })
+
+  const nombreAsignado = reprogramadores.find((r) => r.id === ausencia.rescheduler_id)?.name
+
+  return (
+    <div className="card mt-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+        <h2 className="text-sm font-semibold text-gray-900">Reprogramación de pacientes</h2>
+        {resuelta && <Badge variant="green">Resuelta</Badge>}
+        {asignada && <Badge variant="blue">Asignada</Badge>}
+        {!asignada && !resuelta && <Badge variant="gray">Sin asignar</Badge>}
+      </div>
+      <p className="text-xs text-gray-500 mb-4">
+        Quién se encarga de llamar a los pacientes para moverlos. Las llamadas se hacen
+        fuera del sistema; acá queda el registro de quién lo asignó y quién lo resolvió.
+      </p>
+
+      {(asignada || resuelta) && (
+        <div className="bg-gray-50 border border-gray-100 rounded-lg p-3 text-xs space-y-1 mb-4">
+          <div>
+            <span className="text-gray-400">Asignada a:</span>{' '}
+            <strong className="text-gray-800">{nombreAsignado ?? 'otro usuario'}</strong>
+          </div>
+          {ausencia.assigned_at && (
+            <div>
+              <span className="text-gray-400">Cuándo:</span>{' '}
+              {format(new Date(ausencia.assigned_at), "d 'de' MMM yyyy, HH:mm", { locale: es })}
+            </div>
+          )}
+          {ausencia.reschedule_notes && (
+            <div>
+              <span className="text-gray-400">Indicaciones:</span> {ausencia.reschedule_notes}
+            </div>
+          )}
+          {ausencia.reschedule_done_at && (
+            <div className="text-green-700">
+              Resuelta el {format(new Date(ausencia.reschedule_done_at), "d 'de' MMM yyyy, HH:mm", { locale: es })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {puedeAsignar && !resuelta && (
+        <div className="space-y-3">
+          <div>
+            <label className="label">{asignada ? 'Reasignar a' : 'Asignar a'}</label>
+            <select className="input" value={elegido} onChange={(e) => setElegido(e.target.value)}>
+              <option value="">Seleccionar reprogramador...</option>
+              {reprogramadores.map((r) => (
+                <option key={r.id} value={r.id}>{r.name}</option>
+              ))}
+            </select>
+            {reprogramadores.length === 0 && (
+              <div className="text-[11px] text-amber-700 mt-1">
+                No hay nadie con el rol de reprogramador. Hay que asignárselo primero desde Catálogos → Usuarios.
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="label">Indicaciones (opcional)</label>
+            <textarea
+              className="input resize-none text-xs"
+              rows={2}
+              value={notas}
+              onChange={(e) => setNotas(e.target.value)}
+              placeholder="Qué tiene que hacer con los pacientes: a qué día moverlos, a quién avisar..."
+            />
+          </div>
+
+          <button
+            className="btn-primary w-full justify-center"
+            onClick={() => asignar()}
+            disabled={!elegido || asignando}
+          >
+            {asignando ? <Spinner size="sm" /> : asignada ? 'Reasignar' : 'Asignar reprogramación'}
+          </button>
+        </div>
+      )}
+
+      {puedeCerrar && (
+        <button
+          className="btn w-full justify-center mt-2"
+          onClick={() => cerrar()}
+          disabled={cerrando}
+        >
+          {cerrando ? <Spinner size="sm" /> : '✅ Marcar como resuelta'}
+        </button>
       )}
     </div>
   )
