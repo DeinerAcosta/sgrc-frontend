@@ -79,6 +79,9 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
     // Motivo obligatorio cuando el supervisor edita una sede cerrada (queda en
     // auditoría). Se muestra el input solo si `requiereMotivo` es true.
     supervisor_reason: '',
+    // Oct-2026 · Se hace cargo aunque ya tenga turno en esa franja. Única
+    // excepción a RN-08; por eso se marca a mano y nunca viene puesta.
+    assume_overlap: false,
     // Sep-2026 · Ley 2101 · Autorización directivo para aux que trabajan
     // sáb+dom en la misma semana. Se llenan solo si el modal detecta el
     // escenario y el coord elige un directivo.
@@ -208,6 +211,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
         // el movimiento sale del mismo hecho y así se puede contar después.
         is_replacement:     cubreAusenciaId ? true : undefined,
         covered_absence_id: cubreAusenciaId || undefined,
+        assume_overlap:     cubreAusenciaId && form.assume_overlap ? true : undefined,
       }
       return editando
         ? asignacionService.update(asignacion.id, payload)
@@ -302,6 +306,27 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
               </div>
             </div>
           )}
+          {/* La excepción a RN-08, explícita. No se ofrece fuera de una
+              reprogramación: ahí sí tiene sentido que alguien atienda su propia
+              agenda y además la del que falto. */}
+          {cubreAusenciaId && !editando && (
+            <label className="flex items-start gap-2 cursor-pointer bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+              <input
+                type="checkbox"
+                className="mt-0.5 rounded"
+                checked={form.assume_overlap}
+                onChange={(e) => set('assume_overlap', e.target.checked)}
+              />
+              <span className="text-xs text-amber-900">
+                Se hace cargo <strong>aunque ya tenga turno</strong> en esta franja
+                <span className="block text-[11px] text-amber-700 mt-0.5">
+                  Se le crea un turno adicional encima del suyo, con los pacientes
+                  de {recursoPrecargadoNombre ?? 'quien se ausentó'}. Le llega aviso y queda en auditoría.
+                </span>
+              </span>
+            </label>
+          )}
+
           {/* Recurso principal — buscable */}
           <div>
             <label className="label">Recurso principal * <span className="text-gray-400 font-normal">({recursos.length} disponibles)</span></label>

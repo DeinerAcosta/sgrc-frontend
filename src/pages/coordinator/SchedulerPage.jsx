@@ -248,6 +248,14 @@ export default function ProgramadorPage() {
   })
 
   const [verAvisoAusentes, setVerAvisoAusentes] = useState(false)
+  // Mapa "ausenciaId" -> ausencia, para que la casilla de reprogramación
+  // pueda decir DE QUIÉN son los pacientes que se están atendiendo ahí.
+  const ausenciaPorId = useMemo(() => {
+    const m = new Map()
+    for (const a of ausenciasSemana?.ausencias ?? []) m.set(a.id, a)
+    return m
+  }, [ausenciasSemana])
+
   // Mapa "recursoId|dia" -> ausencia. Se indexa por DIA y no solo por recurso
   // porque una ausencia de martes a jueves no debe teñir el lunes: aqui el dato
   // ES el dia. Se memoiza porque la grilla se repinta cientos de veces.
@@ -951,7 +959,7 @@ export default function ProgramadorPage() {
                     }
                     return (
                       <td key={dia} className="p-1 align-top border-r border-gray-50 min-h-12">
-                        {asigs.map((a) => {
+                        {asigs.map((a, idx) => {
                           // ¿Este recurso esta ausente ESTE dia? Si lo esta, su
                           // casilla manda: el color del tipo deja de importar.
                           const ausente = ausenciasPorRecursoDia.get(a.resource?.id + '|' + dia)
@@ -998,11 +1006,15 @@ export default function ProgramadorPage() {
                             : esReemplazo
                               ? 'slot-reemplazo'
                               : (SLOT_COLOR[a.resource?.type] ?? 'slot-teal')
+                          // Solo la reprogramación que cae sobre otra casilla de
+                          // la misma celda se monta encima. Lo demás, separado.
+                          const seMontaEncima = esReemplazo && idx > 0
+                          const ausenciaQueCubre = esReemplazo ? ausenciaPorId.get(a.covered_absence_id) : null
                           return (
                           <div
                             key={a.id}
                             data-asig-id={a.id}
-                            className={`${claseSlot} group relative ${canEdit ? '' : 'cursor-default'} ${
+                            className={`${claseSlot} ${seMontaEncima ? 'slot-encima' : ''} group relative ${canEdit ? '' : 'cursor-default'} ${
                               asigResaltada === a.id
                                 ? 'ring-2 ring-brand-500 ring-offset-1 shadow-md animate-pulse'
                                 : (!ausente && recursosQueFaltaron.has(a.resource?.id))
@@ -1023,7 +1035,9 @@ export default function ProgramadorPage() {
                               ausente
                                 ? `⛔ AUSENTE este día — ${ausente.motivo_catalogo ?? ausente.type}${ausente.motivo_texto ? ': ' + ausente.motivo_texto : ''}${ausente.status === 'pendiente' ? ' (sin confirmar)' : ''}${ausente.patients_affected ? ' · ' + ausente.patients_affected + ' pacientes afectados' : ''}`
                                 : null,
-                              esReemplazo ? '🔄 Esta asignación cubre una ausencia' : null,
+                              esReemplazo
+                                ? `🔄 REPROGRAMACIÓN${ausenciaQueCubre ? ` — son los pacientes de ${ausenciaQueCubre.resource?.name}, ausente ese día` : ' — cubre una ausencia'}${seMontaEncima ? '. Se suma al turno propio de esta persona.' : ''}`
+                                : null,
                               !ausente && recursosQueFaltaron.has(a.resource?.id)
                                 ? '🔶 Faltó la semana anterior — revisa si repone aquí'
                                 : null,
@@ -1071,7 +1085,14 @@ export default function ProgramadorPage() {
                               </div>
                             )}
                             {esReemplazo && (
-                              <div className="text-indigo-700 text-[10px] font-semibold leading-tight">🔄 REPROGRAMACIÓN</div>
+                              <div className="text-indigo-700 text-[10px] font-semibold leading-tight">
+                                🔄 REPROGRAMACIÓN
+                                {ausenciaQueCubre && (
+                                  <div className="font-normal truncate" title={`Pacientes de ${ausenciaQueCubre.resource?.name}`}>
+                                    pac. de {nombreCorto(ausenciaQueCubre.resource?.name)}
+                                  </div>
+                                )}
+                              </div>
                             )}
                             <div className="text-teal-700 text-xs">{a.start_time}–{a.end_time}</div>
                             {a.assistant && (

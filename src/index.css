@@ -90,6 +90,11 @@
      superposicion solo tiene sentido entre una ausencia y quien la cubre, y
      para ese caso hay algo mejor: una sola casilla partida en dos (ver
      .slot-par en SchedulerPage). */
+  /* La casilla de reprogramacion que cae SOBRE otra de la misma celda: se
+     monta encima, corrida a la derecha para que asome el borde de la de abajo
+     y con sombra que las separa en profundidad. Solo para este caso — dos
+     turnos normales van separados y limpios. */
+  .slot-encima { @apply -mt-3 ml-2 relative z-10 shadow-md; }
   .slot-empty  { @apply rounded p-2 border border-dashed border-gray-200 text-center cursor-pointer hover:border-brand-400 hover:bg-blue-50 transition-colors; }
 
   .semaforo-g { @apply inline-block w-2.5 h-2.5 rounded-full bg-green-500; }
