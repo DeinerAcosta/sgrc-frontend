@@ -33,6 +33,7 @@ const MiEjecucionPage       = lazy(() => import('@/pages/resource/MyExecutionPag
 // Coordinador
 const DashboardCoordPage      = lazy(() => import('@/pages/coordinator/CoordDashboardPage'))
 const ProgramadorPage         = lazy(() => import('@/pages/coordinator/SchedulerPage'))
+const ReemplazoPage         = lazy(() => import('@/pages/coordinator/ReplacementPage'))
 const AusenciasCoordPage      = lazy(() => import('@/pages/coordinator/CoordAbsencesPage'))
 const AusenciasCronogramaPage = lazy(() => import('@/pages/coordinator/AbsencesTimelinePage'))
 const EjecucionPage           = lazy(() => import('@/pages/coordinator/ExecutionPage'))
@@ -123,6 +124,9 @@ export default function App() {
           <Route path="dashboard-coord" element={<RequireAuth roles={['coordinador', 'supervisor']}><DashboardCoordPage /></RequireAuth>} />
           <Route path="programador" element={<RequireAuth roles={['coordinador', 'supervisor', 'reprogramador']}><ProgramadorPage /></RequireAuth>} />
           <Route path="ausencias-coord" element={<RequireAuth roles={['coordinador', 'reprogramador']}><AusenciasCoordPage /></RequireAuth>} />
+          {/* Oct-2026 · La pantalla completa de reemplazo. Reemplaza al modal
+              "Buscar reemplazo", que solo sabia de una franja. */}
+          <Route path="reemplazo/:ausenciaId" element={<RequireAuth roles={['coordinador', 'supervisor', 'gerencia', 'reprogramador']}><ReemplazoPage /></RequireAuth>} />
           <Route path="ausencias-cronograma" element={<RequireAuth roles={['coordinador', 'supervisor', 'reprogramador']}><AusenciasCronogramaPage /></RequireAuth>} />
           <Route path="ejecucion" element={<RequireAuth roles={['coordinador', 'supervisor']}><EjecucionPage /></RequireAuth>} />
           <Route path="recursos-coord" element={<RequireAuth roles={['coordinador', 'supervisor']}><RecursosCoordPage /></RequireAuth>} />

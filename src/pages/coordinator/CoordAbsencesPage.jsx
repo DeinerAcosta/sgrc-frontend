@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { ausenciaService, sedeService, reposicionService } from '@/services/api'
@@ -9,7 +9,6 @@ import { TIPOS_AUSENCIA, formatCOP, parseFechaLocal, GRUPOS_AUSENCIAS, tiposSinG
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import RegistrarAusenciaCoordModal from '@/pages/coordinator/CoordLogAbsenceModal'
-import SugeridorReemplazosModal from '@/pages/coordinator/ReplacementSuggesterModal'
 import RegistrarReposicionModal from '@/pages/resource/LogMakeupModal'
 import { useSedeActiva } from '@/hooks/useActiveSite'
 
@@ -18,13 +17,13 @@ const TIPO_LABEL = Object.fromEntries(TIPOS_AUSENCIA.map((t) => [t.value, t.labe
 export default function AusenciasCoordPage() {
   const { user } = useAuthStore()
   const qc = useQueryClient()
+  const navigate = useNavigate()
   const { siteId: sedeId, Selector } = useSedeActiva()
   const [tab, setTab] = useState('pendientes')
   const [selected, setSelected] = useState(null)
   const [searchParams, setSearchParams] = useSearchParams()
   const [notaConfirm, setNotaConfirm] = useState('')
   const [showRegistrar, setShowRegistrar] = useState(false)
-  const [showSugerir, setShowSugerir] = useState(null)
   // Ausencia abierta en el modal de gestión (§6.1). null = cerrado.
   const [gestionando, setGestionando] = useState(null)
   // Si la ausencia confirmada trae desea_reponer=true,
@@ -98,18 +97,17 @@ export default function AusenciasCoordPage() {
       nota_coordinador: nota ?? notaConfirm,
       action_taken: accion ?? undefined,
     }),
-    onSuccess: (actualizada) => {
+    onSuccess: (actualizada, variables) => {
       qc.invalidateQueries({ queryKey: ['ausencias-coord'] })
       qc.invalidateQueries({ queryKey: ['ausencias-hub'] })
       setGestionando(null)
       toast.success('Ausencia gestionada. Recursos notificados.')
-      // Fase 5 · v04: si el profesional marcó "desea reponer=SÍ" en el formulario
-      // original, encadenamos inmediatamente el modal de proponer reposición.
-      // La ausencia actualizada viene del backend con la bandera desea_reponer.
-      if (actualizada?.wants_makeup === true) {
-        setAutoReposicion(actualizada)
-      }
       setSelected(null)
+      // El proceso no termina al guardar: si la agenda hay que cubrirla o
+      // reprogramarla, lo siguiente es decidir QUIEN, y eso vive en la
+      // pantalla de reemplazo. Antes esto se quedaba aquí y el hueco seguía
+      // abierto sin que nada lo recordara.
+      if (variables?.irAReemplazo) navigate(`/app/reemplazo/${variables.id}`)
     },
     onError: (err) => toast.error(err?.message ?? 'Error al confirmar'),
   })
@@ -348,19 +346,17 @@ export default function AusenciasCoordPage() {
                 </button>
               )}
 
-              {sel.status === 'confirmada' && (
-                <div className="pt-3 border-t border-gray-100 space-y-2">
-                  <button
-                    className="btn-primary w-full justify-center"
-                    onClick={() => setShowSugerir(sel)}
-                  >
-                    🔍 Buscar reemplazo
-                  </button>
-                  <div className="text-xs text-gray-400 text-center">
-                    Sugiere recursos disponibles de cualquier sede de la ciudad
-                  </div>
+              <div className="pt-3 border-t border-gray-100 space-y-2">
+                <button
+                  className="btn-primary w-full justify-center"
+                  onClick={() => navigate(`/app/reemplazo/${sel.id}`)}
+                >
+                  🔍 Buscar reemplazo
+                </button>
+                <div className="text-xs text-gray-400 text-center">
+                  Abre la pantalla con las franjas que se cayeron: día, hora, sede y coordinador
                 </div>
-              )}
+              </div>
             </div>
           )}
         </div>
@@ -372,8 +368,7 @@ export default function AusenciasCoordPage() {
           ausencia={gestionando}
           onClose={() => setGestionando(null)}
           onConfirmar={confirmar}
-          onRechazar={rechazar}
-          procesando={confirmando || rechazando}
+          procesando={confirmando}
         />
       )}
 
@@ -392,20 +387,6 @@ export default function AusenciasCoordPage() {
         />
       )}
 
-      {showSugerir && (
-        <SugeridorReemplazosModal
-          asignacionVacia={{
-            resource: showSugerir.resource,
-            weekday: 'lunes', // simplificación demo
-            start_time: '07:00',
-            end_time: '13:00',
-            week_id: 'sem-actual',
-          }}
-          ausencia={showSugerir}
-          ciudad={sedeActual?.city}
-          onClose={() => setShowSugerir(null)}
-        />
-      )}
     </div>
   )
 }
@@ -450,22 +431,29 @@ const ACCIONES_AGENDA = [
   { value: 'sin_agenda',     label: 'No tenía agenda ese día',        help: 'No había pacientes programados' },
 ]
 
-function GestionarAusenciaModal({ ausencia, onClose, onConfirmar, onRechazar, procesando }) {
-  const [decision, setDecision] = useState('')      // 'procede' | 'no_procede'
+// Oct-2026 · Se quitó el paso "¿Procede la ausencia?". La persona ya faltó:
+// preguntarlo invitaba a cerrar el caso con un clic sin decir qué pasó con la
+// agenda, que es lo único que de verdad hay que registrar.
+function GestionarAusenciaModal({ ausencia, onClose, onConfirmar, procesando }) {
   const [accion, setAccion] = useState('')
   const [nota, setNota] = useState('')
 
   const atiendePacientes = TIPOS_QUE_IMPACTAN_PACIENTES.includes(ausencia.resource?.type)
-  const pideAccion = decision === 'procede' && atiendePacientes
-  const faltaMotivo = decision === 'no_procede' && nota.trim().length < 5
-  const puedeGuardar = decision && !faltaMotivo && (!pideAccion || accion)
+  const puedeGuardar = !atiendePacientes || !!accion
+  // Cubrir o reprogramar exige decidir QUIÉN: al guardar se sigue en la
+  // pantalla de reemplazo en vez de dar el caso por cerrado.
+  const necesitaReemplazo = accion === 'cubierta' || accion === 'reprogramada'
 
   const guardar = () => {
-    if (decision === 'no_procede') return onRechazar({ id: ausencia.id, reason: nota.trim() })
-    const detalle = pideAccion
+    const detalle = atiendePacientes
       ? `${ACCIONES_AGENDA.find((a) => a.value === accion)?.label}${nota.trim() ? ` — ${nota.trim()}` : ''}`
       : nota.trim()
-    onConfirmar({ id: ausencia.id, nota: detalle, accion: pideAccion ? accion : null })
+    onConfirmar({
+      id: ausencia.id,
+      nota: detalle,
+      accion: atiendePacientes ? accion : null,
+      irAReemplazo: necesitaReemplazo,
+    })
   }
 
   return (
@@ -482,27 +470,9 @@ function GestionarAusenciaModal({ ausencia, onClose, onConfirmar, onRechazar, pr
         </div>
 
         <div className="px-5 py-4 space-y-5">
-          <div>
-            <div className="label mb-2">1 · ¿Procede la ausencia?</div>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { v: 'procede',    l: 'Sí, procede',  c: 'border-green-300 bg-green-50 text-green-800' },
-                { v: 'no_procede', l: 'No procede',   c: 'border-red-300 bg-red-50 text-red-800' },
-              ].map((o) => (
-                <button
-                  key={o.v}
-                  onClick={() => { setDecision(o.v); setAccion(''); }}
-                  className={`px-3 py-2.5 rounded-lg border text-xs font-medium transition-colors ${
-                    decision === o.v ? o.c : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                  }`}
-                >{o.l}</button>
-              ))}
-            </div>
-          </div>
-
-          {pideAccion && (
+          {atiendePacientes && (
             <div>
-              <div className="label mb-2">2 · ¿Qué pasó con su agenda?</div>
+              <div className="label mb-2">¿Qué pasó con su agenda?</div>
               <div className="space-y-1.5">
                 {ACCIONES_AGENDA.map((a) => (
                   <label
@@ -526,42 +496,35 @@ function GestionarAusenciaModal({ ausencia, onClose, onConfirmar, onRechazar, pr
             </div>
           )}
 
-          {decision === 'procede' && !atiendePacientes && (
+          {!atiendePacientes && (
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-2.5 text-[11px] text-gray-600">
               {ausencia.resource?.name} no tiene agenda propia de pacientes, así que no hay nada
               que reprogramar. Solo se registra la ausencia.
             </div>
           )}
 
-          {decision && (
-            <div>
-              <label className="label">
-                {decision === 'no_procede' ? 'Motivo del rechazo *' : 'Observaciones (opcional)'}
-              </label>
-              <textarea
-                className="input resize-none text-xs"
-                rows={3}
-                value={nota}
-                onChange={(e) => setNota(e.target.value)}
-                placeholder={decision === 'no_procede'
-                  ? 'Por qué no procede (mínimo 5 caracteres). Queda registrado y el recurso es notificado.'
-                  : 'Lo que el equipo deba saber sobre cómo se resolvió.'}
-              />
-              {faltaMotivo && nota.length > 0 && (
-                <div className="text-[11px] text-red-600 mt-1">Mínimo 5 caracteres.</div>
-              )}
-            </div>
-          )}
+          <div>
+            <label className="label">Observaciones (opcional)</label>
+            <textarea
+              className="input resize-none text-xs"
+              rows={3}
+              value={nota}
+              onChange={(e) => setNota(e.target.value)}
+              placeholder="Lo que el equipo deba saber sobre cómo se resolvió."
+            />
+          </div>
         </div>
 
         <div className="px-5 py-4 border-t border-gray-100 flex gap-2">
           <button className="btn flex-1 justify-center" onClick={onClose}>Cancelar</button>
           <button
-            className={`flex-1 justify-center ${decision === 'no_procede' ? 'btn-danger' : 'btn-primary'}`}
+            className="btn-primary flex-1 justify-center"
             onClick={guardar}
             disabled={!puedeGuardar || procesando}
           >
-            {procesando ? <Spinner size="sm" /> : 'Guardar gestión'}
+            {procesando
+              ? <Spinner size="sm" />
+              : necesitaReemplazo ? 'Guardar y buscar reemplazo →' : 'Guardar gestión'}
           </button>
         </div>
       </div>

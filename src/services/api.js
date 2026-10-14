@@ -595,6 +595,12 @@ export const ausenciaService = {
     if (params.resource_id) list = list.filter((a) => a.resource_id === params.resource_id)
     return ok(list)
   },
+  /** Contexto completo para la pantalla de reemplazo: las franjas que se
+   *  cayeron, con sede, consultorio, coordinador y el reemplazo si ya existe. */
+  contextoReemplazo: async (id) => {
+    if (!DEMO_MODE) return api.get(`/absences/${id}/replacement-context`)
+    return ok({ ausencia: null, semana: null, franjas: [] })
+  },
   create: async (data) => {
     if (!DEMO_MODE) return api.post('/absences', data)
     const nueva = {

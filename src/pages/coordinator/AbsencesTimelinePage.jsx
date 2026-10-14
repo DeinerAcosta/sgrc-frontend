@@ -6,7 +6,7 @@ import {
 } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { ausenciaService, festivoService } from '@/services/api'
-import { parseFechaLocal, DIAS_LABEL, TIPOS_QUE_IMPACTAN_PACIENTES } from '@/utils/helpers'
+import { GRUPOS_TIPO_AUSENCIA, parseFechaLocal, DIAS_LABEL, TIPOS_QUE_IMPACTAN_PACIENTES } from '@/utils/helpers'
 import { useSedeActiva } from '@/hooks/useActiveSite'
 import { Badge } from '@/components/ui'
 
@@ -30,15 +30,22 @@ import { Badge } from '@/components/ui'
 //   - Click en pill → panel de detalle inline abajo del calendario
 // ============================================================================
 
+// Oct-2026 · Antes esto se pintaba por la columna `family` del catálogo, que
+// agrupa por asunto operativo (reprogramación, ajuste de cupos, movilidad...).
+// Eso venía de antes y nadie lo pidió. El tipo de ausencia ahora se organiza en
+// remunerada / no remunerada, así que el cronograma se pinta igual: una sola
+// forma de agrupar en todo el módulo.
 const FAMILIAS = [
-  { value: 'ausencia_profesional',     label: 'Ausencia profesional',     dot: 'bg-red-500',    pill: 'bg-red-50 text-red-800 border-red-200' },
-  { value: 'reprogramacion_operativa', label: 'Reprogramación operativa', dot: 'bg-blue-500',   pill: 'bg-blue-50 text-blue-800 border-blue-200' },
-  { value: 'ajuste_cupos',             label: 'Ajuste de cupos',          dot: 'bg-green-500',  pill: 'bg-green-50 text-green-800 border-green-200' },
-  { value: 'movilidad_regional',       label: 'Movilidad / Regional',     dot: 'bg-amber-500',  pill: 'bg-amber-50 text-amber-800 border-amber-200' },
-  { value: 'calendario_festivo',       label: 'Calendario / Festivo',     dot: 'bg-slate-500',  pill: 'bg-slate-100 text-slate-800 border-slate-200' },
-  { value: 'otros',                    label: 'Otros',                    dot: 'bg-gray-400',   pill: 'bg-gray-50 text-gray-700 border-gray-200' },
+  { value: 'remunerada',    label: 'Remunerada',    dot: 'bg-emerald-500', pill: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
+  { value: 'no_remunerada', label: 'No remunerada', dot: 'bg-amber-500',   pill: 'bg-amber-50 text-amber-800 border-amber-200' },
+  { value: 'otros',         label: 'Sin clasificar', dot: 'bg-gray-400',   pill: 'bg-gray-50 text-gray-700 border-gray-200' },
 ]
 const FAMILIA_MAP = Object.fromEntries(FAMILIAS.map((f) => [f.value, f]))
+
+/** El grupo de una ausencia, por su tipo. 'otros' para las históricas cuyo
+ *  tipo no esté en ningún grupo. */
+const grupoDe = (a) =>
+  GRUPOS_TIPO_AUSENCIA.find((g) => g.tipos.includes(a?.type))?.value ?? 'otros'
 
 const ESTADOS = [
   { value: 'pendiente',  label: 'Pendientes',  dot: 'bg-amber-400' },
@@ -105,7 +112,7 @@ export default function AusenciasCronogramaPage() {
     const m = new Map()
     const familiasActivas = familiasSel.size === 0 ? null : familiasSel  // null = todas
     for (const a of ausencias) {
-      const familia = a.reason_ref?.family ?? 'ausencia_profesional'
+      const familia = grupoDe(a)
       if (familiasActivas && !familiasActivas.has(familia)) continue
       if (!estadosSel.has(a.status)) continue
       const ini = parseFechaLocal(a.start_date)
@@ -370,7 +377,7 @@ function ChipToggle({ active, onClick, label, dot }) {
 }
 
 function AusenciaPill({ ausencia, onClick }) {
-  const familia = ausencia.reason_ref?.family ?? 'ausencia_profesional'
+  const familia = grupoDe(ausencia)
   const f = FAMILIA_MAP[familia] ?? FAMILIA_MAP.otros
   const nombre = ausencia.resource?.name ?? 'Recurso'
   const short = nombre.split(' ').slice(0, 2).join(' ')
@@ -429,7 +436,7 @@ function DetalleAusencia({ data, porDia, onClose, onPickOne, onSeeDay }) {
   }
 
   const a = data
-  const familia = a.reason_ref?.family ?? 'ausencia_profesional'
+  const familia = grupoDe(a)
   const f = FAMILIA_MAP[familia] ?? FAMILIA_MAP.otros
   const ini = parseFechaLocal(a.start_date)
   const fin = parseFechaLocal(a.end_date ?? a.start_date)
