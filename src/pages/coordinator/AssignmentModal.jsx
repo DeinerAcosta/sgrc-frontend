@@ -18,7 +18,12 @@ import { useAuthStore } from '@/store/authStore'
  *  - sedeId, onClose, onSaved
  */
 export default function AsignacionModal({ data, asignacion, sedeId, onClose, onSaved }) {
-  const { roomId: consultorioId, room: consultorio, day: dia, weekId: semanaId, especialidadOverride } = data
+  const {
+    roomId: consultorioId, room: consultorio, day: dia, weekId: semanaId, especialidadOverride,
+    // Oct-2026 · Cuando se llega desde "Mover la agenda", el modal sabe a quién
+    // se está reubicando y a qué ausencia pertenece el movimiento.
+    recursoPrecargado, recursoPrecargadoNombre, cubreAusenciaId,
+  } = data
   const editando = !!asignacion
   const { user } = useAuthStore()
   const esSupervisor = user?.role === 'supervisor' || user?.role === 'gerencia'
@@ -57,7 +62,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
   const labelApoyo2 = esDiagnostico ? 'Técnico de apoyo #2' : 'Auxiliar de enfermería #2'
 
   const [form, setForm] = useState({
-    resource_id:   asignacion?.resource_id   ?? asignacion?.resourceId   ?? '',
+    resource_id:   asignacion?.resource_id   ?? asignacion?.resourceId   ?? recursoPrecargado ?? '',
     assistant_id:  asignacion?.assistant_id  ?? asignacion?.assistantId  ?? '',
     assistant2_id: asignacion?.assistant2_id ?? asignacion?.assistant2Id ?? '',
     start_time:  asignacion?.start_time  ?? asignacion?.startTime  ?? '07:00',
@@ -197,6 +202,12 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
         // Solo se envían si el escenario aplica; sino el backend guarda null.
         authorized_by_id:    requiereAutorizacionFinde ? (form.authorized_by_id || undefined) : undefined,
         authorization_reason: requiereAutorizacionFinde ? (form.authorization_reason || undefined) : undefined,
+        // Oct-2026 · Viniendo de "Mover la agenda", el turno nuevo queda atado a
+        // la ausencia que lo origina. Sirve igual si se reubica al MISMO médico
+        // en otro día —que es el caso más común— o si se pone a otro: en los dos
+        // el movimiento sale del mismo hecho y así se puede contar después.
+        is_replacement:     cubreAusenciaId ? true : undefined,
+        covered_absence_id: cubreAusenciaId || undefined,
       }
       return editando
         ? asignacionService.update(asignacion.id, payload)
@@ -279,6 +290,18 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
         </div>
 
         <div className="px-5 py-4 space-y-4">
+          {/* Oct-2026 · Viniendo de "Mover la agenda". Sin este aviso, el medico
+              aparece puesto sin explicacion y el turno queda atado a una ausencia
+              sin que nadie lo haya dicho en voz alta. */}
+          {cubreAusenciaId && !editando && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-900">
+              🔀 Estás reubicando la agenda de <strong>{recursoPrecargadoNombre ?? 'el profesional ausente'}</strong>.
+              <div className="text-amber-700 mt-0.5">
+                Este turno queda registrado como la reprogramación de esa ausencia. Podés cambiar
+                el profesional si quien lo cubre es otro.
+              </div>
+            </div>
+          )}
           {/* Recurso principal — buscable */}
           <div>
             <label className="label">Recurso principal * <span className="text-gray-400 font-normal">({recursos.length} disponibles)</span></label>

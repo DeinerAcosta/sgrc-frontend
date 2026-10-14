@@ -426,8 +426,17 @@ export default function ProgramadorPage() {
     },
   })
 
+  // El reemplazo se pinta SIEMPRE despues de la casilla que cubre: se monta
+  // encima con margen negativo, asi que si saliera antes se montaria sobre la
+  // casilla equivocada. El backend ordena por hora y a igual hora el orden
+  // queda al azar, de ahi este desempate explicito.
   const asigDeConsultorioDia = (consultorioId, dia) =>
-    asignaciones.filter((a) => a.room_id === consultorioId && a.weekday === dia)
+    asignaciones
+      .filter((a) => a.room_id === consultorioId && a.weekday === dia)
+      .slice()
+      .sort((x, y) =>
+        (x.start_time ?? '').localeCompare(y.start_time ?? '') ||
+        (x.covered_absence_id ? 1 : 0) - (y.covered_absence_id ? 1 : 0))
 
   // ===== ¿VENGO DE UN CASO DE REPROGRAMACIÓN? =====
   // La líder llega aquí desde "Mover la agenda" para buscar dónde hay hueco.
@@ -919,7 +928,7 @@ export default function ProgramadorPage() {
                     const asigs = asigDeConsultorioDia(cons.id, dia)
                     return (
                       <td key={dia} className="p-1 align-top border-r border-gray-50 min-h-12">
-                        {asigs.map((a) => {
+                        {asigs.map((a, idx) => {
                           // ¿Este recurso esta ausente ESTE dia? Si lo esta, su
                           // casilla manda: el color del tipo deja de importar.
                           const ausente = ausenciasPorRecursoDia.get(a.resource?.id + '|' + dia)
@@ -929,11 +938,15 @@ export default function ProgramadorPage() {
                             : esReemplazo
                               ? 'slot-reemplazo'
                               : (SLOT_COLOR[a.resource?.type] ?? 'slot-teal')
+                          // La primera casilla de la celda va normal; de la
+                          // segunda en adelante se montan unas sobre otras.
+                          const apilada = idx > 0
                           return (
                           <div
                             key={a.id}
                             data-asig-id={a.id}
-                            className={`${claseSlot} group relative ${canEdit ? '' : 'cursor-default'} ${
+                            style={apilada ? { zIndex: 10 + idx } : undefined}
+                            className={`${claseSlot} ${apilada ? 'slot-apilada' : ''} group relative ${canEdit ? '' : 'cursor-default'} ${
                               asigResaltada === a.id
                                 ? 'ring-2 ring-brand-500 ring-offset-1 shadow-md animate-pulse'
                                 : (!ausente && recursosQueFaltaron.has(a.resource?.id))
@@ -1050,7 +1063,15 @@ export default function ProgramadorPage() {
                           <div
                             className="slot-empty text-xs py-1"
                             onClick={() => {
-                              const ctx = { roomId: cons.id, room: cons, day: dia, weekId: semanaActual.id }
+                              const ctx = {
+                                roomId: cons.id, room: cons, day: dia, weekId: semanaActual.id,
+                                // Viniendo de "Mover la agenda": el médico que se
+                                // está reubicando viene puesto, y el turno nuevo
+                                // queda atado a su ausencia.
+                                recursoPrecargado: caso?.ausencia?.resource?.id,
+                                recursoPrecargadoNombre: caso?.ausencia?.resource?.name,
+                                cubreAusenciaId: caso?.ausencia?.id,
+                              }
                               // Si tiene servicio alternativo, primero pedir cuál usar
                               if (cons.alt_specialty) setPickerServicio(ctx)
                               else setModalData(ctx)

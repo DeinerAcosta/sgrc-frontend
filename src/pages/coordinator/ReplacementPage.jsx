@@ -135,7 +135,10 @@ function AsignarReprogramador({ ausencia }) {
 
   const asignada = ausencia.reschedule_status === 'asignada'
   const resuelta = ausencia.reschedule_status === 'resuelta'
-  const puedeAsignar = ['coordinador', 'supervisor', 'gerencia'].includes(user?.role)
+  // El rol 'reprogramador' es la LÍDER (María): conduce el proceso —mira la
+  // agenda caída, decide mover o cambiar de médico— y después se lo pasa a
+  // quien va a llamar a los pacientes. No es quien recibe el caso.
+  const puedeAsignar = ['coordinador', 'supervisor', 'gerencia', 'reprogramador'].includes(user?.role)
   // Lo cierra quien lo tiene asignado; supervision tambien, para destrabarlo
   // si esa persona no esta.
   const puedeCerrar = asignada && (ausencia.rescheduler_id === user?.id || ['supervisor', 'gerencia'].includes(user?.role))
