@@ -94,6 +94,14 @@ export default function ReemplazoPage() {
             </div>
           </div>
 
+          <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2.5 text-xs text-blue-900 mb-3">
+            Cada franja se resuelve de una de dos formas.{' '}
+            <strong>Cambiar de médico</strong>: otro profesional cubre esa misma franja y los
+            pacientes no se mueven.{' '}
+            <strong>Mover la agenda</strong>: los pacientes pasan a otro día o a otra sede — te
+            lleva al Programador con todas las sedes para que veas dónde hay espacio.
+          </div>
+
           <div className="space-y-3">
             {franjas.map((f) => (
               <TarjetaFranja key={f.assignment_id} franja={f} ausencia={ausencia} />
@@ -321,7 +329,10 @@ function rangoFechas(a) {
  * mayoría de las franjas se resuelven mirando dos.
  */
 function TarjetaFranja({ franja, ausencia }) {
-  const [abierta, setAbierta] = useState(false)
+  // null = sin elegir · 'medico' = otro profesional cubre esta misma franja
+  // · (mover agenda no deja estado: navega al Programador)
+  const [camino, setCamino] = useState(null)
+  const navigate = useNavigate()
   const yaResuelta = !!franja.reemplazo
 
   return (
@@ -360,14 +371,34 @@ function TarjetaFranja({ franja, ausencia }) {
               <div className="text-sm font-medium text-indigo-900">{franja.reemplazo.resource?.name}</div>
             </div>
           ) : (
-            <button className="btn-primary text-xs" onClick={() => setAbierta((v) => !v)}>
-              {abierta ? 'Ocultar candidatos' : '🔍 Buscar quién la cubre'}
-            </button>
+            <div className="flex flex-col gap-1.5 sm:items-end">
+              {/* Dos caminos, y la diferencia la decide el paciente: cambiar de
+                  médico no lo mueve de día; mover la agenda sí, y por eso hay
+                  que ir a ver dónde hay hueco antes de prometerle nada. */}
+              <button
+                className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors ${
+                  camino === 'medico'
+                    ? 'border-brand-400 bg-blue-50 text-brand-700'
+                    : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+                }`}
+                onClick={() => setCamino((c) => (c === 'medico' ? null : 'medico'))}
+              >
+                👤 Cambiar de médico
+              </button>
+              <button
+                className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 font-medium transition-colors"
+                onClick={() => navigate(`/app/programador?caso=${ausencia.id}`)}
+              >
+                🔀 Mover la agenda
+              </button>
+            </div>
           )}
         </div>
       </div>
 
-      {abierta && !yaResuelta && <Candidatos franja={franja} ausencia={ausencia} onListo={() => setAbierta(false)} />}
+      {camino === 'medico' && !yaResuelta && (
+        <Candidatos franja={franja} ausencia={ausencia} onListo={() => setCamino(null)} />
+      )}
     </div>
   )
 }

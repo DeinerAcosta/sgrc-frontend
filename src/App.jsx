@@ -122,7 +122,7 @@ export default function App() {
 
           {/* COORDINADOR */}
           <Route path="dashboard-coord" element={<RequireAuth roles={['coordinador', 'supervisor']}><DashboardCoordPage /></RequireAuth>} />
-          <Route path="programador" element={<RequireAuth roles={['coordinador', 'supervisor', 'reprogramador']}><ProgramadorPage /></RequireAuth>} />
+          <Route path="programador" element={<RequireAuth roles={['coordinador', 'supervisor', 'gerencia', 'reprogramador']}><ProgramadorPage /></RequireAuth>} />
           <Route path="ausencias-coord" element={<RequireAuth roles={['coordinador', 'reprogramador']}><AusenciasCoordPage /></RequireAuth>} />
           {/* Oct-2026 · La pantalla completa de reemplazo. Reemplaza al modal
               "Buscar reemplazo", que solo sabia de una franja. */}

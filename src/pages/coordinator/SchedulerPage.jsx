@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { addWeeks, subWeeks, startOfWeek, format, differenceInDays } from 'date-fns'
-import { asignacionService, semanaService, sedeService, festivoService, recursoService, consultorioService } from '@/services/api'
+import { asignacionService, semanaService, sedeService, festivoService, recursoService, consultorioService, ausenciaService } from '@/services/api'
 import { useAuthStore } from '@/store/authStore'
 import { Badge, Spinner, EmptyState } from '@/components/ui'
 import { DIAS_LABEL, DIAS, semanaLabel, diasDeSemana, parseFechaLocal, normalizarTexto, TIPOS_RECURSO } from '@/utils/helpers'
@@ -428,6 +429,29 @@ export default function ProgramadorPage() {
   const asigDeConsultorioDia = (consultorioId, dia) =>
     asignaciones.filter((a) => a.room_id === consultorioId && a.weekday === dia)
 
+  // ===== ¿VENGO DE UN CASO DE REPROGRAMACIÓN? =====
+  // La líder llega aquí desde "Mover la agenda" para buscar dónde hay hueco.
+  // Sin este aviso, a los dos clics ya no se acuerda de a qué vino ni tiene
+  // cómo volver a asignar el reprogramador, que es donde termina el proceso.
+  const [paramsCaso] = useSearchParams()
+  const casoId = paramsCaso.get('caso')
+  const navegar = useNavigate()
+  const { data: caso } = useQuery({
+    queryKey: ['contexto-reemplazo', casoId],
+    queryFn: () => ausenciaService.contextoReemplazo(casoId),
+    enabled: !!casoId,
+  })
+
+  // Saltar a la semana de la ausencia. Una vez, al llegar: después la líder
+  // navega libremente entre semanas buscando hueco y volver a arrastrarla a
+  // la semana del caso en cada render sería pelearle a la pantalla.
+  const saltoHecho = useRef(false)
+  useEffect(() => {
+    if (saltoHecho.current || !caso?.semana?.desde) return
+    saltoHecho.current = true
+    setSemanaBase(startOfWeek(parseFechaLocal(caso.semana.desde), { weekStartsOn: 1 }))
+  }, [caso])
+
   const isCerrada = semanaActual?.status === 'cerrada'
   const isSupervisor = user?.role === 'supervisor' || user?.role === 'gerencia'
   // Modo temporal de programación libre (lo decide el backend y viaja en la
@@ -540,6 +564,25 @@ export default function ProgramadorPage() {
 
   return (
     <div className="p-3 sm:p-4">
+      {caso?.ausencia && (
+        <div className="bg-amber-50 border border-amber-300 rounded-lg px-3 py-2.5 mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="text-xs text-amber-900 min-w-0">
+            🔀 Estás moviendo la agenda de <strong>{caso.ausencia.resource?.name}</strong>
+            {caso.ausencia.dias?.length ? <> · ausente el <strong>{caso.ausencia.dias.join(', ')}</strong></> : null}
+            {caso.ausencia.patients_affected ? <> · <strong>{caso.ausencia.patients_affected} pacientes</strong> por reubicar</> : null}
+            <div className="text-amber-700 mt-0.5">
+              Cambia de sede arriba para ver dónde hay espacio. Las casillas rojas son sus franjas caídas.
+            </div>
+          </div>
+          <button
+            className="btn text-xs flex-shrink-0"
+            onClick={() => navegar(`/app/reemplazo/${caso.ausencia.id}`)}
+          >
+            ← Volver al caso
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
         <div>
