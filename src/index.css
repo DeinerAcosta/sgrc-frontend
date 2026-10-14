@@ -79,16 +79,17 @@
   /* Oct-2026 · El dia en que el recurso esta ausente. Rojo y borde solido:
      es lo unico de la grilla que exige una decision, no un estado mas. */
   .slot-ausente   { @apply rounded p-1.5 mb-1 bg-red-50 border-2 border-red-400 cursor-pointer hover:opacity-80 transition-opacity; }
-  /* La asignacion que CUBRE una ausencia: mismo tamaño que las demas, color
-     indigo para distinguirla. La superposicion NO vive aqui — la pone
-     .slot-apilada, que aplica a cualquier casilla que caiga sobre otra. */
+  /* Un turno que cubre una ausencia pero cae en OTRO dia: un traslado de
+     agenda. Indigo para distinguirlo, suelto y del mismo tamaño que los demas.
+     Cuando el que cubre esta el MISMO dia que el ausente no se usa esta clase:
+     los dos van juntos en una casilla partida en dos (ver SchedulerPage). */
   .slot-reemplazo { @apply rounded p-1.5 mb-1 bg-indigo-50 border-2 border-indigo-400 cursor-pointer hover:opacity-80 transition-opacity; }
-  /* Toda casilla que no es la primera de su celda se monta sobre la anterior,
-     como las tarjetas de una billetera: el margen negativo la solapa, el
-     desplazamiento lateral deja ver el borde de la de abajo asomando, y la
-     sombra las separa en profundidad. Se lee de un vistazo que hay dos
-     medicos en el mismo consultorio sin leer una palabra. */
-  .slot-apilada { @apply -mt-3 ml-2 relative shadow-md; }
+  /* Oct-2026 · Hubo una .slot-apilada que montaba TODA casilla sobre la
+     anterior. Estuvo mal: dos turnos normales del mismo consultorio son dos
+     cosas independientes y se leen mejor separadas, como en produccion. La
+     superposicion solo tiene sentido entre una ausencia y quien la cubre, y
+     para ese caso hay algo mejor: una sola casilla partida en dos (ver
+     .slot-par en SchedulerPage). */
   .slot-empty  { @apply rounded p-2 border border-dashed border-gray-200 text-center cursor-pointer hover:border-brand-400 hover:bg-blue-50 transition-colors; }
 
   .semaforo-g { @apply inline-block w-2.5 h-2.5 rounded-full bg-green-500; }
