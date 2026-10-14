@@ -577,7 +577,11 @@ export default function ProgramadorPage() {
         <div className="bg-amber-50 border border-amber-300 rounded-lg px-3 py-2.5 mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="text-xs text-amber-900 min-w-0">
             🔀 Estás moviendo la agenda de <strong>{caso.ausencia.resource?.name}</strong>
-            {caso.ausencia.dias?.length ? <> · ausente el <strong>{caso.ausencia.dias.join(', ')}</strong></> : null}
+            {caso.ausencia.fechas?.length ? (
+              <> · ausente el <strong>{caso.ausencia.fechas
+                .map((f) => format(parseFechaLocal(f), "EEEE d 'de' MMMM", { locale: es }))
+                .join(' · ')}</strong></>
+            ) : caso.ausencia.dias?.length ? <> · ausente el <strong>{caso.ausencia.dias.join(', ')}</strong></> : null}
             {caso.ausencia.patients_affected ? <> · <strong>{caso.ausencia.patients_affected} pacientes</strong> por reubicar</> : null}
             <div className="text-amber-700 mt-0.5">
               Cambia de sede arriba para ver dónde hay espacio. Las casillas rojas son sus franjas caídas.

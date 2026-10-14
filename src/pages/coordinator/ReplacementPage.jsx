@@ -282,7 +282,14 @@ function CabeceraAusencia({ ausencia, semana }) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4 text-xs">
             <Dato label="Fechas" valor={rangoFechas(ausencia)} />
-            <Dato label="Días que cubre" valor={(ausencia.dias ?? []).join(', ') || '—'} />
+            <Dato
+              label="Días que cubre"
+              valor={
+                ausencia.fechas?.length
+                  ? ausencia.fechas.map((f) => format(parseFechaLocal(f), "EEEE d 'de' MMM", { locale: es })).join(' · ')
+                  : (ausencia.dias ?? []).join(', ') || '—'
+              }
+            />
             <Dato label="Motivo" valor={ausencia.motivo_catalogo ?? ausencia.type ?? '—'} />
             <Dato
               label="Pacientes impactados"
