@@ -23,7 +23,7 @@ const REQUIEREN_ANTICIPACION = ['academico', 'vacaciones']
 // Sep-2026: se retiró el prop `esquemaPago`. Solo alimentaba el filtro que
 // escondía las licencias a quien no fuera de salario fijo, y las licencias ya no
 // se le ofrecen al profesional.
-export default function AusenciaFormModal({ recursoId, tipoRecurso, onClose, horarioSemana = [] }) {
+export default function AusenciaFormModal({ recursoId, onClose, horarioSemana = [] }) {
     const qc = useQueryClient()
   // motivoId = del catálogo dinámico; tipo = el enum legacy (se setea automáticamente).
   const [form, setForm] = useState({

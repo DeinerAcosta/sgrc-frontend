@@ -9,7 +9,6 @@ import { TIPOS_AUSENCIA, formatCOP, parseFechaLocal, GRUPOS_AUSENCIAS, tiposSinG
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import RegistrarAusenciaCoordModal from '@/pages/coordinator/CoordLogAbsenceModal'
-import RegistrarReposicionModal from '@/pages/resource/LogMakeupModal'
 import { useSedeActiva } from '@/hooks/useActiveSite'
 
 const TIPO_LABEL = Object.fromEntries(TIPOS_AUSENCIA.map((t) => [t.value, t.label]))
@@ -29,7 +28,6 @@ export default function AusenciasCoordPage() {
   // Si la ausencia confirmada trae desea_reponer=true,
   // abrimos automáticamente el modal de proponer reposición (Fase 3) con la
   // ausencia preseleccionada para no obligar al coord a ir a otro sitio.
-  const [autoReposicion, setAutoReposicion] = useState(null)
   // Grupo de personal elegido. Vive en la URL (?grupo=auxiliares) y no en
   // estado interno, para que el menú lateral pueda enlazar directo a cada uno
   // y para que la pantalla se pueda compartir o recargar sin perderse.
@@ -112,6 +110,14 @@ export default function AusenciasCoordPage() {
     onError: (err) => toast.error(err?.message ?? 'Error al confirmar'),
   })
 
+  // Oct-2026 · SIN USO POR AHORA, y a proposito. Al quitar "No procede" del
+  // modal de gestion (decision de Hector: la persona ya falto, preguntarlo
+  // invitaba a cerrar el caso de un clic) esta quedo sin boton que la llame, y
+  // es la UNICA forma de rechazar una ausencia en toda la app. O sea que hoy
+  // una ausencia registrada por error no se puede deshacer.
+  // No se borra hasta que se decida donde vive esa salida — si es que debe
+  // existir. Ver PROYECTOS-3398 §6.1.
+  // eslint-disable-next-line no-unused-vars
   const { mutate: rechazar, isPending: rechazando } = useMutation({
     mutationFn: ({ id, reason: motivo }) => ausenciaService.rechazar(id, motivo),
     onSuccess: () => {
@@ -376,14 +382,6 @@ export default function AusenciasCoordPage() {
         <RegistrarAusenciaCoordModal
           sedeId={sedeId}
           onClose={() => setShowRegistrar(false)}
-          onCreated={(creada) => setAutoReposicion(creada)}
-        />
-      )}
-
-      {autoReposicion && (
-        <RegistrarReposicionModal
-          ausencia={autoReposicion}
-          onClose={() => setAutoReposicion(null)}
         />
       )}
 
