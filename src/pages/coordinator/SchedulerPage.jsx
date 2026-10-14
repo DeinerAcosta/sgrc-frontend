@@ -649,8 +649,8 @@ export default function ProgramadorPage() {
                 const salir = await confirm({
                   title: `Quedan ${caso.cuenta.pacientes_pendientes} pacientes sin reubicar`,
                   message: 'Todavía no tienen dónde ir. Podés volver al caso y seguir después, pero el caso sigue abierto.',
-                  confirmLabel: 'Volver al caso igual',
-                  cancelLabel: 'Seguir aquí',
+                  confirmLabel: 'Continuar Reprogramación',
+                  cancelLabel: 'Permanecer Aquí',
                 })
                 if (!salir) return
               }
@@ -1103,8 +1103,8 @@ export default function ProgramadorPage() {
                                 const encima = await confirm({
                                   title: `Esta casilla ya tiene a ${a.resource?.name}`,
                                   message: `¿Asignás a ${caso.ausencia.resource?.name} SOBRE esta casilla, o editás la que ya está?`,
-                                  confirmLabel: 'Asignar encima',
-                                  cancelLabel: 'Editar la existente',
+                                  confirmLabel: 'Asignar Reprogramación',
+                                  cancelLabel: 'Editar Existente',
                                 })
                                 if (encima) {
                                   setModalData({
