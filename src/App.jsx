@@ -123,11 +123,19 @@ export default function App() {
           {/* COORDINADOR */}
           <Route path="dashboard-coord" element={<RequireAuth roles={['coordinador', 'supervisor']}><DashboardCoordPage /></RequireAuth>} />
           <Route path="programador" element={<RequireAuth roles={['coordinador', 'supervisor', 'gerencia', 'reprogramador']}><ProgramadorPage /></RequireAuth>} />
-          <Route path="ausencias-coord" element={<RequireAuth roles={['coordinador', 'reprogramador']}><AusenciasCoordPage /></RequireAuth>} />
+          {/* Oct-2026 · Faltaban gerencia y supervisor. Gerencia tiene "Gestión
+              de ausencias" en su menú (nav.js) pero la ruta la rebotaba — el
+              mismo caso que /app/programador. Y supervisor ya entraba a
+              /reemplazo y al cronograma del mismo módulo, así que bloquear solo
+              esta pantalla dejaba sin destino al botón "Volver a Gestión de
+              ausencias" para los dos. */}
+          <Route path="ausencias-coord" element={<RequireAuth roles={['coordinador', 'supervisor', 'gerencia', 'reprogramador']}><AusenciasCoordPage /></RequireAuth>} />
           {/* Oct-2026 · La pantalla completa de reemplazo. Reemplaza al modal
               "Buscar reemplazo", que solo sabia de una franja. */}
           <Route path="reemplazo/:ausenciaId" element={<RequireAuth roles={['coordinador', 'supervisor', 'gerencia', 'reprogramador']}><ReemplazoPage /></RequireAuth>} />
-          <Route path="ausencias-cronograma" element={<RequireAuth roles={['coordinador', 'supervisor', 'reprogramador']}><AusenciasCronogramaPage /></RequireAuth>} />
+          {/* Igual que la de arriba: el Cronograma cuelga de "Gestión de
+              ausencias" en el menú, así que gerencia también lo ve enlazado. */}
+          <Route path="ausencias-cronograma" element={<RequireAuth roles={['coordinador', 'supervisor', 'gerencia', 'reprogramador']}><AusenciasCronogramaPage /></RequireAuth>} />
           <Route path="ejecucion" element={<RequireAuth roles={['coordinador', 'supervisor']}><EjecucionPage /></RequireAuth>} />
           <Route path="recursos-coord" element={<RequireAuth roles={['coordinador', 'supervisor']}><RecursosCoordPage /></RequireAuth>} />
           <Route path="backoffice-coord" element={<RequireAuth roles={['coordinador']}><BackofficeCoordPage /></RequireAuth>} />

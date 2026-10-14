@@ -7,7 +7,8 @@ import toast from 'react-hot-toast'
 import { ausenciaService, recursoService, asignacionService, usuarioService } from '@/services/api'
 import { useAuthStore } from '@/store/authStore'
 import { Avatar, Spinner, EmptyState, Badge } from '@/components/ui'
-import { TIPOS_RECURSO, parseFechaLocal } from '@/utils/helpers'
+import { GRUPOS_AUSENCIAS, TIPOS_RECURSO, parseFechaLocal } from '@/utils/helpers'
+import { RAIZ_AUSENCIAS } from '@/config/nav'
 
 /**
  * PANTALLA DE REEMPLAZO (oct-2026)
@@ -57,13 +58,24 @@ export default function ReemplazoPage() {
 
   const { ausencia, semana, franjas, cuenta } = data
 
+  // VOLVER A GESTIÓN DE AUSENCIAS, NO A LA PÁGINA ANTERIOR.
+  // Antes era navigate(-1), o sea "atrás en el historial". A esta pantalla se
+  // llega desde Gestión de ausencias, pero también desde el Programador cuando
+  // se vuelve de mover una agenda — y ahí "atrás" devolvía al Programador, que
+  // es de donde la persona acababa de salir. Se vuelve al sitio del que SALIÓ
+  // el caso, con su grupo y la ausencia ya seleccionada.
+  const grupoDeLaAusencia =
+    GRUPOS_AUSENCIAS.find((g) => g.tipos.includes(ausencia.resource?.type))?.key ?? 'profesionales'
+  const volverAGestion = () =>
+    navigate(`${RAIZ_AUSENCIAS}?grupo=${grupoDeLaAusencia}&selected=${ausencia.id}`)
+
   return (
     <div className="p-3 sm:p-4 max-w-5xl mx-auto">
       <button
-        onClick={() => navigate(-1)}
+        onClick={volverAGestion}
         className="text-xs text-gray-500 hover:text-brand-600 mb-3"
       >
-        ← Volver
+        ← Volver a Gestión de ausencias
       </button>
 
       <CabeceraAusencia ausencia={ausencia} semana={semana} />
