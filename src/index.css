@@ -70,26 +70,30 @@
     @apply block text-xs font-medium text-gray-500 mb-1;
   }
 
+  /* ---- LAS CASILLAS DEL PROGRAMADOR ----
+     Tres colores y uno solo por casilla:
+       VERDE  asignacion normal del coordinador
+       AZUL   reprogramacion (nace de una ausencia)
+       ROJO   el profesional esta ausente ese dia
+     El color es lo UNICO que dice el estado: dentro no va ninguna etiqueta.
+
+     Y todas miden igual. La altura es fija y lo que no entra se recorta; al
+     pasar el mouse la casilla crece y muestra el resto. Antes cada una crecia
+     con su contenido y la cuadricula quedaba despareja. */
+  .slot-base    { @apply rounded px-1.5 py-1 mb-1 border-2 h-[66px] overflow-hidden cursor-pointer transition-all hover:h-auto hover:overflow-visible hover:shadow-lg hover:z-20 relative; }
+  .slot-normal  { @apply bg-emerald-50 border-emerald-300; }
+  .slot-repro   { @apply bg-blue-50    border-blue-400; }
+  .slot-ausente { @apply bg-red-50     border-red-400; }
+
+  /* Estas cinco son del horario del profesional (pages/resource/SchedulePage),
+     que sigue pintando por especialidad y ahi tiene sentido: es SU semana, no
+     una grilla donde comparar estados. El Programador ya no las usa. */
   .slot-teal   { @apply rounded p-1.5 mb-1 bg-teal-50   border border-teal-200   cursor-pointer hover:opacity-80 transition-opacity; }
   .slot-blue   { @apply rounded p-1.5 mb-1 bg-blue-50   border border-blue-200   cursor-pointer hover:opacity-80 transition-opacity; }
   .slot-purple { @apply rounded p-1.5 mb-1 bg-purple-50 border border-purple-200 cursor-pointer hover:opacity-80 transition-opacity; }
   .slot-amber  { @apply rounded p-1.5 mb-1 bg-amber-50  border border-amber-300  cursor-pointer hover:opacity-80 transition-opacity; }
   .slot-orange { @apply rounded p-1.5 mb-1 bg-orange-50 border border-orange-200 cursor-pointer hover:opacity-80 transition-opacity; }
   .slot-pink   { @apply rounded p-1.5 mb-1 bg-pink-50   border border-pink-200   cursor-pointer hover:opacity-80 transition-opacity; }
-  /* Oct-2026 · El dia en que el recurso esta ausente. Rojo y borde solido:
-     es lo unico de la grilla que exige una decision, no un estado mas. */
-  .slot-ausente   { @apply rounded p-1.5 mb-1 bg-red-50 border-2 border-red-400 cursor-pointer hover:opacity-80 transition-opacity; }
-  /* Un turno que cubre una ausencia pero cae en OTRO dia: un traslado de
-     agenda. Indigo para distinguirlo, suelto y del mismo tamaño que los demas.
-     Cuando el que cubre esta el MISMO dia que el ausente no se usa esta clase:
-     los dos van juntos en una casilla partida en dos (ver SchedulerPage). */
-  .slot-reemplazo { @apply rounded p-1.5 mb-1 bg-indigo-50 border-2 border-indigo-400 cursor-pointer hover:opacity-80 transition-opacity; }
-  /* Oct-2026 · Hubo una .slot-apilada que montaba TODA casilla sobre la
-     anterior. Estuvo mal: dos turnos normales del mismo consultorio son dos
-     cosas independientes y se leen mejor separadas, como en produccion. La
-     superposicion solo tiene sentido entre una ausencia y quien la cubre, y
-     para ese caso hay algo mejor: una sola casilla partida en dos (ver
-     .slot-par en SchedulerPage). */
   /* La casilla de reprogramacion que cae SOBRE otra de la misma celda. Se
      monta encima con el margen negativo y se despega con la sombra, pero mide
      LO MISMO que todas: el corrimiento lateral que tenia antes le comia ancho

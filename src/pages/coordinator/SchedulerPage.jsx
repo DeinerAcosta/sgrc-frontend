@@ -14,15 +14,12 @@ import AsignarBackofficeModal from '@/pages/coordinator/AssignBackofficeModal'
 import AvisoAusentesSemanaAnterior from '@/pages/coordinator/PreviousAbsencesModal'
 import { useConfirm } from '@/contexts/ConfirmContext'
 
-const SLOT_COLOR = {
-  oftalmologo:   'slot-teal',
-  anestesiologo: 'slot-blue',
-  optometra:     'slot-purple',
-  assistant:      'slot-teal',
-  tecnico:       'slot-blue',
-  otorrino:      'slot-orange',
-  fonoaudiologa: 'slot-pink',
-}
+// Oct-2026 · Aquí vivía SLOT_COLOR, que pintaba cada casilla según el TIPO de
+// recurso (teal oftalmólogo, morado optómetra, naranja otorrino…). Se eliminó:
+// ese color competía con el del estado y no dejaba leer de un vistazo lo único
+// que importa en la grilla. El tipo ya se sabe por el consultorio, que está en
+// la fila. Ahora son tres colores y significan estado, no especialidad:
+//   VERDE asignación normal · AZUL reprogramación · ROJO ausente
 
 // Áreas/especialidades disponibles para filtrar consultorios en la grilla
 // Devuelve "Primer Nombre + Primer Apellido" para mostrar en celdas estrechas.
@@ -957,68 +954,29 @@ export default function ProgramadorPage() {
                   </td>
                   {DIAS.map((dia) => {
                     const asigs = asigDeConsultorioDia(cons.id, dia)
-                    // Emparejar cada ausente con quien lo cubre EN ESTA MISMA
-                    // celda: van juntos en una casilla partida en dos. Un
-                    // reemplazo sin pareja aquí es un traslado desde otro día,
-                    // y ese se pinta suelto con su propia etiqueta.
-                    const cubreA = new Map()
-                    for (const r of asigs) {
-                      if (r.covered_absence_id) cubreA.set(r.covered_absence_id, r)
-                    }
-                    const emparejados = new Set()
-                    for (const x of asigs) {
-                      const au = ausenciasPorRecursoDia.get(x.resource?.id + '|' + dia)
-                      if (au && cubreA.has(au.id)) emparejados.add(cubreA.get(au.id).id)
-                    }
                     return (
                       <td key={dia} className="p-1 align-top border-r border-gray-50 min-h-12">
                         {asigs.map((a, idx) => {
-                          // ¿Este recurso esta ausente ESTE dia? Si lo esta, su
-                          // casilla manda: el color del tipo deja de importar.
                           const ausente = ausenciasPorRecursoDia.get(a.resource?.id + '|' + dia)
                           const esReemplazo = !!a.covered_absence_id
-                          // Ya se pinta dentro de la casilla partida de su pareja.
-                          if (emparejados.has(a.id)) return null
-                          const cubridor = ausente ? cubreA.get(ausente.id) : null
 
-                          // CASILLA PARTIDA EN DOS: arriba quien faltó, abajo
-                          // quien lo cubre. Un solo bloque, dos colores: se
-                          // entiende sin leer.
-                          if (cubridor) {
-                            return (
-                              <div key={a.id} data-asig-id={a.id} className="rounded mb-1 border-2 border-indigo-400 overflow-hidden shadow-sm">
-                                <div
-                                  className={`bg-red-50 px-1.5 py-1 border-b-2 border-indigo-300 ${canEdit ? 'cursor-pointer hover:opacity-80' : ''}`}
-                                  title={`${a.resource?.name} · ${a.start_time}–${a.end_time}\n⛔ AUSENTE — ${ausente.motivo_catalogo ?? ausente.type}`}
-                                  onClick={() => canEdit && setModalData({ roomId: cons.id, room: cons, day: dia, weekId: semanaActual.id, assignment: a })}
-                                >
-                                  <div className="font-medium text-[11px] text-red-900 line-through leading-tight truncate">{nombreCorto(a.resource?.name)}</div>
-                                  <div className="text-[10px] text-red-700 font-semibold leading-tight">
-                                    ⛔ AUSENTE{ausente.status === 'pendiente' ? ' (sin confirmar)' : ''} · {a.start_time}–{a.end_time}
-                                  </div>
-                                </div>
-                                <div
-                                  className={`bg-indigo-50 px-1.5 py-1 ${canEdit ? 'cursor-pointer hover:opacity-80' : ''}`}
-                                  title={`${cubridor.resource?.name} · ${cubridor.start_time}–${cubridor.end_time}\n🔄 Cubre la ausencia de ${a.resource?.name}`}
-                                  onClick={() => canEdit && setModalData({ roomId: cons.id, room: cons, day: dia, weekId: semanaActual.id, assignment: cubridor })}
-                                >
-                                  <div className="font-medium text-[11px] text-indigo-900 leading-tight truncate">{nombreCorto(cubridor.resource?.name)}</div>
-                                  <div className="text-[10px] text-indigo-700 font-semibold leading-tight">
-                                    🔄 LO CUBRE · {cubridor.start_time}–{cubridor.end_time}
-                                  </div>
-                                  {cubridor.patient_capacity != null && (
-                                    <div className="text-[10px] text-indigo-600 leading-tight">{cubridor.patient_capacity} pac.</div>
-                                  )}
-                                </div>
-                              </div>
-                            )
-                          }
+                          // Hubo aquí una "casilla partida en dos" que juntaba al
+                          // ausente y a quien lo cubría en un solo bloque. Medía
+                          // el doble que las demás y por eso se fue: todas las
+                          // casillas miden igual. Siguen siendo dos, roja y azul,
+                          // con la azul montada sobre la roja.
 
+                          // TRES COLORES Y NINGUNO MÁS. El color por tipo de
+                          // recurso (teal/azul/morado/naranja/rosa) competía con
+                          // el de estado y no dejaba leer lo único que importa de
+                          // un vistazo; el tipo ya se sabe por el consultorio, que
+                          // está en la fila. Rojo manda sobre azul: si la persona
+                          // faltó, da igual de dónde salió ese turno.
                           const claseSlot = ausente
                             ? 'slot-ausente'
                             : esReemplazo
-                              ? 'slot-reemplazo'
-                              : (SLOT_COLOR[a.resource?.type] ?? 'slot-teal')
+                              ? 'slot-repro'
+                              : 'slot-normal'
                           // Solo la reprogramación que cae sobre otra casilla de
                           // la misma celda se monta encima. Lo demás, separado.
                           const seMontaEncima = esReemplazo && idx > 0
@@ -1027,7 +985,7 @@ export default function ProgramadorPage() {
                           <div
                             key={a.id}
                             data-asig-id={a.id}
-                            className={`${claseSlot} ${seMontaEncima ? 'slot-encima' : ''} group relative ${canEdit ? '' : 'cursor-default'} ${
+                            className={`slot-base ${claseSlot} ${seMontaEncima ? 'slot-encima' : ''} group ${canEdit ? '' : 'cursor-default'} ${
                               asigResaltada === a.id
                                 ? 'ring-2 ring-brand-500 ring-offset-1 shadow-md animate-pulse'
                                 : (!ausente && recursosQueFaltaron.has(a.resource?.id))
@@ -1039,23 +997,6 @@ export default function ProgramadorPage() {
                                   ? 'ring-2 ring-amber-400 ring-offset-1'
                                   : ''
                             }`}
-                            title={[
-                              `${a.resource?.name} · ${a.start_time}–${a.end_time}`,
-                              a.assistant ? `Aux 1: ${a.assistant.name}` : null,
-                              a.assistant2 ? `Aux 2: ${a.assistant2.name}` : null,
-                              // PROYECTOS-3255 #2.1: asesores no muestran capacidad de pacientes.
-                              a.resource?.type !== 'asesor_servicios' ? `Capacidad: ${a.patient_capacity} pacientes` : null,
-                              ausente
-                                ? `⛔ AUSENTE este día — ${ausente.motivo_catalogo ?? ausente.type}${ausente.motivo_texto ? ': ' + ausente.motivo_texto : ''}${ausente.status === 'pendiente' ? ' (sin confirmar)' : ''}${ausente.patients_affected ? ' · ' + ausente.patients_affected + ' pacientes afectados' : ''}`
-                                : null,
-                              esReemplazo
-                                ? `🔄 REPROGRAMACIÓN${ausenciaQueCubre ? ` — son los pacientes de ${ausenciaQueCubre.resource?.name}, ausente ese día` : ' — cubre una ausencia'}${seMontaEncima ? '. Se suma al turno propio de esta persona.' : ''}`
-                                : null,
-                              !ausente && recursosQueFaltaron.has(a.resource?.id)
-                                ? '🔶 Faltó la semana anterior — revisa si repone aquí'
-                                : null,
-                              canEdit ? '👆 Click para editar' : null,
-                            ].filter(Boolean).join('\n')}
                             onClick={async () => {
                               if (!canEdit) return
                               // Viniendo de un caso, la casilla ocupada tiene dos
@@ -1088,36 +1029,22 @@ export default function ProgramadorPage() {
                               })
                             }}
                           >
-                            <div className={`font-medium text-xs leading-tight truncate ${ausente ? 'text-red-900 line-through' : esReemplazo ? 'text-indigo-900' : 'text-teal-900'}`} title={a.resource?.name}>{nombreCorto(a.resource?.name)}</div>
-                            {ausente && (
-                              <div className="text-red-700 text-[10px] font-semibold leading-tight">
-                                ⛔ AUSENTE{ausente.status === 'pendiente' ? ' (sin confirmar)' : ''}
-                                <div className="font-normal truncate" title={ausente.motivo_catalogo ?? ausente.type}>
-                                  {ausente.motivo_catalogo ?? ausente.type}
-                                </div>
-                              </div>
-                            )}
-                            {esReemplazo && (
-                              <div className="text-indigo-700 text-[10px] font-semibold leading-tight">
-                                🔄 REPROGRAMACIÓN
-                                {ausenciaQueCubre && (
-                                  <div className="font-normal truncate" title={`Pacientes de ${ausenciaQueCubre.resource?.name}`}>
-                                    pac. de {nombreCorto(ausenciaQueCubre.resource?.name)}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            <div className="text-teal-700 text-xs">{a.start_time}–{a.end_time}</div>
-                            {a.assistant && (
-                              <div className="text-teal-600 text-xs truncate" title={`Aux 1: ${a.assistant?.name}`}>
-                                Aux: {nombreCorto(a.assistant?.name)}
-                              </div>
-                            )}
-                            {a.assistant2 && (
-                              <div className="text-teal-600 text-xs truncate" title={`Aux 2: ${a.assistant2?.name}`}>
-                                Aux2: {nombreCorto(a.assistant2?.name)}
-                              </div>
-                            )}
+                            {/* Las MISMAS cuatro líneas en todas las casillas,
+                                pase lo que pase. El estado lo dice el color del
+                                fondo, no el texto: con etiquetas dentro, cada
+                                casilla crecía distinto y la cuadrícula quedaba
+                                despareja. Las líneas sin dato van con un espacio
+                                duro para que la altura no dependa del contenido. */}
+                            <div className="font-medium text-xs leading-tight truncate text-gray-900" title={a.resource?.name}>
+                              {nombreCorto(a.resource?.name)}
+                            </div>
+                            <div className="text-xs leading-tight text-gray-700">{a.start_time}–{a.end_time}</div>
+                            <div className="text-xs leading-tight text-gray-600 truncate">
+                              {a.assistant ? `Aux: ${nombreCorto(a.assistant.name)}` : ' '}
+                            </div>
+                            <div className="text-xs leading-tight text-gray-600">
+                              {a.resource?.type !== 'asesor_servicios' ? `${a.patient_capacity} pac.` : ' '}
+                            </div>
 
                             {/* EL DETALLE, AL PASAR EL MOUSE.
                                 La casilla se mantiene chica y pareja con el resto;
@@ -1235,19 +1162,23 @@ export default function ProgramadorPage() {
         </div>
       )}
 
-      {/* Leyenda */}
-      <div className="flex gap-4 mt-3 flex-wrap">
-        {[
-          { cls: 'slot-teal',   label: 'Oftalmología / técnico' },
-          { cls: 'slot-blue',   label: 'Anestesiología' },
-          { cls: 'slot-purple', label: 'Optometría' },
-          { cls: 'slot-amber',  label: 'Alerta / sin cubrir' },
-        ].map((l) => (
-          <div key={l.cls} className="flex items-center gap-1.5">
-            <span className={`w-3 h-3 rounded ${l.cls.replace('slot-', 'bg-').replace('teal','teal-100').replace('blue','blue-100').replace('purple','purple-100').replace('amber','amber-100')} border`} />
-            <span className="text-xs text-gray-500">{l.label}</span>
-          </div>
-        ))}
+      {/* Leyenda: tres colores, tres estados. Nada más. */}
+      <div className="mt-3 space-y-1">
+        <div className="flex gap-4 flex-wrap">
+          {[
+            { bg: 'bg-emerald-50 border-emerald-300', label: 'Asignación normal' },
+            { bg: 'bg-blue-50 border-blue-400',       label: 'Reprogramación' },
+            { bg: 'bg-red-50 border-red-400',         label: 'Ausente' },
+          ].map((l) => (
+            <div key={l.label} className="flex items-center gap-1.5">
+              <span className={`w-3 h-3 rounded border-2 ${l.bg}`} />
+              <span className="text-xs text-gray-500">{l.label}</span>
+            </div>
+          ))}
+        </div>
+        <div className="text-[11px] text-gray-400">
+          Pasa el mouse por una casilla para ver el detalle completo.
+        </div>
       </div>
 
       {pickerServicio && (
