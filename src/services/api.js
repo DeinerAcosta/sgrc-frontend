@@ -365,6 +365,12 @@ export const semanaService = {
     if (!DEMO_MODE) return api.get(`/weeks/${id}/previous-absences`, { params: sedeId ? { site_id: sedeId } : {} })
     return ok({ semana_anterior: null, semana_destino: null, ausentes: [], recursos_pendientes: [] })
   },
+  /** Las ausencias que caen DENTRO de esta semana, con el dia exacto y el
+   *  reemplazo si ya se cargo. Alimenta el rojo de la casilla en el Programador. */
+  ausenciasDeLaSemana: async (id, { siteId: sedeId } = {}) => {
+    if (!DEMO_MODE) return api.get(`/weeks/${id}/absences`, { params: sedeId ? { site_id: sedeId } : {} })
+    return ok({ ausencias: [] })
+  },
 }
 
 // ============ ASIGNACIONES ============

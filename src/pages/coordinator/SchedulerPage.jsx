@@ -234,7 +234,29 @@ export default function ProgramadorPage() {
     enabled: !!semanaActual,
     staleTime: 60_000,
   })
+  // ===== AUSENCIAS DE ESTA MISMA SEMANA =====
+  // El gemelo hacia adentro de la consulta de arriba: aquella avisa de quien
+  // falto la semana PASADA y hay que reprogramar; esta dice quien esta ausente
+  // AHORA y en que dia, que es lo que tiñe la casilla de rojo.
+  const { data: ausenciasSemana } = useQuery({
+    queryKey: ['ausencias-de-la-semana', semanaActual?.id, sedeId],
+    queryFn: () => semanaService.ausenciasDeLaSemana(semanaActual.id, { siteId: sedeId || undefined }),
+    enabled: !!semanaActual,
+    staleTime: 60_000,
+  })
+
   const [verAvisoAusentes, setVerAvisoAusentes] = useState(false)
+  // Mapa "recursoId|dia" -> ausencia. Se indexa por DIA y no solo por recurso
+  // porque una ausencia de martes a jueves no debe teñir el lunes: aqui el dato
+  // ES el dia. Se memoiza porque la grilla se repinta cientos de veces.
+  const ausenciasPorRecursoDia = useMemo(() => {
+    const m = new Map()
+    for (const a of ausenciasSemana?.ausencias ?? []) {
+      for (const dia of a.dias ?? []) m.set(a.resource?.id + '|' + dia, a)
+    }
+    return m
+  }, [ausenciasSemana])
+
   // Se memoiza sobre `ausentesPrev`, no sobre la lista derivada: `?? []` crea un
   // array nuevo en cada render y eso recalculaba el Set en cada pintada de la
   // grilla, que es lo único de esta pantalla que se pinta cientos de veces.
@@ -854,14 +876,24 @@ export default function ProgramadorPage() {
                     const asigs = asigDeConsultorioDia(cons.id, dia)
                     return (
                       <td key={dia} className="p-1 align-top border-r border-gray-50 min-h-12">
-                        {asigs.map((a) => (
+                        {asigs.map((a) => {
+                          // ¿Este recurso esta ausente ESTE dia? Si lo esta, su
+                          // casilla manda: el color del tipo deja de importar.
+                          const ausente = ausenciasPorRecursoDia.get(a.resource?.id + '|' + dia)
+                          const esReemplazo = !!a.covered_absence_id
+                          const claseSlot = ausente
+                            ? 'slot-ausente'
+                            : esReemplazo
+                              ? 'slot-reemplazo'
+                              : (SLOT_COLOR[a.resource?.type] ?? 'slot-teal')
+                          return (
                           <div
                             key={a.id}
                             data-asig-id={a.id}
-                            className={`${SLOT_COLOR[a.resource?.type] ?? 'slot-teal'} group relative ${canEdit ? '' : 'cursor-default'} ${
+                            className={`${claseSlot} group relative ${canEdit ? '' : 'cursor-default'} ${
                               asigResaltada === a.id
                                 ? 'ring-2 ring-brand-500 ring-offset-1 shadow-md animate-pulse'
-                                : recursosQueFaltaron.has(a.resource?.id)
+                                : (!ausente && recursosQueFaltaron.has(a.resource?.id))
                                   /* §7 · Faltó la semana pasada: el borde ámbar
                                      marca la casilla que hay que revisar. El
                                      resaltado de la búsqueda tiene prioridad —
@@ -876,7 +908,11 @@ export default function ProgramadorPage() {
                               a.assistant2 ? `Aux 2: ${a.assistant2.name}` : null,
                               // PROYECTOS-3255 #2.1: asesores no muestran capacidad de pacientes.
                               a.resource?.type !== 'asesor_servicios' ? `Capacidad: ${a.patient_capacity} pacientes` : null,
-                              recursosQueFaltaron.has(a.resource?.id)
+                              ausente
+                                ? `⛔ AUSENTE este día — ${ausente.motivo_catalogo ?? ausente.type}${ausente.motivo_texto ? ': ' + ausente.motivo_texto : ''}${ausente.status === 'pendiente' ? ' (sin confirmar)' : ''}${ausente.patients_affected ? ' · ' + ausente.patients_affected + ' pacientes afectados' : ''}`
+                                : null,
+                              esReemplazo ? '🔄 Esta asignación cubre una ausencia' : null,
+                              !ausente && recursosQueFaltaron.has(a.resource?.id)
                                 ? '🔶 Faltó la semana anterior — revisa si repone aquí'
                                 : null,
                               canEdit ? '👆 Click para editar' : null,
@@ -889,7 +925,18 @@ export default function ProgramadorPage() {
                               assignment: a,
                             })}
                           >
-                            <div className="font-medium text-teal-900 text-xs leading-tight truncate" title={a.resource?.name}>{nombreCorto(a.resource?.name)}</div>
+                            <div className={`font-medium text-xs leading-tight truncate ${ausente ? 'text-red-900 line-through' : esReemplazo ? 'text-indigo-900' : 'text-teal-900'}`} title={a.resource?.name}>{nombreCorto(a.resource?.name)}</div>
+                            {ausente && (
+                              <div className="text-red-700 text-[10px] font-semibold leading-tight">
+                                ⛔ AUSENTE{ausente.status === 'pendiente' ? ' (sin confirmar)' : ''}
+                                <div className="font-normal truncate" title={ausente.motivo_catalogo ?? ausente.type}>
+                                  {ausente.motivo_catalogo ?? ausente.type}
+                                </div>
+                              </div>
+                            )}
+                            {esReemplazo && (
+                              <div className="text-indigo-700 text-[10px] font-semibold leading-tight">🔄 REEMPLAZO</div>
+                            )}
                             <div className="text-teal-700 text-xs">{a.start_time}–{a.end_time}</div>
                             {a.assistant && (
                               <div className="text-teal-600 text-xs truncate" title={`Aux 1: ${a.assistant?.name}`}>
@@ -931,7 +978,8 @@ export default function ProgramadorPage() {
                               >×</button>
                             )}
                           </div>
-                        ))}
+                          )
+                        })}
                         {/* Botón "Copiar este consultorio+día" cuando hay 2+ asignaciones
                             (útil para área asesores con varios al tiempo) */}
                         {canCopiar && asigs.length >= 2 && (

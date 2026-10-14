@@ -76,6 +76,12 @@
   .slot-amber  { @apply rounded p-1.5 mb-1 bg-amber-50  border border-amber-300  cursor-pointer hover:opacity-80 transition-opacity; }
   .slot-orange { @apply rounded p-1.5 mb-1 bg-orange-50 border border-orange-200 cursor-pointer hover:opacity-80 transition-opacity; }
   .slot-pink   { @apply rounded p-1.5 mb-1 bg-pink-50   border border-pink-200   cursor-pointer hover:opacity-80 transition-opacity; }
+  /* Oct-2026 · El dia en que el recurso esta ausente. Rojo y borde solido:
+     es lo unico de la grilla que exige una decision, no un estado mas. */
+  .slot-ausente   { @apply rounded p-1.5 mb-1 bg-red-50 border-2 border-red-400 cursor-pointer hover:opacity-80 transition-opacity; }
+  /* La asignacion que CUBRE una ausencia. Va apilada debajo de la roja, en
+     otro color, para que se lea "esta reemplaza a esta". */
+  .slot-reemplazo { @apply rounded p-1.5 mb-1 bg-indigo-50 border-2 border-indigo-400 border-dashed cursor-pointer hover:opacity-80 transition-opacity; }
   .slot-empty  { @apply rounded p-2 border border-dashed border-gray-200 text-center cursor-pointer hover:border-brand-400 hover:bg-blue-50 transition-colors; }
 
   .semaforo-g { @apply inline-block w-2.5 h-2.5 rounded-full bg-green-500; }
