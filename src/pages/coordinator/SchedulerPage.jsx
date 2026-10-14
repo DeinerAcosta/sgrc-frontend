@@ -470,6 +470,20 @@ export default function ProgramadorPage() {
     setSemanaBase(startOfWeek(parseFechaLocal(caso.semana.desde), { weekStartsOn: 1 }))
   }, [caso])
 
+  // TERMINÓ DE REPARTIR → DE VUELTA AL CASO, SOLO.
+  // "Ya distribuí a los pacientes, ¿por qué me sigue ahí? Cuando ya termine me
+  // debería mandar a la principal inmediatamente."
+  // El Programador es la herramienta, no el destino: una vez que todos los
+  // pacientes tienen dónde ir, lo que queda es cerrar el caso asignando quién
+  // los llama, y eso vive en la pantalla del caso.
+  const vueltaHecha = useRef(false)
+  useEffect(() => {
+    if (vueltaHecha.current || !caso?.cuenta?.resuelto || !caso?.ausencia?.id) return
+    vueltaHecha.current = true
+    toast.success(`Listo: los ${caso.cuenta.pacientes_impactados} pacientes quedaron reubicados.`)
+    navegar(`/app/reemplazo/${caso.ausencia.id}`)
+  }, [caso, navegar])
+
   const isCerrada = semanaActual?.status === 'cerrada'
   const isSupervisor = user?.role === 'supervisor' || user?.role === 'gerencia'
   // Modo temporal de programación libre (lo decide el backend y viaja en la
@@ -1283,7 +1297,15 @@ export default function ProgramadorPage() {
           asignacion={modalData.assignment}
           sedeId={sedeId}
           onClose={() => setModalData(null)}
-          onSaved={() => { qc.invalidateQueries({ queryKey: ['asignaciones'] }); setModalData(null) }}
+          onSaved={() => {
+            qc.invalidateQueries({ queryKey: ['asignaciones'] })
+            // El contador del caso se quedaba viejo: la grilla ya mostraba los
+            // turnos nuevos y el aviso seguía diciendo "faltan N". También las
+            // ausencias de la semana, que son las que pintan las casillas rojas.
+            qc.invalidateQueries({ queryKey: ['contexto-reemplazo'] })
+            qc.invalidateQueries({ queryKey: ['ausencias-de-la-semana'] })
+            setModalData(null)
+          }}
         />
       )}
 
