@@ -13,6 +13,26 @@ import { useSedeActiva } from '@/hooks/useActiveSite'
 
 const TIPO_LABEL = Object.fromEntries(TIPOS_AUSENCIA.map((t) => [t.value, t.label]))
 
+/**
+ * ¿Esta ausencia todavía necesita que alguien la gestione?
+ *
+ * No es lo mismo que "está pendiente". Son dos preguntas:
+ *   · `status`            ¿ocurrió la ausencia?       → pendiente | confirmada
+ *   · `reschedule_status` ¿ya se gestionó la agenda?  → null | asignada | resuelta
+ *
+ * Una ausencia CONFIRMADA con 33 pacientes sin reubicar es el caso más urgente
+ * que hay, y antes no aparecía como pendiente de nadie porque la pestaña solo
+ * miraba la primera pregunta.
+ *
+ * Queda fuera la rechazada (no ocurrió) y la que no dejó pacientes tirados: si
+ * nadie se quedó sin atender, no hay agenda que reubicar.
+ */
+const necesitaGestion = (a) => {
+  if (a.status === 'rechazada') return false
+  if (a.status === 'pendiente') return true
+  return (a.patients_affected ?? 0) > 0 && a.reschedule_status !== 'resuelta'
+}
+
 export default function AusenciasCoordPage() {
   const { user } = useAuthStore()
   const qc = useQueryClient()
@@ -60,8 +80,10 @@ export default function AusenciasCoordPage() {
   const sedeActual = sedes.find((s) => s.id === sedeId)
 
   const { data: ausencias = [], isLoading } = useQuery({
-    queryKey: ['ausencias-coord', sedeId, tab],
-    queryFn: () => ausenciaService.list({ site_id: sedeId, status: tab === 'pendientes' ? 'pendiente' : undefined }),
+    queryKey: ['ausencias-coord', sedeId],
+    // Sin filtro de estado en el servidor: "por gestionar" no es un estado de
+    // la ausencia, es el cruce de dos. Se filtra abajo con necesitaGestion.
+    queryFn: () => ausenciaService.list({ site_id: sedeId }),
     enabled: tab === 'pendientes' || tab === 'todas',
   })
 
@@ -136,7 +158,7 @@ export default function AusenciasCoordPage() {
     ? ausencias.filter((a) => grupo.tipos.includes(a.resource?.type))
     : ausencias
 
-  const pendientes = ausenciasGrupo.filter((a) => a.status === 'pendiente')
+  const pendientes = ausenciasGrupo.filter(necesitaGestion)
   const sel = ausenciasGrupo.find((a) => a.id === selected)
   const pag = usePaginacion(ausenciasGrupo, 10)
 
@@ -182,7 +204,7 @@ export default function AusenciasCoordPage() {
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
             {[
-              ['pendientes', `Pendientes (${pendientes.length})`],
+              ['pendientes', `Por gestionar (${pendientes.length})`],
               ['todas', 'Todas'],
               ['reposiciones', `Reposiciones${reposicionesPend.length ? ` (${reposicionesPend.length})` : ''}`],
             ].map(([k, label]) => (
@@ -266,6 +288,19 @@ export default function AusenciasCoordPage() {
                           <Badge variant={a.status === 'pendiente' ? 'amber' : a.status === 'confirmada' ? 'green' : 'red'}>
                             {a.status}
                           </Badge>
+                          {/* El segundo estado: el de la gestión. Sin esto, una
+                              confirmada y una confirmada-sin-reubicar se veían
+                              exactamente igual. */}
+                          {necesitaGestion(a) && a.status !== 'pendiente' && (
+                            <div className="mt-0.5">
+                              <Badge variant="amber">por gestionar</Badge>
+                            </div>
+                          )}
+                          {a.reschedule_status === 'resuelta' && (
+                            <div className="mt-0.5">
+                              <Badge variant="green">gestionada</Badge>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -427,7 +462,7 @@ function HubAusencias({ ausencias, cargando, Selector, onElegir, onRegistrar, ch
     const delGrupo = ausencias.filter((a) => tipos.includes(a.resource?.type))
     return {
       total: delGrupo.length,
-      pendientes: delGrupo.filter((a) => a.status === 'pendiente').length,
+      pendientes: delGrupo.filter(necesitaGestion).length,
     }
   }
   // Si alguien agrega un tipo de recurso y olvida meterlo en un grupo, sus
