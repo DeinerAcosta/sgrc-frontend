@@ -336,28 +336,20 @@ export default function AusenciasCoordPage() {
                 </div>
               )}
 
-              {/* PROYECTOS-3398 §6.1 · GESTIONAR reemplaza a Confirmar/Rechazar.
-                  Antes los dos botones estaban sueltos en el panel: el caso se
-                  resolvía con un clic y sin obligar a decidir nada más, así que
-                  quedaban colgados. En producción había 6 pendientes de hasta
-                  106 días — ausencias reales que ya ocurrieron y seguían sin
-                  revisar. Ahora se abre un paso explícito donde hay que elegir
-                  qué pasó con la agenda, no solo aceptar o negar. */}
-              {sel.status === 'pendiente' && (
-                <button
-                  className="btn-primary w-full justify-center"
-                  onClick={() => { setNotaConfirm(''); setGestionando(sel) }}
-                >
-                  ⚙️ GESTIONAR
-                </button>
-              )}
-
+              {/* Oct-2026 · UN SOLO BOTÓN.
+                  Antes eran dos: GESTIONAR abría un modal que preguntaba "¿qué
+                  pasó con su agenda?" y Buscar reemplazo llevaba a la pantalla.
+                  Decidirlo a ciegas en un modal, antes de ver las franjas que se
+                  cayeron, era pedirle a alguien que se comprometa con una
+                  respuesta que todavía no puede saber. Ahora GESTIONAR lleva
+                  directo a la pantalla, y qué pasa con la agenda se decide ahí,
+                  franja por franja, con los candidatos a la vista. */}
               <div className="pt-3 border-t border-gray-100 space-y-2">
                 <button
                   className="btn-primary w-full justify-center"
                   onClick={() => navigate(`/app/reemplazo/${sel.id}`)}
                 >
-                  🔍 Buscar reemplazo
+                  ⚙️ GESTIONAR
                 </button>
                 <div className="text-xs text-gray-400 text-center">
                   Abre la pantalla con las franjas que se cayeron: día, hora, sede y coordinador
@@ -367,15 +359,6 @@ export default function AusenciasCoordPage() {
           )}
         </div>
       </div>
-      )}
-
-      {gestionando && (
-        <GestionarAusenciaModal
-          ausencia={gestionando}
-          onClose={() => setGestionando(null)}
-          onConfirmar={confirmar}
-          procesando={confirmando}
-        />
       )}
 
       {showRegistrar && (
@@ -428,107 +411,6 @@ const ACCIONES_AGENDA = [
   { value: 'perdida',        label: 'La agenda se perdió',            help: 'No se pudo reubicar a nadie' },
   { value: 'sin_agenda',     label: 'No tenía agenda ese día',        help: 'No había pacientes programados' },
 ]
-
-// Oct-2026 · Se quitó el paso "¿Procede la ausencia?". La persona ya faltó:
-// preguntarlo invitaba a cerrar el caso con un clic sin decir qué pasó con la
-// agenda, que es lo único que de verdad hay que registrar.
-function GestionarAusenciaModal({ ausencia, onClose, onConfirmar, procesando }) {
-  const [accion, setAccion] = useState('')
-  const [nota, setNota] = useState('')
-
-  const atiendePacientes = TIPOS_QUE_IMPACTAN_PACIENTES.includes(ausencia.resource?.type)
-  const puedeGuardar = !atiendePacientes || !!accion
-  // Cubrir o reprogramar exige decidir QUIÉN: al guardar se sigue en la
-  // pantalla de reemplazo en vez de dar el caso por cerrado.
-  const necesitaReemplazo = accion === 'cubierta' || accion === 'reprogramada'
-
-  const guardar = () => {
-    const detalle = atiendePacientes
-      ? `${ACCIONES_AGENDA.find((a) => a.value === accion)?.label}${nota.trim() ? ` — ${nota.trim()}` : ''}`
-      : nota.trim()
-    onConfirmar({
-      id: ausencia.id,
-      nota: detalle,
-      accion: atiendePacientes ? accion : null,
-      irAReemplazo: necesitaReemplazo,
-    })
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <div>
-            <h2 className="text-sm font-semibold text-gray-900">Gestionar ausencia</h2>
-            <p className="text-xs text-gray-500 mt-0.5">
-              {ausencia.resource?.name} · {format(parseFechaLocal(ausencia.start_date), 'd MMM yyyy', { locale: es })}
-            </p>
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
-        </div>
-
-        <div className="px-5 py-4 space-y-5">
-          {atiendePacientes && (
-            <div>
-              <div className="label mb-2">¿Qué pasó con su agenda?</div>
-              <div className="space-y-1.5">
-                {ACCIONES_AGENDA.map((a) => (
-                  <label
-                    key={a.value}
-                    className={`flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-colors ${
-                      accion === a.value ? 'border-brand-400 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    <input
-                      type="radio" name="accion" className="mt-0.5"
-                      checked={accion === a.value}
-                      onChange={() => setAccion(a.value)}
-                    />
-                    <span className="min-w-0">
-                      <span className="block text-xs font-medium text-gray-800">{a.label}</span>
-                      <span className="block text-[11px] text-gray-500">{a.help}</span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {!atiendePacientes && (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-2.5 text-[11px] text-gray-600">
-              {ausencia.resource?.name} no tiene agenda propia de pacientes, así que no hay nada
-              que reprogramar. Solo se registra la ausencia.
-            </div>
-          )}
-
-          <div>
-            <label className="label">Observaciones (opcional)</label>
-            <textarea
-              className="input resize-none text-xs"
-              rows={3}
-              value={nota}
-              onChange={(e) => setNota(e.target.value)}
-              placeholder="Lo que el equipo deba saber sobre cómo se resolvió."
-            />
-          </div>
-        </div>
-
-        <div className="px-5 py-4 border-t border-gray-100 flex gap-2">
-          <button className="btn flex-1 justify-center" onClick={onClose}>Cancelar</button>
-          <button
-            className="btn-primary flex-1 justify-center"
-            onClick={guardar}
-            disabled={!puedeGuardar || procesando}
-          >
-            {procesando
-              ? <Spinner size="sm" />
-              : necesitaReemplazo ? 'Guardar y buscar reemplazo →' : 'Guardar gestión'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 /**
  * Pantalla de entrada del módulo: una tarjeta por grupo de personal.

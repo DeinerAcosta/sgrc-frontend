@@ -954,17 +954,71 @@ export default function ProgramadorPage() {
                   </td>
                   {DIAS.map((dia) => {
                     const asigs = asigDeConsultorioDia(cons.id, dia)
+                    // MISMO HORARIO = UNA SOLA CASILLA.
+                    // Cuando quien cubre entra exactamente en la franja del que
+                    // faltó, no son dos cosas: es la misma franja atendida por
+                    // otro. Se pintan en un único recuadro partido por dentro.
+                    // Si la hora NO coincide (la agenda se movió a la tarde, o a
+                    // otro día) sí son dos turnos distintos y van separados.
+                    const cubreA = new Map()
+                    for (const r of asigs) if (r.covered_absence_id) cubreA.set(r.covered_absence_id, r)
+                    const fusionados = new Set()
+                    const parejaDe = new Map()
+                    for (const x of asigs) {
+                      const au = ausenciasPorRecursoDia.get(x.resource?.id + '|' + dia)
+                      const c = au && cubreA.get(au.id)
+                      if (c && c.start_time === x.start_time && c.end_time === x.end_time) {
+                        parejaDe.set(x.id, c)
+                        fusionados.add(c.id)
+                      }
+                    }
                     return (
                       <td key={dia} className="p-1 align-top border-r border-gray-50 min-h-12">
                         {asigs.map((a, idx) => {
                           const ausente = ausenciasPorRecursoDia.get(a.resource?.id + '|' + dia)
                           const esReemplazo = !!a.covered_absence_id
+                          // Ya se pinta dentro del recuadro de su pareja.
+                          if (fusionados.has(a.id)) return null
+                          const cubridor = parejaDe.get(a.id)
 
-                          // Hubo aquí una "casilla partida en dos" que juntaba al
-                          // ausente y a quien lo cubría en un solo bloque. Medía
-                          // el doble que las demás y por eso se fue: todas las
-                          // casillas miden igual. Siguen siendo dos, roja y azul,
-                          // con la azul montada sobre la roja.
+                          // UNA SOLA CASILLA, del mismo alto que todas: arriba
+                          // quien faltó (rojo, tachado), abajo quien lo cubre
+                          // (azul). El detalle completo, al pasar el mouse.
+                          if (cubridor) {
+                            return (
+                              <div
+                                key={a.id}
+                                data-asig-id={a.id}
+                                className="slot-base slot-repro group !p-0 flex flex-col"
+                              >
+                                <div
+                                  className="bg-red-50 px-1.5 pt-1 pb-0.5 border-b border-red-300 flex-1 min-h-0"
+                                  onClick={() => canEdit && setModalData({ roomId: cons.id, room: cons, day: dia, weekId: semanaActual.id, assignment: a })}
+                                >
+                                  <div className="text-xs leading-tight truncate line-through text-gray-900 font-medium">{nombreCorto(a.resource?.name)}</div>
+                                  <div className="text-xs leading-tight text-gray-700">{a.start_time}–{a.end_time}</div>
+                                </div>
+                                <div
+                                  className="bg-blue-50 px-1.5 pt-0.5 pb-1 flex-1 min-h-0"
+                                  onClick={() => canEdit && setModalData({ roomId: cons.id, room: cons, day: dia, weekId: semanaActual.id, assignment: cubridor })}
+                                >
+                                  <div className="text-xs leading-tight truncate text-gray-900 font-medium">{nombreCorto(cubridor.resource?.name)}</div>
+                                  <div className="text-xs leading-tight text-gray-600">{cubridor.patient_capacity} pac.</div>
+                                </div>
+                                <div className="hidden group-hover:block px-1.5 pb-1 pt-1 border-t border-black/10 text-[10px] leading-snug bg-white">
+                                  <div className="text-gray-600">{cons.name} · {cons.specialty}</div>
+                                  <div className="text-red-800 font-medium mt-0.5">
+                                    Ausente: {a.resource?.name} · {ausente.motivo_catalogo ?? ausente.type}
+                                    {ausente.status === 'pendiente' ? ' (sin confirmar)' : ''}
+                                  </div>
+                                  <div className="text-blue-800 font-medium">
+                                    Lo cubre: {cubridor.resource?.name} · {cubridor.start_time}–{cubridor.end_time}
+                                  </div>
+                                  {cubridor.assistant && <div className="text-gray-600">Aux: {cubridor.assistant.name}</div>}
+                                </div>
+                              </div>
+                            )
+                          }
 
                           // TRES COLORES Y NINGUNO MÁS. El color por tipo de
                           // recurso (teal/azul/morado/naranja/rosa) competía con
@@ -1016,6 +1070,7 @@ export default function ProgramadorPage() {
                                     recursoPrecargado: quienAtiende === 'mismo' ? caso.ausencia.resource?.id : undefined,
                                     recursoPrecargadoNombre: quienAtiende === 'mismo' ? caso.ausencia.resource?.name : undefined,
                                     cubreAusenciaId: caso.ausencia.id,
+                                    franjaCaida: caso.franjas?.[0],
                                   })
                                   return
                                 }
@@ -1143,6 +1198,7 @@ export default function ProgramadorPage() {
                                 recursoPrecargado: quienAtiende === 'mismo' ? caso?.ausencia?.resource?.id : undefined,
                                 recursoPrecargadoNombre: quienAtiende === 'mismo' ? caso?.ausencia?.resource?.name : undefined,
                                 cubreAusenciaId: caso?.ausencia?.id,
+                                franjaCaida: caso?.franjas?.[0],
                               }
                               // Si tiene servicio alternativo, primero pedir cuál usar
                               if (cons.alt_specialty) setPickerServicio(ctx)

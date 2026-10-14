@@ -22,7 +22,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
     roomId: consultorioId, room: consultorio, day: dia, weekId: semanaId, especialidadOverride,
     // Oct-2026 · Cuando se llega desde "Mover la agenda", el modal sabe a quién
     // se está reubicando y a qué ausencia pertenece el movimiento.
-    recursoPrecargado, recursoPrecargadoNombre, cubreAusenciaId,
+    recursoPrecargado, recursoPrecargadoNombre, cubreAusenciaId, franjaCaida,
   } = data
   const editando = !!asignacion
   const { user } = useAuthStore()
@@ -65,8 +65,11 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
     resource_id:   asignacion?.resource_id   ?? asignacion?.resourceId   ?? recursoPrecargado ?? '',
     assistant_id:  asignacion?.assistant_id  ?? asignacion?.assistantId  ?? '',
     assistant2_id: asignacion?.assistant2_id ?? asignacion?.assistant2Id ?? '',
-    start_time:  asignacion?.start_time  ?? asignacion?.startTime  ?? '07:00',
-    end_time:     asignacion?.end_time     ?? asignacion?.endTime     ?? '13:00',
+    // Oct-2026 · Viniendo de una reprogramacion, la franja nueva arranca con
+    // el horario y los pacientes de la que se cayo: es lo que hay que reponer.
+    // Se puede cambiar, pero el valor por defecto deja de ser una suposicion.
+    start_time:  asignacion?.start_time  ?? asignacion?.startTime  ?? franjaCaida?.start_time ?? '07:00',
+    end_time:     asignacion?.end_time     ?? asignacion?.endTime     ?? franjaCaida?.end_time ?? '13:00',
     // Sub-horarios opcionales por auxiliar. Si "" → hereda del recurso principal.
     assistant_start_time:  asignacion?.assistant_start_time  ?? asignacion?.assistantStartTime  ?? '',
     assistant_end_time:     asignacion?.assistant_end_time     ?? asignacion?.assistantEndTime     ?? '',
@@ -75,7 +78,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
     // Override manual de pacientes programados. "" = usar el cálculo nominal.
     // Al editar, pre-llenamos con el valor guardado (pacientes_capacidad) para que
     // el coord vea el número actual y pueda editarlo si quiere; si lo borra → recalcula.
-    expected_patients: asignacion?.patient_capacity ?? asignacion?.patientCapacity ?? '',
+    expected_patients: asignacion?.patient_capacity ?? asignacion?.patientCapacity ?? franjaCaida?.patient_capacity ?? '',
     // Motivo obligatorio cuando el supervisor edita una sede cerrada (queda en
     // auditoría). Se muestra el input solo si `requiereMotivo` es true.
     supervisor_reason: '',
