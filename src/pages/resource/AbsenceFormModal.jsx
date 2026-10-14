@@ -9,10 +9,10 @@ import { useDirtyClose } from '@/hooks/useDirtyClose'
 
 const REQUIEREN_ANTICIPACION = ['academico', 'vacaciones']
 
-// Sep-2026: el recurso profesional solo debe ver los motivos que aparecen en el
-// formato oficial F-AA-126 v04. Los motivos operativos (cambio horario, formato,
-// disminuir pacientes, cubre_qx, regionales, brigada, etc.) los usa quien gestiona
-// la reprogramacion — no el profesional que se ausenta. Se filtran por code.
+// El profesional que se ausenta solo debe ver los motivos que le aplican a el.
+// Los motivos operativos (cambio horario, disminuir pacientes, cubre_qx,
+// regionales, brigada, etc.) los usa quien gestiona la reprogramacion — no el
+// profesional. Se filtran por code.
 //
 // Sep-2026 · feedback usuario: las LICENCIAS (remunerada y no remunerada) salen
 // de esta lista. El diligenciamiento se simplifico y las licencias no las
@@ -51,7 +51,7 @@ export default function AusenciaFormModal({ recursoId, tipoRecurso, onClose, hor
   const [form, setForm] = useState({
     reasonId: '', type: '', start_date: '', end_date: '',
     is_partial: false, absence_start_time: '', absence_end_time: '', reason: '',
-    // Fase 5 · F-AA-126 v04 — sin default; obligamos elección explícita.
+    // Sin default: obligamos elección explícita.
     affected_company: '',
     wants_makeup: '',
     makeup_notes: '',
@@ -90,9 +90,8 @@ export default function AusenciaFormModal({ recursoId, tipoRecurso, onClose, hor
     ? motivosCatalogo.map((m) => ({ id: m.id, value: m.code, label: m.name }))
     : TIPOS_AUSENCIA.map((t) => ({ id: null, value: t.value, label: t.label }))
 
-  // Sep-2026: el recurso solo ve los motivos del F-AA-126 oficial, ya sin las
-  // dos licencias. Coord/sup/gerencia siguen viendo TODOS via
-  // CoordLogAbsenceModal, que es por donde se tramita una licencia.
+  // El recurso no ve las dos licencias. Coord/sup/gerencia siguen viendo TODOS
+  // via CoordLogAbsenceModal, que es por donde se tramita una licencia.
   const tipos = opciones.filter((t) => MOTIVOS_VISIBLES_RECURSO.has(t.value))
 
   const { mutate, isPending } = useMutation({
@@ -208,10 +207,10 @@ export default function AusenciaFormModal({ recursoId, tipoRecurso, onClose, hor
             />
           </div>
 
-          {/* Sep-2026 · Estos campos ya NO alimentan un PDF: el formato oficial se
-              eliminó. Se conservan porque son datos del negocio (la empresa
-              afectada y la reposición) que usan los informes y el flujo de
-              reposición. Solo cambió el rótulo, que nombraba al formato. */}
+          {/* La empresa afectada y la reposición son datos del negocio: la primera
+              decide la razón social con la que la ausencia sale en los informes
+              (FOCA y VIU son entidades distintas) y la segunda dispara el flujo
+              de reposición. */}
           <div className="border-t border-gray-100 pt-3">
             <div className="text-[11px] uppercase tracking-wide text-gray-400 mb-2">Datos de la ausencia</div>
 

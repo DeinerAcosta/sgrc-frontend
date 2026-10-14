@@ -12,7 +12,6 @@ import RegistrarAusenciaCoordModal from '@/pages/coordinator/CoordLogAbsenceModa
 import SugeridorReemplazosModal from '@/pages/coordinator/ReplacementSuggesterModal'
 import RegistrarReposicionModal from '@/pages/resource/LogMakeupModal'
 import { useSedeActiva } from '@/hooks/useActiveSite'
-import VistaFormatoAusencia from '@/pages/absences/AbsenceFormView'
 
 const TIPO_LABEL = Object.fromEntries(TIPOS_AUSENCIA.map((t) => [t.value, t.label]))
 
@@ -28,11 +27,7 @@ export default function AusenciasCoordPage() {
   const [showSugerir, setShowSugerir] = useState(null)
   // Ausencia abierta en el modal de gestión (§6.1). null = cerrado.
   const [gestionando, setGestionando] = useState(null)
-  // §1 · Ausencia abierta en el formato de solo lectura (el que reemplazó al
-  // PDF). Guardamos solo el id: el formato se pide aparte porque trae la firma
-  // escaneada, que ya no viaja en el listado.
-  const [verFormato, setVerFormato] = useState(null)
-  // Fase 5 · F-AA-126 v04: si la ausencia confirmada trae desea_reponer=true,
+  // Si la ausencia confirmada trae desea_reponer=true,
   // abrimos automáticamente el modal de proponer reposición (Fase 3) con la
   // ausencia preseleccionada para no obligar al coord a ir a otro sitio.
   const [autoReposicion, setAutoReposicion] = useState(null)
@@ -344,17 +339,6 @@ export default function AusenciasCoordPage() {
                   106 días — ausencias reales que ya ocurrieron y seguían sin
                   revisar. Ahora se abre un paso explícito donde hay que elegir
                   qué pasó con la agenda, no solo aceptar o negar. */}
-              {/* §1 · El formato se consulta en cualquier estado: es el registro de
-                  lo que el profesional diligenció, no un paso del trámite. Antes
-                  el botón del PDF solo salía en las confirmadas, así que de una
-                  pendiente o una rechazada no quedaba forma de ver qué decía. */}
-              <button
-                className="btn w-full justify-center"
-                onClick={() => setVerFormato(sel.id)}
-              >
-                Ver formato F-AA-126
-              </button>
-
               {sel.status === 'pendiente' && (
                 <button
                   className="btn-primary w-full justify-center"
@@ -375,19 +359,12 @@ export default function AusenciasCoordPage() {
                   <div className="text-xs text-gray-400 text-center">
                     Sugiere recursos disponibles de cualquier sede de la ciudad
                   </div>
-                  {/* Sep-2026 · Se eliminó el botón "Descargar formato F-AA-126".
-                      El PDF sale del sistema por completo: el formato pasa a verse
-                      como formulario de solo lectura dentro del detalle. */}
                 </div>
               )}
             </div>
           )}
         </div>
       </div>
-      )}
-
-      {verFormato && (
-        <VistaFormatoAusencia ausenciaId={verFormato} onClose={() => setVerFormato(null)} />
       )}
 
       {gestionando && (

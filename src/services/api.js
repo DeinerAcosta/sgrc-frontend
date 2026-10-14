@@ -252,9 +252,6 @@ export const recursoService = {
     if (params.active !== undefined) list = list.filter((r) => r.active === params.active)
     return ok(list)
   },
-  // Sep-2026: getById devuelve el recurso COMPLETO (incluye firma_url MEDIUMTEXT).
-  // El list() ahora omite firma_url por performance — cuando el modal de editar
-  // se abre, llama este endpoint para traer la firma bajo demanda.
   getById: async (id) => {
     if (!DEMO_MODE) return api.get(`/resources/${id}`)
     return ok(_recursos.find((r) => r.id === id))
@@ -591,54 +588,6 @@ export const ausenciaService = {
     if (params.status) list = list.filter((a) => a.status === params.status)
     if (params.resource_id) list = list.filter((a) => a.resource_id === params.resource_id)
     return ok(list)
-  },
-  // Sep-2026 · Se eliminó descargarFormatoFAA126(): el PDF del formato oficial
-  // salió del sistema por completo (PROYECTOS-3398 §1). Lo reemplaza formato(),
-  // que trae el mismo contenido para verse en pantalla.
-  //
-  // Va aparte del listado a propósito: la respuesta incluye la firma escaneada
-  // del profesional (base64, hasta ~6 MB) y el nombre de quien dio el Vo Bo,
-  // que vive en `usuarios`. Se pide solo cuando alguien abre el formato.
-  formato: async (id) => {
-    if (!DEMO_MODE) return api.get(`/absences/${id}/form`)
-    const a = _ausencias.find((x) => x.id === id)
-    if (!a) return fail('No encontrada', 404)
-    return ok({
-      codigo: 'F-AA-126',
-      version: '05',
-      empresa: a.affected_company ?? null,
-      empresa_label: { foca: 'FOCA', viu: 'VIU', ambas: 'AMBAS' }[a.affected_company] ?? null,
-      razon_social: a.affected_company === 'foca'
-        ? 'FUNDACIÓN OFTALMOLÓGICA DEL CARIBE'
-        : 'CLÍNICA OFTALMOLÓGICA DEL CARIBE',
-      subtitulo: 'CONTINUIDAD DEL SERVICIO CON LOS PRESTADORES DE SERVICIO',
-      especialidades: 'OFTALMOLOGÍA - OTORRINOLARINGOLOGÍA',
-      ausencia: {
-        id: a.id, estado: a.status, tipo: a.type,
-        motivo_catalogo: a.reason_ref?.name ?? null, motivo_texto: a.reason ?? null,
-        fecha_salida: a.start_date, fecha_entrada: a.end_date,
-        es_parcial: a.is_partial, hora_inicio: a.absence_start_time, hora_fin: a.absence_end_time,
-        ciudad_regional: a.regional_city ?? null,
-        es_programada: a.is_planned, anticipacion_dias: a.notice_days,
-        desea_reponer: a.wants_makeup ?? null,
-        fecha_reposicion_propuesta: a.makeup_date ?? null,
-        observaciones_reposicion: a.makeup_notes ?? null,
-        accion_agenda: a.agenda_action ?? null, accion_tomada: a.action_taken ?? null,
-        motivo_rechazo: a.rejection_reason ?? null,
-        pacientes_impactados: a.patients_affected ?? null,
-        impacto_por_dia: a.daily_impact ?? null,
-      },
-      profesional: {
-        nombre: a.resource?.name, tipo: a.resource?.type,
-        especialidad: a.resource?.specialty, correo: null, firma_url: null,
-      },
-      diligenciamiento: {
-        fecha: a.reported_at, por: null, rol: null,
-        registrado_por_coordinador: a.recorded_by_coordinator ?? false,
-      },
-      vo_bo: a.confirmed_at ? { nombre: null, fecha: a.confirmed_at } : null,
-      nota: 'Las ausencias deben ser informadas con 20 días de anticipación.',
-    })
   },
   create: async (data) => {
     if (!DEMO_MODE) return api.post('/absences', data)
@@ -1081,17 +1030,6 @@ export const usuarioService = {
   listDirectivos: async () => {
     if (!DEMO_MODE) return api.get('/users/directivos')
     return ok(_usuarios_lista.filter((u) => ['directivo', 'gerencia'].includes(u.role) && u.active))
-  },
-  /** Sep-2026 · Self-service de firma para el propio médico.
-   *  Devuelve { signatureUrl, hasSignature }. Solo funciona para rol=recurso. */
-  getMiFirma: async () => {
-    if (!DEMO_MODE) return api.get('/users/me/signature')
-    return ok({ signatureUrl: null, hasSignature: false })
-  },
-  /** Guarda o borra la firma. Pasar `dataUrl=null` para borrar. */
-  actualizarMiFirma: async (dataUrl) => {
-    if (!DEMO_MODE) return api.put('/users/me/signature', { signatureUrl: dataUrl })
-    return ok({ ok: true, hasSignature: !!dataUrl })
   },
   /** Elimina usuario. hard=true intenta borrar fila completa; soft (default) desactiva. */
   remove: async (id, hard = false) => {

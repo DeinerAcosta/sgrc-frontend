@@ -37,7 +37,7 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, onCreated
     absence_end_time: '',
     reason: '',
     regional_city: '',
-    // Fase 5 · F-AA-126 v04 — sin default; forzamos elección explícita.
+    // Sin default: forzamos elección explícita.
     affected_company: '',
     wants_makeup: '',                    // '' = sin elegir, 'si' | 'no'
     makeup_notes: '',
@@ -112,7 +112,6 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, onCreated
       ...form,
       reason_id: form.reasonId || undefined,
       regional_city: esMotivoRegional ? form.regional_city.trim() : undefined,
-      // Fase 5 · F-AA-126 v04
       affected_company: form.affected_company || undefined,
       wants_makeup: form.wants_makeup === 'si' ? true : form.wants_makeup === 'no' ? false : undefined,
       makeup_notes: form.wants_makeup === 'si' ? (form.makeup_notes || undefined) : undefined,
@@ -121,10 +120,8 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, onCreated
     }),
     onSuccess: (creada) => {
       qc.invalidateQueries({ queryKey: ['ausencias-coord'] })
-      // Sep-2026 · Se eliminó el atajo para descargar el F-AA-126 tras crear
-      // la ausencia. El PDF sale del sistema por completo.
       toast.success('Ausencia registrada. El sistema calculó el impacto.')
-      // Fase 5 · v04: si vino desea_reponer=SÍ, notificamos al padre para que
+      // Si vino desea_reponer=SÍ, notificamos al padre para que
       // encadene el modal de proponer reposición (Fase 3).
       if (creada?.wants_makeup === true && typeof onCreated === 'function') {
         onCreated(creada)
@@ -277,10 +274,10 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, onCreated
             <textarea className="input resize-none" rows={2} value={form.reason} onChange={(e) => set('reason', e.target.value)} placeholder="Ej: No se presentó al consultorio y no avisó" />
           </div>
 
-          {/* Sep-2026 · Estos campos ya NO alimentan un PDF: el formato oficial se
-              eliminó. Se conservan porque son datos del negocio (la empresa
-              afectada y la reposición) que usan los informes y el flujo de
-              reposición. Solo cambió el rótulo, que nombraba al formato. */}
+          {/* La empresa afectada y la reposición son datos del negocio: la primera
+              decide la razón social con la que la ausencia sale en los informes
+              (FOCA y VIU son entidades distintas) y la segunda dispara el flujo
+              de reposición. */}
           <div className="border-t border-gray-100 pt-3">
             <div className="text-[11px] uppercase tracking-wide text-gray-400 mb-2">Datos de la ausencia</div>
 
