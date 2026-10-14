@@ -592,6 +592,20 @@ export default function ProgramadorPage() {
                 .join(' · ')}</strong></>
             ) : caso.ausencia.dias?.length ? <> · ausente el <strong>{caso.ausencia.dias.join(', ')}</strong></> : null}
             {caso.ausencia.patients_affected ? <> · <strong>{caso.ausencia.patients_affected} pacientes</strong> por reubicar</> : null}
+            {caso.cuenta && caso.cuenta.pacientes_impactados > 0 && (
+              <div className="mt-1">
+                {caso.cuenta.resuelto ? (
+                  <span className="text-emerald-800 font-semibold">
+                    ✅ Los {caso.cuenta.pacientes_impactados} pacientes ya tienen dónde ir. Volvé al caso para cerrarlo.
+                  </span>
+                ) : (
+                  <span className="text-amber-900">
+                    <strong>{caso.cuenta.pacientes_cubiertos}</strong> de <strong>{caso.cuenta.pacientes_impactados}</strong> pacientes reubicados ·{" "}
+                    <strong className="text-red-700">faltan {caso.cuenta.pacientes_pendientes}</strong>
+                  </span>
+                )}
+              </div>
+            )}
             {caso.franjas?.length > 0 && (
               <div className="mt-1 text-amber-800">
                 Se cayeron {caso.franjas.length} franja{caso.franjas.length === 1 ? '' : 's'}:{' '}
@@ -613,7 +627,21 @@ export default function ProgramadorPage() {
           </div>
           <button
             className="btn text-xs flex-shrink-0"
-            onClick={() => navegar(`/app/reemplazo/${caso.ausencia.id}`)}
+            onClick={async () => {
+              // No se bloquea la salida —puede hacer falta irse y volver— pero
+              // irse con gente sin reubicar no puede pasar en silencio: así es
+              // como un caso queda a medias y nadie se entera.
+              if (caso.cuenta && !caso.cuenta.resuelto && caso.cuenta.pacientes_pendientes > 0) {
+                const salir = await confirm({
+                  title: `Quedan ${caso.cuenta.pacientes_pendientes} pacientes sin reubicar`,
+                  message: 'Todavía no tienen dónde ir. Podés volver al caso y seguir después, pero el caso sigue abierto.',
+                  confirmLabel: 'Volver al caso igual',
+                  cancelLabel: 'Seguir aquí',
+                })
+                if (!salir) return
+              }
+              navegar(`/app/reemplazo/${caso.ausencia.id}`)
+            }}
           >
             ← Volver al caso
           </button>

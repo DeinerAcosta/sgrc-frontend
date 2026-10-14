@@ -55,9 +55,7 @@ export default function ReemplazoPage() {
     )
   }
 
-  const { ausencia, semana, franjas } = data
-  const resueltas = franjas.filter((f) => f.reemplazo).length
-  const pacientesEnJuego = franjas.reduce((n, f) => n + (f.patient_capacity ?? 0), 0)
+  const { ausencia, semana, franjas, cuenta } = data
 
   return (
     <div className="p-3 sm:p-4 max-w-5xl mx-auto">
@@ -69,6 +67,8 @@ export default function ReemplazoPage() {
       </button>
 
       <CabeceraAusencia ausencia={ausencia} semana={semana} />
+
+      {cuenta && <Avance cuenta={cuenta} />}
 
       {franjas.length === 0 ? (
         <div className="mt-4">
@@ -89,8 +89,7 @@ export default function ReemplazoPage() {
               Franjas que se cayeron ({franjas.length})
             </h2>
             <div className="text-xs text-gray-500">
-              {resueltas} de {franjas.length} con reemplazo
-              {pacientesEnJuego > 0 && <> · <strong className="text-red-700">{pacientesEnJuego} pacientes en juego</strong></>}
+              {cuenta?.franjas_cubiertas ?? 0} de {franjas.length} con reemplazo
             </div>
           </div>
 
@@ -257,6 +256,80 @@ function AsignarReprogramador({ ausencia }) {
           {cerrando ? <Spinner size="sm" /> : '✅ Marcar como resuelta'}
         </button>
       )}
+    </div>
+  )
+}
+
+/**
+ * EL AVANCE DEL CASO — cuántos pacientes faltan por reubicar.
+ *
+ * Hector: "si son 100 pacientes, hasta que no cuente los 100 pacientes repro
+ * no me deje salir del programador. Y cuando ya termine me debería salir a la
+ * pantalla principal de que a quién asignó. Y al final después de guardar
+ * ¿qué viene?"
+ *
+ * Eso era justo lo que faltaba: se asignaba un reemplazo y la pantalla quedaba
+ * igual que antes, sin decir cuánto falta ni cuándo se terminó. Sin esto, el
+ * caso se abandonaba a medias sin que nadie se enterara — que es exactamente
+ * como se acumularon las 6 ausencias de 118 días.
+ *
+ * Los cubiertos salen de los turnos NUEVOS, no de las franjas caídas: quien
+ * cubre puede atender más o menos pacientes que el ausente (otro intervalo,
+ * otra franja), y lo que importa es a cuánta gente se le resolvió de verdad.
+ */
+function Avance({ cuenta }) {
+  const { pacientes_impactados: total, pacientes_cubiertos: cubiertos, pacientes_pendientes: faltan, resuelto } = cuenta
+  const pct = total > 0 ? Math.min(100, Math.round((cubiertos / total) * 100)) : 0
+
+  if (resuelto) {
+    return (
+      <div className="card mt-4 border-emerald-300 bg-emerald-50/50">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-semibold text-emerald-900">✅ Caso resuelto</h2>
+            <p className="text-xs text-emerald-800 mt-0.5">
+              Los <strong>{total} pacientes</strong> quedaron reubicados.
+            </p>
+          </div>
+        </div>
+        <div className="mt-3 space-y-1">
+          {cuenta.quienes_cubren.map((q, i) => (
+            <div key={i} className="text-xs text-emerald-900">
+              · <strong>{q.nombre}</strong> — {q.dia} {q.desde}–{q.hasta} · {q.pacientes} pacientes
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-emerald-800 mt-3">
+          Falta el último paso: asignar abajo quién va a llamar a los pacientes.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="card mt-4 border-amber-300 bg-amber-50/40">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-sm font-semibold text-amber-900">Caso abierto</h2>
+        <div className="text-xs text-amber-900">
+          <strong>{cubiertos}</strong> de <strong>{total}</strong> pacientes reubicados
+          {faltan > 0 && <> · faltan <strong className="text-red-700">{faltan}</strong></>}
+        </div>
+      </div>
+      <div className="mt-2 h-2 rounded-full bg-amber-100 overflow-hidden">
+        <div className="h-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
+      </div>
+      {cuenta.quienes_cubren.length > 0 && (
+        <div className="mt-3 space-y-1">
+          {cuenta.quienes_cubren.map((q, i) => (
+            <div key={i} className="text-xs text-gray-700">
+              · <strong>{q.nombre}</strong> — {q.dia} {q.desde}–{q.hasta} · {q.pacientes} pacientes
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="text-xs text-amber-800 mt-3">
+        El caso no se da por terminado hasta que los {total} pacientes tengan dónde ir.
+      </p>
     </div>
   )
 }
