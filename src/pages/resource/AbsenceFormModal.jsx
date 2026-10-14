@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { ausenciaService, motivoAusenciaService } from '@/services/api'
-import { TIPOS_AUSENCIA, parseFechaLocal } from '@/utils/helpers'
+import { GRUPOS_TIPO_AUSENCIA, parseFechaLocal, tiposDelGrupo } from '@/utils/helpers'
 import { Spinner } from '@/components/ui'
 import { differenceInDays } from 'date-fns'
 import { useDirtyClose } from '@/hooks/useDirtyClose'
@@ -20,42 +20,18 @@ const REQUIEREN_ANTICIPACION = ['academico', 'vacaciones']
 // coord/sup/gerencia las siguen viendo completas en CoordLogAbsenceModal. Con
 // esto cayo tambien el filtro SOLO_SALARIO_FIJO, que existia solo para
 // esconderle esos dos motivos a quien no fuera de salario fijo.
-const MOTIVOS_VISIBLES_RECURSO = new Set([
-  'enfermedad',
-  'calamidad',
-  'academico',
-  'familiar',
-  'vacaciones',
-  'traslado_sedes_externas',
-])
-
-// Sep-2026 · feedback usuario: la reposición de ausencias aplica SOLO a los
-// profesionales que atienden pacientes directamente. Personal de apoyo
-// (auxiliares, técnicos, asesores) NO repone — no ven el bloque "¿Deseas
-// reponer?" ni la caja de observaciones de reposición.
-const TIPOS_QUE_REPONEN = new Set([
-  'oftalmologo',
-  'otorrino',
-  'fonoaudiologa',
-  'optometra',
-  'anestesiologo',
-])
-
 // Sep-2026: se retiró el prop `esquemaPago`. Solo alimentaba el filtro que
 // escondía las licencias a quien no fuera de salario fijo, y las licencias ya no
 // se le ofrecen al profesional.
 export default function AusenciaFormModal({ recursoId, tipoRecurso, onClose, horarioSemana = [] }) {
-  const puedeReponer = TIPOS_QUE_REPONEN.has(tipoRecurso)
-  const qc = useQueryClient()
+    const qc = useQueryClient()
   // motivoId = del catálogo dinámico; tipo = el enum legacy (se setea automáticamente).
   const [form, setForm] = useState({
+    // grupo = primer nivel (remunerada / no remunerada). Recorta el segundo
+    // select y no se envía: el backend solo conoce `type`.
+    grupo: '',
     reasonId: '', type: '', start_date: '', end_date: '',
     is_partial: false, absence_start_time: '', absence_end_time: '', reason: '',
-    // Sin default: obligamos elección explícita.
-    affected_company: '',
-    wants_makeup: '',
-    makeup_notes: '',
-    makeup_date: '',
   })
   const { tryClose } = useDirtyClose(form, onClose)
 
@@ -84,24 +60,16 @@ export default function AusenciaFormModal({ recursoId, tipoRecurso, onClose, hor
     .filter((a) => a.weekday && form.start_date)
     .reduce((acc, a) => acc + (a.patient_capacity ?? 0), 0)
 
-  // Combina catálogo dinámico + fallback hardcoded. Si el backend responde,
-  // muestra el catálogo (incluye personalizados). Si no, sigue el hardcoded.
-  const opciones = motivosCatalogo.length > 0
-    ? motivosCatalogo.map((m) => ({ id: m.id, value: m.code, label: m.name }))
-    : TIPOS_AUSENCIA.map((t) => ({ id: null, value: t.value, label: t.label }))
-
-  // El recurso no ve las dos licencias. Coord/sup/gerencia siguen viendo TODOS
-  // via CoordLogAbsenceModal, que es por donde se tramita una licencia.
-  const tipos = opciones.filter((t) => MOTIVOS_VISIBLES_RECURSO.has(t.value))
+  // Los tipos del grupo elegido. Mientras no haya grupo, el segundo select
+  // ni se muestra.
+  const grupoSel = GRUPOS_TIPO_AUSENCIA.find((g) => g.value === form.grupo)
+  const tipos = tiposDelGrupo(form.grupo, motivosCatalogo)
 
   const { mutate, isPending } = useMutation({
     mutationFn: () => ausenciaService.create({
       resource_id: recursoId, ...form,
       reason_id: form.reasonId || undefined,
-      affected_company: form.affected_company || undefined,
-      wants_makeup: form.wants_makeup === 'si' ? true : form.wants_makeup === 'no' ? false : undefined,
-      makeup_notes: form.wants_makeup === 'si' ? (form.makeup_notes || undefined) : undefined,
-      makeup_date: form.wants_makeup === 'si' ? (form.makeup_date || undefined) : undefined,
+      grupo: undefined,   // solo organiza el formulario; no es un campo del backend
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['ausencias'] })
@@ -112,7 +80,7 @@ export default function AusenciaFormModal({ recursoId, tipoRecurso, onClose, hor
   })
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
-  const valid = form.type && form.start_date && !!form.affected_company
+  const valid = form.type && form.start_date
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && tryClose()}>
@@ -145,25 +113,38 @@ export default function AusenciaFormModal({ recursoId, tipoRecurso, onClose, hor
             )}
           </div>
 
+          {/* Primer nivel. Cambiarlo limpia el tipo: los del grupo anterior
+              ya no aplican y dejarlo puesto guardaría una incoherencia. */}
           <div>
-            <label className="label">Tipo de ausencia *</label>
+            <label className="label">¿La ausencia es remunerada? *</label>
             <select
               className="input"
-              value={form.reasonId || form.type}
-              onChange={(e) => {
-                const sel = tipos.find((t) => String(t.id) === e.target.value || t.value === e.target.value)
-                // El backend valida `tipo` contra el enum legacy (9 valores). Si el
-                // motivo personalizado no corresponde a ninguno, mapeamos a 'otra'
-                // y dejamos el motivoId para que la lógica del catálogo aplique.
-                const codigosEnum = TIPOS_AUSENCIA.map((t) => t.value)
-                const tipoEnum = codigosEnum.includes(sel?.value) ? sel.value : 'otra'
-                setForm((f) => ({ ...f, reasonId: sel?.id ?? '', type: sel ? tipoEnum : '' }))
-              }}
+              value={form.grupo}
+              onChange={(e) => setForm((f) => ({ ...f, grupo: e.target.value, reasonId: '', type: '' }))}
             >
-              <option value="">Seleccionar tipo...</option>
-              {tipos.map((t) => <option key={t.id ?? t.value} value={t.id ?? t.value}>{t.label}</option>)}
+              <option value="">Seleccionar...</option>
+              {GRUPOS_TIPO_AUSENCIA.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
             </select>
+            {grupoSel && <div className="text-[11px] text-gray-500 mt-1">{grupoSel.descripcion}</div>}
           </div>
+
+          {/* Segundo nivel. */}
+          {form.grupo && (
+            <div>
+              <label className="label">Tipo de ausencia *</label>
+              <select
+                className="input"
+                value={form.reasonId || form.type}
+                onChange={(e) => {
+                  const sel = tipos.find((t) => String(t.id) === e.target.value || t.value === e.target.value)
+                  setForm((f) => ({ ...f, reasonId: sel?.id ?? '', type: sel?.value ?? '' }))
+                }}
+              >
+                <option value="">Seleccionar tipo...</option>
+                {tipos.map((t) => <option key={t.id ?? t.value} value={t.id ?? t.value}>{t.label}</option>)}
+              </select>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -205,101 +186,6 @@ export default function AusenciaFormModal({ recursoId, tipoRecurso, onClose, hor
               onChange={(e) => set('reason', e.target.value)}
               placeholder="Describe brevemente el motivo..."
             />
-          </div>
-
-          {/* La empresa afectada y la reposición son datos del negocio: la primera
-              decide la razón social con la que la ausencia sale en los informes
-              (FOCA y VIU son entidades distintas) y la segunda dispara el flujo
-              de reposición. */}
-          <div className="border-t border-gray-100 pt-3">
-            <div className="text-[11px] uppercase tracking-wide text-gray-400 mb-2">Datos de la ausencia</div>
-
-            <div>
-              <label className="label">¿A qué empresa aplica la ausencia? *</label>
-              <div className="flex gap-4 flex-wrap">
-                {[
-                  { v: 'foca',  l: 'FOCA' },
-                  { v: 'viu',   l: 'VIU' },
-                  { v: 'ambas', l: 'AMBAS' },
-                ].map((o) => (
-                  <label key={o.v} className="flex items-center gap-1.5 text-xs cursor-pointer">
-                    <input
-                      type="radio"
-                      name="empresa_afectada_rec"
-                      checked={form.affected_company === o.v}
-                      onChange={() => set('affected_company', o.v)}
-                    />
-                    {o.l}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-
-            {/* Reposición solo aplica a los profesionales que atienden pacientes.
-                El personal de apoyo (asesores, auxiliares, tecnicos, anestesiologos)
-                no repone — el bloque queda oculto para ellos. */}
-            {puedeReponer && (
-              <>
-                <div className="mt-3">
-                  <label className="label">¿Deseas reponer esta ausencia?</label>
-                  <div className="flex gap-4 flex-wrap">
-                    {[
-                      { v: 'si', l: 'SÍ' },
-                      { v: 'no', l: 'NO' },
-                    ].map((o) => (
-                      <label key={o.v} className="flex items-center gap-1.5 text-xs cursor-pointer">
-                        <input
-                          type="radio"
-                          name="desea_reponer_rec"
-                          checked={form.wants_makeup === o.v}
-                          onChange={() => set('wants_makeup', o.v)}
-                        />
-                        {o.l}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {form.wants_makeup === 'si' && (
-                  <div className="mt-3 space-y-3">
-                    {/* PROYECTOS-3398 §4 · "Fecha en que repondrá la ausencia".
-                        Era el único campo realmente nuevo de ese bloque: antes
-                        la fecha se pedía dentro del texto libre, así que no se
-                        podía filtrar ni cruzar con la agenda. Ahora es un campo
-                        propio y queda como dato. */}
-                    <div>
-                      <label className="label">Fecha en que repondrá</label>
-                      <input
-                        className="input"
-                        type="date"
-                        value={form.makeup_date}
-                        min={form.end_date || form.start_date}
-                        onChange={(e) => set('makeup_date', e.target.value)}
-                      />
-                      <div className="text-[11px] text-gray-500 mt-1">
-                        Tiene que ser posterior a la ausencia. Si aún no la tienes, déjala vacía
-                        y la acuerdas con tu coordinador.
-                      </div>
-                    </div>
-                    <div>
-                      <label className="label">Describir</label>
-                      <textarea
-                        className="input resize-none"
-                        rows={2}
-                        value={form.makeup_notes}
-                        onChange={(e) => set('makeup_notes', e.target.value)}
-                        placeholder="Horario y modalidad propuesta para la reposición."
-                        maxLength={2000}
-                      />
-                    </div>
-                    <div className="text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded p-2">
-                      ℹ️ Cuando el coordinador confirme tu ausencia, podrás proponer formalmente la reposición desde "Mis ausencias".
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
           </div>
 
           {alertaAnticip && (

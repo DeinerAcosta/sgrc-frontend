@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { differenceInDays } from 'date-fns'
 import { recursoService, ausenciaService, motivoAusenciaService } from '@/services/api'
-import { TIPOS_AUSENCIA, TIPOS_RECURSO, parseFechaLocal } from '@/utils/helpers'
+import { GRUPOS_TIPO_AUSENCIA, TIPOS_RECURSO, parseFechaLocal, tiposDelGrupo } from '@/utils/helpers'
 import { Spinner } from '@/components/ui'
 import { useDirtyClose } from '@/hooks/useDirtyClose'
 import { useAuthStore } from '@/store/authStore'
@@ -14,7 +14,6 @@ const REQUIEREN_ANTICIPACION = ['academico', 'vacaciones', 'licencia_remunerada'
 // que atienden pacientes directamente. Personal de apoyo (asesores, auxiliares,
 // técnicos) no repone → se oculta el bloque "¿Desea reponer?" cuando la
 // categoría elegida no está en este set.
-const TIPOS_QUE_REPONEN = new Set(['oftalmologo', 'otorrino', 'fonoaudiologa', 'optometra', 'anestesiologo'])
 
 /**
  * HU-C-06: Coordinador registra una ausencia en nombre del recurso.
@@ -37,10 +36,9 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, onCreated
     absence_end_time: '',
     reason: '',
     regional_city: '',
-    // Sin default: forzamos elección explícita.
-    affected_company: '',
-    wants_makeup: '',                    // '' = sin elegir, 'si' | 'no'
-    makeup_notes: '',
+    // grupo = primer nivel (remunerada / no remunerada). Recorta el segundo
+    // select y no se envía: el backend solo conoce `type`.
+    grupo: '',
   })
 
   // Catálogo dinámico de motivos. Fallback al hardcoded si la API falla.
@@ -49,9 +47,6 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, onCreated
     queryFn: () => motivoAusenciaService.list({ soloActivos: true }),
     staleTime: 5 * 60 * 1000,
   })
-  const opcionesMotivo = motivosCatalogo.length > 0
-    ? motivosCatalogo.map((m) => ({ id: m.id, value: m.code, label: m.name, family: m.family }))
-    : TIPOS_AUSENCIA.map((t) => ({ id: null, value: t.value, label: t.label, family: null }))
   const esMotivoRegional = form.motivoCodigo === 'regional'
   const dirtySnapshot = { categoria, ...form }
   const { tryClose } = useDirtyClose(dirtySnapshot, onClose)
@@ -112,20 +107,13 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, onCreated
       ...form,
       reason_id: form.reasonId || undefined,
       regional_city: esMotivoRegional ? form.regional_city.trim() : undefined,
-      affected_company: form.affected_company || undefined,
-      wants_makeup: form.wants_makeup === 'si' ? true : form.wants_makeup === 'no' ? false : undefined,
-      makeup_notes: form.wants_makeup === 'si' ? (form.makeup_notes || undefined) : undefined,
+      grupo: undefined,   // solo organiza el formulario; no es un campo del backend
       end_date: form.end_date || form.start_date,
       recorded_by_coordinator: true,
     }),
     onSuccess: (creada) => {
       qc.invalidateQueries({ queryKey: ['ausencias-coord'] })
       toast.success('Ausencia registrada. El sistema calculó el impacto.')
-      // Si vino desea_reponer=SÍ, notificamos al padre para que
-      // encadene el modal de proponer reposición (Fase 3).
-      if (creada?.wants_makeup === true && typeof onCreated === 'function') {
-        onCreated(creada)
-      }
       onClose()
     },
     onError: (err) => toast.error(err?.message ?? 'Error al registrar la ausencia'),
@@ -133,8 +121,8 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, onCreated
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
   const ciudadOk = !esMotivoRegional || form.regional_city.trim().length >= 2
-  const empresaOk = !!form.affected_company  // Fase 5 · v04: campo obligatorio del formato
-  const valid = form.resource_id && form.type && form.start_date && !fechaInvalida && horasOk && ciudadOk && empresaOk
+  const grupoSel = GRUPOS_TIPO_AUSENCIA.find((g) => g.value === form.grupo)
+  const valid = form.resource_id && form.type && form.start_date && !fechaInvalida && horasOk && ciudadOk
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && tryClose()}>
@@ -179,29 +167,51 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, onCreated
             </select>
           </div>
 
+          {/* Primer nivel. Cambiarlo limpia el tipo: los del grupo anterior
+              ya no aplican y dejarlo puesto guardaría una incoherencia. */}
           <div>
-            <label className="label">Tipo de ausencia *</label>
+            <label className="label">¿La ausencia es remunerada? *</label>
             <select
               className="input"
-              value={form.reasonId || form.type}
-              onChange={(e) => {
-                const sel = opcionesMotivo.find((t) => String(t.id) === e.target.value || t.value === e.target.value)
-                const codigosEnum = TIPOS_AUSENCIA.map((t) => t.value)
-                const tipoEnum = codigosEnum.includes(sel?.value) ? sel.value : 'otra'
-                setForm((f) => ({
-                  ...f,
-                  reasonId: sel?.id ?? '',
-                  motivoCodigo: sel?.value ?? '',
-                  type: sel ? tipoEnum : '',
-                  // Si cambia a un motivo distinto de "regional", limpiamos la ciudad.
-                  regional_city: sel?.value === 'regional' ? f.regional_city : '',
-                }))
-              }}
+              value={form.grupo}
+              onChange={(e) => setForm((f) => ({
+                ...f, grupo: e.target.value, reasonId: '', motivoCodigo: '', type: '', regional_city: '',
+              }))}
             >
-              <option value="">Seleccionar tipo...</option>
-              {opcionesMotivo.map((t) => <option key={t.id ?? t.value} value={t.id ?? t.value}>{t.label}</option>)}
+              <option value="">Seleccionar...</option>
+              {GRUPOS_TIPO_AUSENCIA.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
             </select>
+            {grupoSel && <div className="text-[11px] text-gray-500 mt-1">{grupoSel.descripcion}</div>}
           </div>
+
+          {/* Segundo nivel. */}
+          {form.grupo && (
+            <div>
+              <label className="label">Tipo de ausencia *</label>
+              <select
+                className="input"
+                value={form.reasonId || form.type}
+                onChange={(e) => {
+                  const sel = tiposDelGrupo(form.grupo, motivosCatalogo).find(
+                    (t) => String(t.id) === e.target.value || t.value === e.target.value,
+                  )
+                  setForm((f) => ({
+                    ...f,
+                    reasonId: sel?.id ?? '',
+                    motivoCodigo: sel?.value ?? '',
+                    type: sel?.value ?? '',
+                    // Si cambia a un motivo distinto de "regional", limpiamos la ciudad.
+                    regional_city: sel?.value === 'regional' ? f.regional_city : '',
+                  }))
+                }}
+              >
+                <option value="">Seleccionar tipo...</option>
+                {tiposDelGrupo(form.grupo, motivosCatalogo).map((t) => (
+                  <option key={t.id ?? t.value} value={t.id ?? t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {esMotivoRegional && (
             <div>
@@ -272,80 +282,6 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, onCreated
           <div>
             <label className="label">Observaciones</label>
             <textarea className="input resize-none" rows={2} value={form.reason} onChange={(e) => set('reason', e.target.value)} placeholder="Ej: No se presentó al consultorio y no avisó" />
-          </div>
-
-          {/* La empresa afectada y la reposición son datos del negocio: la primera
-              decide la razón social con la que la ausencia sale en los informes
-              (FOCA y VIU son entidades distintas) y la segunda dispara el flujo
-              de reposición. */}
-          <div className="border-t border-gray-100 pt-3">
-            <div className="text-[11px] uppercase tracking-wide text-gray-400 mb-2">Datos de la ausencia</div>
-
-            <div>
-              <label className="label">¿A qué empresa aplica la ausencia? *</label>
-              <div className="flex gap-4 flex-wrap">
-                {[
-                  { v: 'foca',  l: 'FOCA' },
-                  { v: 'viu',   l: 'VIU' },
-                  { v: 'ambas', l: 'AMBAS' },
-                ].map((o) => (
-                  <label key={o.v} className="flex items-center gap-1.5 text-xs cursor-pointer">
-                    <input
-                      type="radio"
-                      name="empresa_afectada"
-                      checked={form.affected_company === o.v}
-                      onChange={() => set('affected_company', o.v)}
-                    />
-                    {o.l}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-
-            {/* Reposición solo aplica a profesionales que atienden pacientes.
-                El personal de apoyo (asesores, auxiliares, tecnicos,
-                anestesiologos) no repone — bloque oculto para esas categorias. */}
-            {TIPOS_QUE_REPONEN.has(categoria) && (
-              <>
-                <div className="mt-3">
-                  <label className="label">¿Desea reponer?</label>
-                  <div className="flex gap-4 flex-wrap">
-                    {[
-                      { v: 'si', l: 'SÍ' },
-                      { v: 'no', l: 'NO' },
-                    ].map((o) => (
-                      <label key={o.v} className="flex items-center gap-1.5 text-xs cursor-pointer">
-                        <input
-                          type="radio"
-                          name="desea_reponer"
-                          checked={form.wants_makeup === o.v}
-                          onChange={() => set('wants_makeup', o.v)}
-                        />
-                        {o.l}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {form.wants_makeup === 'si' && (
-                  <div className="mt-3">
-                    <label className="label">Observaciones de reposición</label>
-                    <textarea
-                      className="input resize-none"
-                      rows={2}
-                      value={form.makeup_notes}
-                      onChange={(e) => set('makeup_notes', e.target.value)}
-                      placeholder="Detalle la fecha, horario y/o modalidad propuesta para la reposición."
-                      maxLength={2000}
-                    />
-                    <div className="text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded p-2 mt-2">
-                      ℹ️ Al confirmar esta ausencia, se abrirá automáticamente el formulario de <strong>Proponer reposición</strong> con estos datos precargados.
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
           </div>
 
           {alertaAnticip && (

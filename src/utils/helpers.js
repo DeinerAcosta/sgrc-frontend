@@ -41,6 +41,52 @@ export const TIPOS_AUSENCIA = [
   { value: 'otra',                label: 'Otra' },
 ]
 
+// Oct-2026 · EL TIPO DE AUSENCIA, EN DOS NIVELES
+//
+// Hector, revisando en local: "cuando yo presione uno me aparezca otro select
+// desglosando cuales son de cada uno". Primero se elige si la ausencia es
+// remunerada o no, y eso recorta el segundo select.
+//
+// El reparto vive AQUI y en un solo sitio, porque es una regla de nomina y va
+// a cambiar: mover un tipo de grupo es mover una linea. Los valores son los
+// del enum que ya valida el backend, asi que esto no necesita migracion.
+//
+// PENDIENTE DE CONFIRMAR CON NOMINA: este reparto es una propuesta. 'otra'
+// quedo en no remunerada porque es el caso sin respaldo documental; si en la
+// practica se usa como cajon de sastre para cosas que si se pagan, hay que
+// moverla o partirla en dos.
+export const GRUPOS_TIPO_AUSENCIA = [
+  {
+    value: 'remunerada',
+    label: 'Remunerada',
+    descripcion: 'La clínica paga el tiempo no trabajado.',
+    tipos: ['enfermedad', 'calamidad', 'familiar', 'academico', 'vacaciones', 'licencia_remunerada'],
+  },
+  {
+    value: 'no_remunerada',
+    label: 'No remunerada',
+    descripcion: 'El tiempo no trabajado no se paga.',
+    tipos: ['licencia_no_remunerada', 'no_presentacion', 'otra'],
+  },
+]
+
+/**
+ * Los tipos de un grupo, listos para pintar en el segundo select.
+ *
+ * Si el catálogo de motivos tiene uno con el mismo código, mandan su id y su
+ * nombre: así lo que el admin renombre desde Catálogos se ve aquí, y la
+ * ausencia queda enlazada al motivo en vez de solo al enum.
+ */
+export function tiposDelGrupo(grupo, catalogo = []) {
+  const g = GRUPOS_TIPO_AUSENCIA.find((x) => x.value === grupo)
+  if (!g) return []
+  return g.tipos.map((code) => {
+    const base = TIPOS_AUSENCIA.find((t) => t.value === code)
+    const delCatalogo = catalogo.find((m) => m.code === code)
+    return { id: delCatalogo?.id ?? null, value: code, label: delCatalogo?.name ?? base?.label ?? code }
+  })
+}
+
 export const TIPOS_RECURSO = [
   { value: 'oftalmologo',      label: 'Oftalmólogo',         color: 'teal' },
   { value: 'optometra',        label: 'Optómetra',           color: 'purple' },
