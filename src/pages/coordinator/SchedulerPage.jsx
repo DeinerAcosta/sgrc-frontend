@@ -253,6 +253,24 @@ export default function ProgramadorPage() {
     return m
   }, [ausenciasSemana])
 
+  /**
+   * ¿Esta asignación cae dentro de la ausencia?
+   *
+   * Una ausencia parcial no tumba el día entero. Quien falta de 07:00 a 11:00
+   * sigue atendiendo por la tarde: ese turno va verde, no rojo. Antes se
+   * pintaba todo el día y el coordinador veía como caída una agenda que estaba
+   * en pie.
+   *
+   * Las horas son "HH:mm" de ancho fijo: compararlas como texto equivale a
+   * compararlas como minutos.
+   */
+  const laTumbaLaAusencia = (asig, ausencia) => {
+    if (!ausencia?.is_partial) return true
+    const { absence_start_time: desde, absence_end_time: hasta } = ausencia
+    if (!desde || !hasta) return true
+    return !(hasta <= asig.start_time || desde >= asig.end_time)
+  }
+
   // Mapa "recursoId|dia" -> ausencia. Se indexa por DIA y no solo por recurso
   // porque una ausencia de martes a jueves no debe teñir el lunes: aqui el dato
   // ES el dia. Se memoiza porque la grilla se repinta cientos de veces.
@@ -1017,7 +1035,9 @@ export default function ProgramadorPage() {
                     return (
                       <td key={dia} className="p-1 align-top border-r border-gray-50 min-h-12">
                         {asigs.map((a, idx) => {
-                          const ausente = ausenciasPorRecursoDia.get(a.resource?.id + '|' + dia)
+                          const posibleAusencia = ausenciasPorRecursoDia.get(a.resource?.id + '|' + dia)
+                          // Parcial: solo las franjas que pisa su horario.
+                          const ausente = laTumbaLaAusencia(a, posibleAusencia) ? posibleAusencia : undefined
                           const esReemplazo = !!a.covered_absence_id
                           // Ya se pinta dentro del recuadro de su pareja.
                           if (fusionados.has(a.id)) return null
