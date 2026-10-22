@@ -65,22 +65,30 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, tipos }) 
     ),
   })
 
-  // Oftalmólogos y anestesiólogos son ROTATIVOS — no tienen coordinador_lider ni sede fija,
+  // Los PROFESIONALES son rotativos — no tienen coordinador_lider ni sede fija,
   // pero igual el coordinador debe poder registrarles ausencia (si no se presentan, la sede pierde
   // dinero por costo del consultorio agendado). Traer aparte y combinar con el equipo.
-  const { data: rotativosOft = [] } = useQuery({
-    queryKey: ['recursos-rotativos-oftalmologo'],
-    queryFn: () => recursoService.list({ type: 'oftalmologo', active: true }),
+  // 22-oct · QA (F1): solo traía oftalmólogos y anestesiólogos; con "Optómetra"
+  // salía "Sin personal" aunque hay 12 activos. Ahora los cinco tipos de profesional.
+  const { data: rotativos = [] } = useQuery({
+    queryKey: ['recursos-rotativos-profesionales'],
+    queryFn: async () => (await Promise.all(
+      ['oftalmologo', 'optometra', 'anestesiologo', 'otorrino', 'fonoaudiologa']
+        .map((type) => recursoService.list({ type, active: true })),
+    )).flat(),
   })
-  const { data: rotativosAnest = [] } = useQuery({
-    queryKey: ['recursos-rotativos-anestesiologo'],
-    queryFn: () => recursoService.list({ type: 'anestesiologo', active: true }),
+  // Y el personal de la sede activa (técnicos, auxiliares, asesores que no
+  // tienen a este coordinador como líder pero trabajan en su sede).
+  const { data: deLaSede = [] } = useQuery({
+    queryKey: ['recursos-sede-ausencia', sedeId],
+    queryFn: () => recursoService.list({ site_id: sedeId, active: true }),
+    enabled: esCoordAus && !!sedeId,
   })
 
-  // Combina y deduplica por id (por si algún oftalmólogo tiene líder asignado y aparece en ambos).
+  // Combina y deduplica por id (por si algún profesional tiene líder asignado y aparece en ambos).
   const recursos = (() => {
     const map = new Map()
-    for (const r of [...equipo, ...rotativosOft, ...rotativosAnest]) map.set(r.id, r)
+    for (const r of [...equipo, ...deLaSede, ...rotativos]) map.set(r.id, r)
     return [...map.values()]
   })()
 

@@ -8,7 +8,7 @@ import { format, startOfMonth, startOfYear, endOfMonth } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { informeService, sedeService } from '@/services/api'
 import { Spinner, EmptyState } from '@/components/ui'
-import { TIPOS_RECURSO } from '@/utils/helpers'
+import { TIPOS_RECURSO, parseFechaLocal } from '@/utils/helpers'
 import focaLogo from '@/assets/brand/foca-azul.png'
 
 // ============================================================================
@@ -57,10 +57,21 @@ function rangoAnio() {
 }
 
 // Header FOCA (estilo tablero gerencial: logo + titulo grande serif + chips)
+// 22-oct · QA (F6): tomaba la primera palabra y salía solo "Dr.". Ahora el
+// título (Dr., Dra., Tec.) más el primer nombre y el primer apellido.
+const nombreCorto = (nombre) => {
+  if (!nombre) return '—'
+  const p = nombre.trim().split(/\s+/)
+  const titulo = /^(dr|dra|tec|téc|lic)\.?$/i.test(p[0]) ? p.shift() + ' ' : ''
+  return titulo + p.slice(0, 2).join(' ')
+}
+
 function HeaderFOCA({ rango, totalEventos, totalPacientes }) {
   const gestion = useMemo(() => {
-    const d = new Date(rango.desde)
-    const h = new Date(rango.hasta)
+    // 22-oct · QA (F5): new Date('2026-01-01') es medianoche UTC = 31-dic en
+    // Colombia, y el encabezado decía "Dic–Oct". Se lee como fecha local.
+    const d = parseFechaLocal(rango.desde)
+    const h = parseFechaLocal(rango.hasta)
     return `${MESES_ES_ABREV[d.getMonth()]}–${MESES_ES_ABREV[h.getMonth()]} ${h.getFullYear()}`
   }, [rango])
   return (
@@ -524,8 +535,8 @@ function TabMedicos({ data }) {
       >
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <KpiFoca label="Top 3 médicos" value={`${pctTop3}%`} color="text-amber-600" sub="de los pacientes afectados" />
-          <KpiFoca label="Líder de impacto" value={lider?.name?.split(' ')[0] ?? '—'} color="text-red-600" sub={`${fmtNum(lider?.pacientes ?? 0)} pac · ${lider?.count > 0 ? Math.round((lider.approved_makeups / lider.count) * 100) : 0}% repone`} />
-          <KpiFoca label="Mejor reposición" value={mejorRep?.name?.split(' ')[0] ?? '—'} color="text-blue-600" sub={`${mejorRep?.approved_makeups ?? 0} de ${mejorRep?.count ?? 0} repuestos`} />
+          <KpiFoca label="Líder de impacto" value={nombreCorto(lider?.name)} color="text-red-600" sub={`${fmtNum(lider?.pacientes ?? 0)} pac · ${lider?.count > 0 ? Math.round((lider.approved_makeups / lider.count) * 100) : 0}% repone`} />
+          <KpiFoca label="Mejor reposición" value={nombreCorto(mejorRep?.name)} color="text-blue-600" sub={`${mejorRep?.approved_makeups ?? 0} de ${mejorRep?.count ?? 0} repuestos`} />
           <KpiFoca label="Médicos en selección" value={fmtNum(data.medicos_involucrados ?? 0)} color="text-brand-800" sub="distribución asimétrica" />
         </div>
       </Panel>
