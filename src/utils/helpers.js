@@ -82,9 +82,18 @@ export const MOTIVO_RETRASO = 'retraso_inicio'
  * nombre: así lo que el admin renombre desde Catálogos se ve aquí, y la
  * ausencia queda enlazada al motivo en vez de solo al enum.
  */
+// 22-oct · Hector: si ya se eligió "Remunerada" / "No remunerada", ofrecer
+// además "Licencia remunerada" / "Licencia no remunerada" como tipo sobra.
+// Las ausencias viejas con esos tipos se siguen mostrando con su nombre.
+const TIPOS_QUE_REPITEN_EL_GRUPO = new Set(['licencia_remunerada', 'licencia_no_remunerada'])
+
 export function tiposDelGrupo(grupo, catalogo = []) {
   const g = GRUPOS_TIPO_AUSENCIA.find((x) => x.value === grupo)
   if (!g) return []
+  return tiposDelGrupoSinFiltrar(g, grupo, catalogo).filter((t) => !TIPOS_QUE_REPITEN_EL_GRUPO.has(t.code))
+}
+
+function tiposDelGrupoSinFiltrar(g, grupo, catalogo) {
   // 22-oct · Hector: si es remunerado lo dice cada motivo del catálogo
   // (Configuración → Motivos de ausencia). Así un motivo nuevo sale solo en su
   // grupo. Lo fijo de abajo queda para cuando el catálogo no carga.
@@ -96,13 +105,13 @@ export function tiposDelGrupo(grupo, catalogo = []) {
         const base = TIPOS_AUSENCIA.find((t) => t.value === m.code)
         return { id: m.id, value: base ? m.code : 'otra', code: m.code, label: m.name }
       })
-    // Los tipos base del grupo que el catálogo no trae siguen saliendo: si
-    // faltaran, el grupo podría quedar vacío y no se podría registrar nada.
-    const codigos = new Set(conMarca.map((m) => m.code))
-    const base = g.tipos
-      .filter((code) => !codigos.has(code) && TIPOS_AUSENCIA.some((t) => t.value === code))
+    // Lo que se eliminó del catálogo no vuelve a salir. Solo si el grupo se
+    // quedara sin nada que elegir se ofrecen los tipos base, para que se
+    // pueda seguir registrando.
+    if (delCatalogo.some((t) => !TIPOS_QUE_REPITEN_EL_GRUPO.has(t.code))) return delCatalogo
+    return g.tipos
+      .filter((code) => TIPOS_AUSENCIA.some((t) => t.value === code))
       .map((code) => ({ id: null, value: code, code, label: TIPOS_AUSENCIA.find((t) => t.value === code).label }))
-    return [...delCatalogo, ...base]
   }
   return g.tipos.flatMap((code) => {
     const base = TIPOS_AUSENCIA.find((t) => t.value === code)

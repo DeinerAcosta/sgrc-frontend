@@ -147,7 +147,7 @@ export default function AdminMotivosAusenciaPage() {
                         {!m.is_system && m.active && (
                           <button className="text-xs text-amber-700 hover:underline mr-3" onClick={() => confirmarDesactivar(m)}>Desactivar</button>
                         )}
-                        {!m.is_system && m.code !== 'retraso_inicio' && (
+                        {m.code !== 'retraso_inicio' && (
                           <button className="text-xs text-red-600 hover:underline" onClick={() => confirmarEliminar(m)}>Eliminar</button>
                         )}
                       </td>

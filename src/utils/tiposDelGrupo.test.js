@@ -33,6 +33,16 @@ describe('tiposDelGrupo · los grupos salen del catálogo (22-oct)', () => {
     expect(rem.some((t) => t.code === 'formato')).toBe(false)
   })
 
+  it('no ofrece "Licencia remunerada" ni "Licencia no remunerada": ya lo dice el grupo', () => {
+    const todos = [...tiposDelGrupo('remunerada', produccion), ...tiposDelGrupo('no_remunerada', produccion), ...tiposDelGrupo('remunerada', [])]
+    expect(todos.some((t) => t.code === 'licencia_remunerada' || t.code === 'licencia_no_remunerada')).toBe(false)
+  })
+
+  it('un motivo del sistema eliminado del catálogo no vuelve a salir', () => {
+    const sinVacaciones = produccion.filter((m) => m.code !== 'vacaciones')
+    expect(tiposDelGrupo('remunerada', sinVacaciones).some((t) => t.code === 'vacaciones')).toBe(false)
+  })
+
   it('sin catálogo, usa la lista fija', () => {
     expect(tiposDelGrupo('remunerada', []).length).toBeGreaterThan(0)
   })
