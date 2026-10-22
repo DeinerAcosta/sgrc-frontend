@@ -117,7 +117,7 @@ export default function AusenciaFormModal({ recursoId, onClose, horarioSemana = 
   // Al cambiar las fechas de la ausencia, las de reposición que caigan en ella se quitan.
   const fechasValidas = form.makeup_dates.filter((f) => !(form.start_date && f >= form.start_date && f <= (form.end_date || form.start_date)))
   const esRetraso = form.motivoCodigo === MOTIVO_RETRASO
-  const horasRetraso = !esRetraso || (form.absence_start_time && form.absence_end_time)
+  const horasRetraso = !(esRetraso || form.is_partial) || (form.absence_start_time && form.absence_end_time)
   const valid = form.type && form.start_date && horasRetraso && autorizaDatos && !!autorizacion && !faltaMotivoNoReponer
 
   return (
@@ -209,11 +209,11 @@ export default function AusenciaFormModal({ recursoId, onClose, horarioSemana = 
           {form.is_partial && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="label">{esRetraso ? 'Hora en que debía empezar' : 'Hora inicio ausencia'}</label>
+                <label className="label">{esRetraso ? 'Hora en que debía empezar' : 'Hora inicio ausencia'} <span className="text-red-600">*</span></label>
                 <input className="input" type="time" value={form.absence_start_time} onChange={(e) => set('absence_start_time', e.target.value)} />
               </div>
               <div>
-                <label className="label">{esRetraso ? 'Hora en que empezó' : 'Hora fin ausencia'}</label>
+                <label className="label">{esRetraso ? 'Hora en que empezó' : 'Hora fin ausencia'} <span className="text-red-600">*</span></label>
                 <input className="input" type="time" value={form.absence_end_time} onChange={(e) => set('absence_end_time', e.target.value)} />
               </div>
             </div>

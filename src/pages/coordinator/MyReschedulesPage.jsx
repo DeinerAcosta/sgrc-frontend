@@ -210,7 +210,7 @@ function Llamadas({ caso, onGuardar, guardando }) {
       </p>
       <div className="flex flex-wrap items-end gap-3">
         <label className="text-xs text-gray-600">
-          <span className="block mb-1">Contestaron</span>
+          <span className="block mb-1 font-semibold text-gray-700">Contestaron</span>
           <input
             type="number" min="0" inputMode="numeric"
             id={`contestaron-${caso.id}`}
@@ -221,7 +221,7 @@ function Llamadas({ caso, onGuardar, guardando }) {
           />
         </label>
         <label className="text-xs text-gray-600">
-          <span className="block mb-1">No contestaron</span>
+          <span className="block mb-1 font-semibold text-gray-700">No contestaron</span>
           <input
             type="number" min="0" inputMode="numeric"
             id={`no-contestaron-${caso.id}`}
@@ -235,7 +235,7 @@ function Llamadas({ caso, onGuardar, guardando }) {
         {/* Oct-2026 · Solo para ver (Hector: "Pacientes reales (SOLO
             VISUAL)"). Los pone la líder en el caso. */}
         <label className="text-xs text-gray-600">
-          <span className="block mb-1">Pacientes reales</span>
+          <span className="block mb-1 font-semibold text-gray-700">Pacientes reales</span>
           <input
             type="number" readOnly tabIndex={-1}
             id={`oficiales-${caso.id}`}

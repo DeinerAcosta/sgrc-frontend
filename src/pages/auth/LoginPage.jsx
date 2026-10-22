@@ -115,7 +115,7 @@ export default function LoginPage() {
         </p>
         <div className="space-y-4">
           <div>
-            <label className="label">Correo electrónico</label>
+            <label className="label">Correo electrónico <span className="text-red-600">*</span></label>
             <input
               className="input"
               type="email"
@@ -144,7 +144,7 @@ export default function LoginPage() {
 
       <div className="space-y-4">
         <div>
-          <label className="label">Correo electrónico</label>
+          <label className="label">Correo electrónico <span className="text-red-600">*</span></label>
           <input
             className="input"
             type="email"
@@ -156,7 +156,7 @@ export default function LoginPage() {
         </div>
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="label mb-0">Contraseña</label>
+            <label className="label mb-0">Contraseña <span className="text-red-600">*</span></label>
             <button onClick={() => setForgot(true)} className="text-xs text-brand-600 hover:underline">
               ¿Olvidaste tu contraseña?
             </button>

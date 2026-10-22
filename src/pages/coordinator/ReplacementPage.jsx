@@ -273,7 +273,7 @@ function AsignarReprogramador({ ausencia, cuenta }) {
       {puedeAsignar && ausencia.status !== 'rechazada' && !resuelta && (
         <div className="space-y-3">
           <div>
-            <label className="label">{asignada ? 'Reasignar a' : 'Asignar a'}</label>
+            <label className="label">{asignada ? 'Reasignar a' : 'Asignar a'} <span className="text-red-600">*</span></label>
             <select className="input" value={elegido} onChange={(e) => setElegido(e.target.value)}>
               <option value="">Seleccionar reprogramador...</option>
               {reprogramadores.map((r) => (
@@ -514,7 +514,7 @@ function PacientesDelCaso({ ausencia, cuenta }) {
   if (editando) {
     return (
       <div>
-        <div className="text-gray-400">Pacientes reales</div>
+        <div className="font-semibold text-gray-700">Pacientes reales <span className="text-red-600">*</span></div>
         <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
           <input
             type="number" min={minimo} max={1000} inputMode="numeric" autoFocus

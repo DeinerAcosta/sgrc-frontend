@@ -1081,7 +1081,7 @@ function RemuneradaEditable({ ausencia }) {
   if (!puede) return <Row label="Remunerada" value={ausencia.remunerada ? 'Sí' : 'No'} />
   return (
     <div className="flex justify-between items-center gap-2">
-      <span className="text-gray-400">Remunerada</span>
+      <span className="font-semibold text-gray-700">Remunerada</span>
       <select
         className="input py-0.5 text-xs w-20"
         value={ausencia.remunerada ? 'si' : 'no'}

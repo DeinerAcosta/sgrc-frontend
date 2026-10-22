@@ -1717,7 +1717,7 @@ function CopiarDiaModal({ info, semanaId, sedeId, semanaSiguienteId, origenCerra
             {descripcion}
           </div>
           <div>
-            <label className="label">¿A qué semana?</label>
+            <label className="label">¿A qué semana? <span className="text-red-600">*</span></label>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
@@ -1745,7 +1745,7 @@ function CopiarDiaModal({ info, semanaId, sedeId, semanaSiguienteId, origenCerra
             )}
           </div>
           <div>
-            <label className="label">¿A qué día(s)?</label>
+            <label className="label">¿A qué día(s)? <span className="text-red-600">*</span></label>
             <div className="border border-gray-200 rounded-lg p-2 space-y-1">
               {diasDisponibles.map((d) => {
                 const label = DIAS_TODOS_LABEL[DIAS_TODOS.indexOf(d)]
