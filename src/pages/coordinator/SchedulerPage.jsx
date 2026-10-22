@@ -753,7 +753,10 @@ export default function ProgramadorPage() {
               + Crear semana
             </button>
           )}
-          {semanaActual && !isCerrada && (
+          {/* 22-oct · Con programación libre el servidor deja copiar hacia una
+              semana cerrada (weekController.copiar), pero el botón se escondía
+              igual: Hector no podía copiar la semana anterior. */}
+          {semanaActual && (!isCerrada || libre) && (
             <button
               className="btn"
               onClick={() => onClickCopiarSemana()}
