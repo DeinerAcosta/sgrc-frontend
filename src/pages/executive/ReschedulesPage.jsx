@@ -35,7 +35,7 @@ const TIPO_LABEL = Object.fromEntries(TIPOS_RECURSO.map((t) => [t.value, t.label
 
 const TABS = [
   { key: 'resumen',    label: 'Resumen ejecutivo' },
-  { key: 'medicos',    label: 'Médicos' },
+  { key: 'medicos',    label: 'Profesionales' },
   { key: 'reposicion', label: 'Reposición & cobertura' },
   { key: 'causas',     label: 'Causas & especialidades' },
   { key: 'reprogramadores', label: 'Gestión de reprogramadores' },
@@ -81,7 +81,7 @@ function HeaderFOCA({ rango, totalEventos, totalPacientes }) {
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-[10px] tracking-widest uppercase text-brand-600 font-semibold">Central de citas</div>
-        <div className="text-xl sm:text-2xl font-semibold text-gray-900 leading-tight">Reprogramación de agendas médicas</div>
+        <div className="text-xl sm:text-2xl font-semibold text-gray-900 leading-tight">Reprogramación de agendas de profesionales</div>
       </div>
       <div className="flex flex-wrap gap-2">
         <div className="px-3 py-1.5 bg-white border border-gray-200 rounded-full text-xs text-gray-700">
@@ -396,7 +396,7 @@ function TabResumen({ data }) {
           <KpiFoca label="Pacientes impactados" value={fmtNum(totalPac)} color="text-amber-600" sub={`${promPorEvento} por evento`} />
           <KpiFoca label="Tasa de reposición" value={`${tasaRep}%`} color="text-red-600" sub={`${pctSinRep}% no se repuso`} />
           <KpiFoca label="Pacientes sin cobertura" value={fmtNum(sinCobertura)} color="text-red-600" sub="Sin turno nuevo" />
-          <KpiFoca label="Médicos involucrados" value={fmtNum(medicos)} color="text-brand-800" sub="Profesionales distintos" />
+          <KpiFoca label="Profesionales involucrados" value={fmtNum(medicos)} color="text-brand-800" sub="Personas distintas" />
           <KpiFoca label="Avisadas con 20+ días" value={`${pctAntel}%`} color="text-blue-600" sub={`Promedio ${mediaAntel} días`} />
         </div>
       </Panel>
@@ -529,21 +529,21 @@ function TabMedicos({ data }) {
   return (
     <>
       <Panel
-        eyebrow="Profundización · Médicos"
+        eyebrow="Profundización · Profesionales"
         title="Concentración y reposición por profesional"
         description="Quién genera el mayor impacto en pacientes y qué tan frecuentemente repone su agenda. Barra = eventos, segmentada entre repuestos y no repuestos."
       >
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <KpiFoca label="Top 3 médicos" value={`${pctTop3}%`} color="text-amber-600" sub="de los pacientes afectados" />
+          <KpiFoca label="Top 3 profesionales" value={`${pctTop3}%`} color="text-amber-600" sub="de los pacientes afectados" />
           <KpiFoca label="Líder de impacto" value={nombreCorto(lider?.name)} color="text-red-600" sub={`${fmtNum(lider?.pacientes ?? 0)} pac · ${lider?.count > 0 ? Math.round((lider.approved_makeups / lider.count) * 100) : 0}% repone`} />
           <KpiFoca label="Mejor reposición" value={nombreCorto(mejorRep?.name)} color="text-blue-600" sub={`${mejorRep?.approved_makeups ?? 0} de ${mejorRep?.count ?? 0} repuestos`} />
-          <KpiFoca label="Médicos en selección" value={fmtNum(data.medicos_involucrados ?? 0)} color="text-brand-800" sub="distribución asimétrica" />
+          <KpiFoca label="Profesionales en selección" value={fmtNum(data.medicos_involucrados ?? 0)} color="text-brand-800" sub="distribución asimétrica" />
         </div>
       </Panel>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-6">
         <ChartCard
-          title="Eventos por médico — ¿repuso o no?"
+          title="Eventos por profesional — ¿repuso o no?"
           description="Azul = repuestos · coral = sin reponer · ordenado por pacientes afectados"
         >
           <div style={{ width: '100%', height: Math.max(220, top12.length * 28) }}>
