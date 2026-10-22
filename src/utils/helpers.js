@@ -85,6 +85,25 @@ export const MOTIVO_RETRASO = 'retraso_inicio'
 export function tiposDelGrupo(grupo, catalogo = []) {
   const g = GRUPOS_TIPO_AUSENCIA.find((x) => x.value === grupo)
   if (!g) return []
+  // 22-oct · Hector: si es remunerado lo dice cada motivo del catálogo
+  // (Configuración → Motivos de ausencia). Así un motivo nuevo sale solo en su
+  // grupo. Lo fijo de abajo queda para cuando el catálogo no carga.
+  const conMarca = catalogo.filter((m) => m.active !== false && typeof m.is_paid === 'boolean')
+  if (conMarca.length) {
+    const delCatalogo = conMarca
+      .filter((m) => m.is_paid === (grupo === 'remunerada'))
+      .map((m) => {
+        const base = TIPOS_AUSENCIA.find((t) => t.value === m.code)
+        return { id: m.id, value: base ? m.code : 'otra', code: m.code, label: m.name }
+      })
+    // Los tipos base del grupo que el catálogo no trae siguen saliendo: si
+    // faltaran, el grupo podría quedar vacío y no se podría registrar nada.
+    const codigos = new Set(conMarca.map((m) => m.code))
+    const base = g.tipos
+      .filter((code) => !codigos.has(code) && TIPOS_AUSENCIA.some((t) => t.value === code))
+      .map((code) => ({ id: null, value: code, code, label: TIPOS_AUSENCIA.find((t) => t.value === code).label }))
+    return [...delCatalogo, ...base]
+  }
   return g.tipos.flatMap((code) => {
     const base = TIPOS_AUSENCIA.find((t) => t.value === code)
     const delCatalogo = catalogo.find((m) => m.code === code)

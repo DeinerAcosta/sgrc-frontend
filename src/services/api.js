@@ -1223,6 +1223,8 @@ export const motivoAusenciaService = {
   crear: async (data) => api.post('/absence-reasons', data),
   actualizar: async (id, data) => api.put(`/absence-reasons/${id}`, data),
   desactivar: async (id) => api.delete(`/absence-reasons/${id}`),
+  /** Oct-2026 · Eliminar de verdad (los del sistema siguen protegidos). */
+  eliminar: async (id) => api.delete(`/absence-reasons/${id}/permanent`),
 }
 
 // ============ AUDITORÍA (HU-S-05) ============

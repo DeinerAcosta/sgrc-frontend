@@ -6,25 +6,14 @@ import { Spinner, EmptyState, SectionHeader, Badge } from '@/components/ui'
 import { useDirtyClose } from '@/hooks/useDirtyClose'
 import { useConfirm } from '@/contexts/ConfirmContext'
 
-// Alineado al tablero FOCA (ago-2026): 5 familias de causa raíz + "otros".
-// El label debe coincidir con FAMILIAS_MOTIVO_LABEL en el backend.
-const FAMILIAS = [
-  { value: 'ausencia_profesional',     label: 'Ausencia profesional',     variant: 'red'   },
-  { value: 'reprogramacion_operativa', label: 'Reprogramación operativa', variant: 'blue'  },
-  { value: 'ajuste_cupos',             label: 'Ajuste de cupos',          variant: 'green' },
-  { value: 'movilidad_regional',       label: 'Movilidad / Regional',     variant: 'amber' },
-  { value: 'calendario_festivo',       label: 'Calendario / Festivo',     variant: 'gray'  },
-  { value: 'otros',                    label: 'Otros',                    variant: 'gray'  },
-]
-const FAMILIA_MAP = Object.fromEntries(FAMILIAS.map((f) => [f.value, f]))
-
 /**
  * Catálogo editable de motivos de ausencia. Gerencia y supervisor pueden:
  *  - Editar nombre / descripción / factor de impacto / orden de los 9 motivos
  *    del sistema (no se pueden borrar ni desactivar).
  *  - Crear motivos personalizados nuevos (con código auto-generado del nombre).
- *  - Desactivar motivos personalizados (soft-delete — las ausencias antiguas
- *    siguen vinculadas pero ya no aparece en el dropdown del modal).
+ *  - Desactivar motivos personalizados (ya no aparecen en el formulario) o
+ *    eliminarlos de verdad (oct-2026); las ausencias viejas conservan su tipo.
+ *  - Decir si cada motivo es remunerado: arma los dos grupos del formulario.
  *
  * El factor de impacto (0.00 a 1.00) multiplica los pacientes y el costo
  * de oportunidad en el cálculo de RN-18. Ej: factor=0.30 en "Vacaciones"
@@ -36,7 +25,8 @@ export default function AdminMotivosAusenciaPage() {
   const confirm = useConfirm()
   const [editando, setEditando] = useState(null)
   const [creando, setCreando] = useState(false)
-  const [filtroFamilia, setFiltroFamilia] = useState('todas')
+  // 22-oct · Hector quitó la familia de esta pantalla; el filtro es remunerada sí/no.
+  const [filtro, setFiltro] = useState('todas')
 
   const { data: motivos = [], isLoading } = useQuery({
     queryKey: ['motivos-ausencia'],
@@ -44,18 +34,30 @@ export default function AdminMotivosAusenciaPage() {
   })
 
   const motivosFiltrados = useMemo(() => {
-    if (filtroFamilia === 'todas') return motivos
-    return motivos.filter((m) => (m.family ?? 'ausencia_profesional') === filtroFamilia)
-  }, [motivos, filtroFamilia])
+    if (filtro === 'todas') return motivos
+    return motivos.filter((m) => !!m.is_paid === (filtro === 'si'))
+  }, [motivos, filtro])
+  const remuneradas = motivos.filter((m) => m.is_paid).length
 
-  const conteoPorFamilia = useMemo(() => {
-    const acc = {}
-    for (const m of motivos) {
-      const f = m.family ?? 'ausencia_profesional'
-      acc[f] = (acc[f] ?? 0) + 1
-    }
-    return acc
-  }, [motivos])
+  const { mutate: eliminar } = useMutation({
+    mutationFn: (id) => motivoAusenciaService.eliminar(id),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ['motivos-ausencia'] })
+      toast.success(r?.ausencias_sin_motivo ? `Motivo eliminado · ${r.ausencias_sin_motivo} ausencia(s) quedan con su tipo base` : 'Motivo eliminado')
+    },
+    onError: (err) => toast.error(err?.message ?? 'Error al eliminar'),
+  })
+
+  const confirmarEliminar = async (m) => {
+    const ok = await confirm({
+      title: `¿Eliminar "${m.name}" definitivamente?`,
+      message: 'Se borra del catálogo y no se puede deshacer. Las ausencias que ya lo usaban conservan su tipo base, pero dejan de mostrar este motivo.',
+      confirmLabel: 'Eliminar',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    })
+    if (ok) eliminar(m.id)
+  }
 
   const { mutate: desactivar } = useMutation({
     mutationFn: (id) => motivoAusenciaService.desactivar(id),
@@ -80,7 +82,7 @@ export default function AdminMotivosAusenciaPage() {
         <div>
           <h1 className="text-base font-semibold text-gray-900">Motivos de ausencia</h1>
           <p className="text-xs text-gray-500">
-            Catálogo editable con factor de impacto por motivo. El factor multiplica los pacientes y el costo cuando se confirma una nueva ausencia.
+            Los motivos que se eligen al registrar una ausencia, si son remunerados y cuánto impactan en pacientes y costo.
           </p>
         </div>
         <button className="btn-primary text-sm" onClick={() => setCreando(true)}>+ Nuevo motivo</button>
@@ -94,26 +96,16 @@ export default function AdminMotivosAusenciaPage() {
 
         {!isLoading && motivos.length > 0 && (
           <div className="px-3 pb-2 flex flex-wrap gap-1.5">
-            <FiltroChip active={filtroFamilia === 'todas'} onClick={() => setFiltroFamilia('todas')} label="Todas" count={motivos.length} />
-            {FAMILIAS.map((f) => (
-              conteoPorFamilia[f.value] ? (
-                <FiltroChip
-                  key={f.value}
-                  active={filtroFamilia === f.value}
-                  onClick={() => setFiltroFamilia(f.value)}
-                  label={f.label}
-                  count={conteoPorFamilia[f.value]}
-                  variant={f.variant}
-                />
-              ) : null
-            ))}
+            <FiltroChip active={filtro === 'todas'} onClick={() => setFiltro('todas')} label="Todos" count={motivos.length} />
+            <FiltroChip active={filtro === 'si'} onClick={() => setFiltro('si')} label="Remunerados" count={remuneradas} variant="green" />
+            <FiltroChip active={filtro === 'no'} onClick={() => setFiltro('no')} label="No remunerados" count={motivos.length - remuneradas} variant="amber" />
           </div>
         )}
 
         {isLoading ? (
           <div className="flex justify-center py-8"><Spinner /></div>
         ) : motivosFiltrados.length === 0 ? (
-          <EmptyState icon="📂" title="Sin motivos" description={filtroFamilia === 'todas' ? 'No hay motivos cargados todavía.' : 'No hay motivos en esta familia.'} />
+          <EmptyState icon="📂" title="Sin motivos" description={filtro === 'todas' ? 'No hay motivos cargados todavía.' : 'No hay motivos en este grupo.'} />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -121,7 +113,7 @@ export default function AdminMotivosAusenciaPage() {
                 <tr className="text-xs text-gray-500 border-b border-gray-100">
                   <th className="text-left px-2 py-2">Orden</th>
                   <th className="text-left px-2 py-2">Motivo</th>
-                  <th className="text-left px-2 py-2">Familia</th>
+                  <th className="text-left px-2 py-2">Remunerado</th>
                   <th className="text-left px-2 py-2 hidden md:table-cell">Descripción</th>
                   <th className="text-left px-2 py-2">Impacto</th>
                   <th className="text-left px-2 py-2">Estado</th>
@@ -130,7 +122,6 @@ export default function AdminMotivosAusenciaPage() {
               </thead>
               <tbody>
                 {motivosFiltrados.map((m) => {
-                  const fam = FAMILIA_MAP[m.family] ?? FAMILIA_MAP.ausencia_profesional
                   return (
                     <tr key={m.id} className="border-b border-gray-50 hover:bg-gray-50">
                       <td className="px-2 py-2 text-gray-400">{m.sort_order}</td>
@@ -139,7 +130,7 @@ export default function AdminMotivosAusenciaPage() {
                         <div className="text-xs text-gray-400">cód: {m.code}</div>
                       </td>
                       <td className="px-2 py-2">
-                        <Badge variant={fam.variant}>{fam.label}</Badge>
+                        {m.is_paid ? <Badge variant="green">Sí</Badge> : <Badge variant="amber">No</Badge>}
                       </td>
                       <td className="px-2 py-2 text-gray-600 hidden md:table-cell">
                         <span className="line-clamp-2">{m.description ?? '—'}</span>
@@ -154,7 +145,10 @@ export default function AdminMotivosAusenciaPage() {
                       <td className="px-2 py-2 text-right whitespace-nowrap">
                         <button className="text-xs text-brand-600 hover:underline mr-3" onClick={() => setEditando(m)}>Editar</button>
                         {!m.is_system && m.active && (
-                          <button className="text-xs text-red-600 hover:underline" onClick={() => confirmarDesactivar(m)}>Desactivar</button>
+                          <button className="text-xs text-amber-700 hover:underline mr-3" onClick={() => confirmarDesactivar(m)}>Desactivar</button>
+                        )}
+                        {!m.is_system && m.code !== 'retraso_inicio' && (
+                          <button className="text-xs text-red-600 hover:underline" onClick={() => confirmarEliminar(m)}>Eliminar</button>
                         )}
                       </td>
                     </tr>
@@ -164,10 +158,6 @@ export default function AdminMotivosAusenciaPage() {
             </table>
           </div>
         )}
-      </div>
-
-      <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-800">
-        💡 <strong>¿Cómo funciona el factor de impacto?</strong> Cuando se confirma una nueva ausencia, el sistema multiplica los pacientes afectados y el costo de oportunidad por el factor del motivo elegido. Ej: factor 1.00 = impacto completo (calamidad real); factor 0.30 = solo 30% del impacto (vacaciones programadas con cobertura). Las ausencias ya confirmadas conservan el cálculo histórico — solo afecta a las nuevas.
       </div>
 
       {editando && (
@@ -226,8 +216,9 @@ function MotivoModal({ motivo, onClose, onSaved }) {
   const [form, setForm] = useState({
     name: motivo?.name ?? '',
     description: motivo?.description ?? '',
-    family: motivo?.family ?? 'ausencia_profesional',
     impactFactor: motivo?.impact_factor ?? 1,
+    // '' = sin elegir (obligatorio al crear).
+    isPaid: motivo ? (motivo.is_paid ? 'si' : 'no') : '',
     sort_order: motivo?.sort_order ?? 99,
     active: motivo?.active ?? true,
   })
@@ -238,17 +229,17 @@ function MotivoModal({ motivo, onClose, onSaved }) {
       ? motivoAusenciaService.actualizar(motivo.id, {
           name: form.name,
           description: form.description || null,
-          family: form.family,
           impactFactor: form.impactFactor,
           sort_order: form.sort_order,
+          isPaid: form.isPaid === 'si',
           ...(esSistema ? {} : { active: form.active }),
         })
       : motivoAusenciaService.crear({
           name: form.name,
           description: form.description || null,
-          family: form.family,
           impactFactor: form.impactFactor,
           sort_order: form.sort_order,
+          isPaid: form.isPaid === 'si',
         }),
     onSuccess: () => {
       toast.success(esEdicion ? 'Motivo actualizado' : 'Motivo creado')
@@ -257,7 +248,8 @@ function MotivoModal({ motivo, onClose, onSaved }) {
     onError: (err) => toast.error(err?.message ?? 'Error al guardar'),
   })
 
-  const valida = form.name.trim().length >= 2 && form.impactFactor >= 0 && form.impactFactor <= 1
+  const valida = form.name.trim().length >= 2 && form.impactFactor >= 0 && form.impactFactor <= 1 && form.isPaid !== ''
+  const fija = motivo?.code === 'licencia_remunerada'
 
   return (
     <div
@@ -298,24 +290,20 @@ function MotivoModal({ motivo, onClose, onSaved }) {
           </div>
 
           <div>
-            <label className="label">Familia <span className="text-red-600">*</span></label>
-            <select
-              className="input"
-              value={form.family}
-              onChange={(e) => setForm({ ...form, family: e.target.value })}
-            >
-              {FAMILIAS.map((f) => (
-                <option key={f.value} value={f.value}>{f.label}</option>
+            <label className="label">¿Es remunerado? <span className="text-red-600">*</span></label>
+            <div className="flex gap-4">
+              {[{ v: 'si', l: 'Sí' }, { v: 'no', l: 'No' }].map((o) => (
+                <label key={o.v} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                  <input type="radio" name="motivo_remunerado" checked={form.isPaid === o.v} disabled={fija} onChange={() => setForm({ ...form, isPaid: o.v })} />
+                  {o.l}
+                </label>
               ))}
-            </select>
-            <div className="text-xs text-gray-400 mt-1">
-              Agrupa el motivo en el tablero gerencial de reprogramaciones.
             </div>
           </div>
 
           <div>
             <label className="label">
-              Factor de impacto: <strong>{Math.round(form.impactFactor * 100)}%</strong>
+              Impacto en pacientes y costo: <strong>{Math.round(form.impactFactor * 100)}%</strong>
             </label>
             <input
               type="range"
