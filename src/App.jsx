@@ -1,8 +1,10 @@
-import { lazy, Suspense } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Suspense } from 'react'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import { rutaDeEntrada } from '@/config/nav'
 import { Spinner } from '@/components/ui'
+import { lazyConReintento } from '@/utils/cargaDiferida'
+import PantallaConError from '@/components/PantallaConError'
 
 // ============================================================================
 // CARGA POR RUTA (code-splitting)
@@ -20,50 +22,50 @@ import LoginPage  from '@/pages/auth/LoginPage'
 import AppLayout  from '@/components/layout/AppLayout'
 
 // Auth (secundarias)
-const RegistroPage        = lazy(() => import('@/pages/auth/SignupPage'))
-const CambiarPasswordPage = lazy(() => import('@/pages/auth/ChangePasswordPage'))
-const ResetPasswordPage   = lazy(() => import('@/pages/auth/ResetPasswordPage'))
+const RegistroPage        = lazyConReintento(() => import('@/pages/auth/SignupPage'))
+const CambiarPasswordPage = lazyConReintento(() => import('@/pages/auth/ChangePasswordPage'))
+const ResetPasswordPage   = lazyConReintento(() => import('@/pages/auth/ResetPasswordPage'))
 
 // Recurso
-const HorarioPage           = lazy(() => import('@/pages/resource/SchedulePage'))
-const AusenciasRecursoPage  = lazy(() => import('@/pages/resource/ResourceAbsencesPage'))
-const PerfilPage            = lazy(() => import('@/pages/resource/ProfilePage'))
-const BackofficeRecursoPage = lazy(() => import('@/pages/resource/ResourceBackofficePage'))
-const MiEjecucionPage       = lazy(() => import('@/pages/resource/MyExecutionPage'))
+const HorarioPage           = lazyConReintento(() => import('@/pages/resource/SchedulePage'))
+const AusenciasRecursoPage  = lazyConReintento(() => import('@/pages/resource/ResourceAbsencesPage'))
+const PerfilPage            = lazyConReintento(() => import('@/pages/resource/ProfilePage'))
+const BackofficeRecursoPage = lazyConReintento(() => import('@/pages/resource/ResourceBackofficePage'))
+const MiEjecucionPage       = lazyConReintento(() => import('@/pages/resource/MyExecutionPage'))
 
 // Coordinador
-const DashboardCoordPage      = lazy(() => import('@/pages/coordinator/CoordDashboardPage'))
-const ProgramadorPage         = lazy(() => import('@/pages/coordinator/SchedulerPage'))
-const ReemplazoPage         = lazy(() => import('@/pages/coordinator/ReplacementPage'))
-const MisReprogramacionesPage = lazy(() => import('@/pages/coordinator/MyReschedulesPage'))
-const AusenciasCoordPage      = lazy(() => import('@/pages/coordinator/CoordAbsencesPage'))
-const AusenciasCronogramaPage = lazy(() => import('@/pages/coordinator/AbsencesTimelinePage'))
-const EjecucionPage           = lazy(() => import('@/pages/coordinator/ExecutionPage'))
-const RecursosCoordPage       = lazy(() => import('@/pages/coordinator/CoordResourcesPage'))
-const BackofficeCoordPage     = lazy(() => import('@/pages/coordinator/CoordBackofficePage'))
-const HorarioDiarioPage       = lazy(() => import('@/pages/coordinator/DailySchedulePage'))
-const SolicitudesRecursoCoordPage = lazy(() => import('@/pages/coordinator/CoordResourceRequestsPage'))
+const DashboardCoordPage      = lazyConReintento(() => import('@/pages/coordinator/CoordDashboardPage'))
+const ProgramadorPage         = lazyConReintento(() => import('@/pages/coordinator/SchedulerPage'))
+const ReemplazoPage         = lazyConReintento(() => import('@/pages/coordinator/ReplacementPage'))
+const MisReprogramacionesPage = lazyConReintento(() => import('@/pages/coordinator/MyReschedulesPage'))
+const AusenciasCoordPage      = lazyConReintento(() => import('@/pages/coordinator/CoordAbsencesPage'))
+const AusenciasCronogramaPage = lazyConReintento(() => import('@/pages/coordinator/AbsencesTimelinePage'))
+const EjecucionPage           = lazyConReintento(() => import('@/pages/coordinator/ExecutionPage'))
+const RecursosCoordPage       = lazyConReintento(() => import('@/pages/coordinator/CoordResourcesPage'))
+const BackofficeCoordPage     = lazyConReintento(() => import('@/pages/coordinator/CoordBackofficePage'))
+const HorarioDiarioPage       = lazyConReintento(() => import('@/pages/coordinator/DailySchedulePage'))
+const SolicitudesRecursoCoordPage = lazyConReintento(() => import('@/pages/coordinator/CoordResourceRequestsPage'))
 
 // Directivo
-const DashboardDirectivoPage    = lazy(() => import('@/pages/executive/ExecutiveDashboardPage'))
-const InformePage               = lazy(() => import('@/pages/executive/ReportPage'))
-const ComparativoPage           = lazy(() => import('@/pages/executive/ComparisonPage'))
-const ProductividadRecursoPage  = lazy(() => import('@/pages/executive/ResourceProductivityPage'))
-const ReprogramacionesPage      = lazy(() => import('@/pages/executive/ReschedulesPage'))
+const DashboardDirectivoPage    = lazyConReintento(() => import('@/pages/executive/ExecutiveDashboardPage'))
+const InformePage               = lazyConReintento(() => import('@/pages/executive/ReportPage'))
+const ComparativoPage           = lazyConReintento(() => import('@/pages/executive/ComparisonPage'))
+const ProductividadRecursoPage  = lazyConReintento(() => import('@/pages/executive/ResourceProductivityPage'))
+const ReprogramacionesPage      = lazyConReintento(() => import('@/pages/executive/ReschedulesPage'))
 
 // Admin / Supervisor
-const AdminSedesPage            = lazy(() => import('@/pages/admin/AdminSitesPage'))
-const AdminUsuariosPage         = lazy(() => import('@/pages/admin/AdminUsersPage'))
-const AdminParametrosPage       = lazy(() => import('@/pages/admin/AdminSettingsPage'))
-const AdminTareasBackofficePage = lazy(() => import('@/pages/admin/AdminBackofficeTasksPage'))
-const AdminAuditoriaPage        = lazy(() => import('@/pages/admin/AdminAuditPage'))
-const AdminRecursosPage         = lazy(() => import('@/pages/admin/AdminResourcesPage'))
-const AdminFestivosPage         = lazy(() => import('@/pages/admin/AdminHolidaysPage'))
-const AdminMetasPage            = lazy(() => import('@/pages/admin/AdminTargetsPage'))
-const AdminSolicitudesPage      = lazy(() => import('@/pages/admin/AdminRequestsPage'))
-const AdminSolicitudesRecursoPage = lazy(() => import('@/pages/admin/AdminResourceRequestsPage'))
-const AdminMotivosAusenciaPage  = lazy(() => import('@/pages/admin/AdminAbsenceReasonsPage'))
-const ModuloHomePage            = lazy(() => import('@/pages/ModuleHomePage'))
+const AdminSedesPage            = lazyConReintento(() => import('@/pages/admin/AdminSitesPage'))
+const AdminUsuariosPage         = lazyConReintento(() => import('@/pages/admin/AdminUsersPage'))
+const AdminParametrosPage       = lazyConReintento(() => import('@/pages/admin/AdminSettingsPage'))
+const AdminTareasBackofficePage = lazyConReintento(() => import('@/pages/admin/AdminBackofficeTasksPage'))
+const AdminAuditoriaPage        = lazyConReintento(() => import('@/pages/admin/AdminAuditPage'))
+const AdminRecursosPage         = lazyConReintento(() => import('@/pages/admin/AdminResourcesPage'))
+const AdminFestivosPage         = lazyConReintento(() => import('@/pages/admin/AdminHolidaysPage'))
+const AdminMetasPage            = lazyConReintento(() => import('@/pages/admin/AdminTargetsPage'))
+const AdminSolicitudesPage      = lazyConReintento(() => import('@/pages/admin/AdminRequestsPage'))
+const AdminSolicitudesRecursoPage = lazyConReintento(() => import('@/pages/admin/AdminResourceRequestsPage'))
+const AdminMotivosAusenciaPage  = lazyConReintento(() => import('@/pages/admin/AdminAbsenceReasonsPage'))
+const ModuloHomePage            = lazyConReintento(() => import('@/pages/ModuleHomePage'))
 
 /** Se muestra mientras se descarga el trozo de la página pedida. */
 function CargandoPagina() {
@@ -96,9 +98,13 @@ function RoleRedirect() {
 }
 
 export default function App() {
+  const location = useLocation()
   return (
     // Un solo Suspense envolviendo todas las rutas: cualquier página en diferido
-    // muestra el mismo indicador mientras baja su trozo.
+    // muestra el mismo indicador mientras baja su trozo. PantallaConError evita
+    // la pantalla en blanco si algo falla (AppLayout tiene otro por dentro, para
+    // que el menú siga en pie).
+    <PantallaConError ruta={location.pathname}>
     <Suspense fallback={<CargandoPagina />}>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
@@ -178,5 +184,6 @@ export default function App() {
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </Suspense>
+    </PantallaConError>
   )
 }

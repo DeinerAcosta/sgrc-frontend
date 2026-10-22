@@ -6,7 +6,14 @@ import { Toaster } from 'react-hot-toast'
 import App from './App'
 import { ConfirmProvider } from '@/contexts/ConfirmContext'
 import DemoBadge from '@/components/layout/DemoBadge'
+import { recargarUnaVez } from '@/utils/cargaDiferida'
 import './index.css'
+
+// 22-oct · Vite avisa con este evento cuando no puede bajar un archivo de una
+// versión anterior (CSS o dependencias de una página). Recargar toma la nueva.
+window.addEventListener('vite:preloadError', (e) => {
+  if (recargarUnaVez()) e.preventDefault()
+})
 
 const queryClient = new QueryClient({
   defaultOptions: {

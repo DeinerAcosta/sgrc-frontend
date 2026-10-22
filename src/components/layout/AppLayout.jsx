@@ -6,6 +6,7 @@ import NotificacionesPanel from '@/components/layout/NotificationsPanel'
 import { ROLES } from '@/utils/helpers'
 import { NAV_ITEMS, rutaModulo } from '@/config/nav'
 import { useHeartbeat } from '@/hooks/useHeartbeat'
+import PantallaConError from '@/components/PantallaConError'
 
 
 /**
@@ -380,7 +381,9 @@ export default function AppLayout() {
 
         {/* Content */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden">
-          <Outlet />
+          <PantallaConError ruta={location.pathname}>
+            <Outlet />
+          </PantallaConError>
         </main>
       </div>
     </div>
