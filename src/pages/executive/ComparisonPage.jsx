@@ -110,10 +110,10 @@ export default function ComparativoPage() {
           </thead>
           <tbody>
             <Row label="Pacientes programados" a={a.pacientes} b={b.pacientes} better="up" />
-            <Row label="Horas ejecutadas" a={formatHoras(a.horas_ejec)} b={formatHoras(b.horas_ejec)} delta={delta(a.horas_ejec, b.horas_ejec)} pct={pctDelta(a.horas_ejec, b.horas_ejec)} unidad="h" better="up" />
+            <Row label="Horas ejecutadas" a={formatHoras(a.horas_ejec)} b={formatHoras(b.horas_ejec)} delta={delta(a.horas_ejec, b.horas_ejec)} pct={pctDelta(a.horas_ejec, b.horas_ejec)} formato={formatHoras} better="up" />
             <Row label="Ocupación global" a={`${a.ocupacion}%`} b={`${b.ocupacion}%`} delta={delta(a.ocupacion, b.ocupacion)} pct={pctDelta(a.ocupacion, b.ocupacion)} unidad="pp" better="up" semaforoA={a.ocupacion} semaforoB={b.ocupacion} />
             <Row label="Ausencias" a={a.absences} b={b.absences} better="down" />
-            <Row label="Costo de ausentismo" a={formatCOP(a.costo_ausentismo)} b={formatCOP(b.costo_ausentismo)} delta={delta(a.costo_ausentismo, b.costo_ausentismo)} pct={pctDelta(a.costo_ausentismo, b.costo_ausentismo)} unidad="$" better="down" />
+            <Row label="Costo de ausentismo" a={formatCOP(a.costo_ausentismo)} b={formatCOP(b.costo_ausentismo)} delta={delta(a.costo_ausentismo, b.costo_ausentismo)} pct={pctDelta(a.costo_ausentismo, b.costo_ausentismo)} formato={formatCOP} better="down" />
           </tbody>
         </table>
         </div>
@@ -139,7 +139,7 @@ export default function ComparativoPage() {
   )
 }
 
-function Row({ label, a, b, delta, pct, unidad, better, semaforoA, semaforoB }) {
+function Row({ label, a, b, delta, pct, unidad, formato, better, semaforoA, semaforoB }) {
   // Si no se pasan delta/pct, calcular si los valores son numéricos
   const aNum = typeof a === 'number' ? a : null
   const bNum = typeof b === 'number' ? b : null
@@ -165,7 +165,8 @@ function Row({ label, a, b, delta, pct, unidad, better, semaforoA, semaforoB }) 
         {semaforoB != null && <Semaforo pct={semaforoB} metaVerde={80} />}
       </td>
       <td className={`px-3 py-2 text-xs text-right font-medium ${colorDelta}`}>
-        {d == null ? '—' : (d > 0 ? `+${d}${unidad ?? ''}` : `${d}${unidad ?? ''}`)}
+        {/* 22-oct · el Δ del costo salía "-382920$": horas y pesos usan el mismo formato que A y B. */}
+        {d == null ? '—' : `${d > 0 ? '+' : d < 0 ? '−' : ''}${formato ? formato(Math.abs(d)) : `${Math.abs(d)}${unidad ?? ''}`}`}
       </td>
       <td className={`px-3 py-2 text-xs text-right font-medium ${colorDelta}`}>
         {p == null ? '—' : (p > 0 ? `+${p}%` : `${p}%`)}
