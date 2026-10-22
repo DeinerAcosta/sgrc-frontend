@@ -1030,8 +1030,8 @@ export const informeService = {
     return ok([])
   },
   /** Comparativo semana actual vs cualquiera de las últimas 52 (HU-D-06) */
-  comparativo: async (semanaB) => {
-    if (!DEMO_MODE) return api.get('/reports/comparison', { params: { semana_b: semanaB } })
+  comparativo: async ({ semanaA, semanaB } = {}) => {
+    if (!DEMO_MODE) return api.get('/reports/comparison', { params: { semana_a: semanaA || undefined, semana_b: semanaB || undefined } })
     return ok(COMPARATIVO_SEMANAS)
   },
   exportar: async (tipo, formato, params = {}) => {

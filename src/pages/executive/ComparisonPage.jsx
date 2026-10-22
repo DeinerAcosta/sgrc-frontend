@@ -4,19 +4,27 @@ import { useQuery } from '@tanstack/react-query'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid } from 'recharts'
 import toast from 'react-hot-toast'
 import { informeService } from '@/services/api'
-import { Spinner, SectionHeader, Semaforo } from '@/components/ui'
+import { Spinner, SectionHeader, Semaforo, Badge } from '@/components/ui'
 import { formatCOP, formatHoras, descargarCSV } from '@/utils/helpers'
 
 /**
- * HU-D-06: Comparativo semana actual vs anteriores (hasta 52 semanas).
+ * HU-D-06: Comparativo entre dos semanas cualesquiera de las últimas 52.
+ *
+ * 22-oct · Hector: "no le veo coherencia". Decía "cualquiera de las últimas 52"
+ * pero solo había 3 atajos para B, y A era siempre la semana en curso (a
+ * medias). Ahora A y B se eligen de la lista; por defecto el servidor pone la
+ * última semana completa contra la anterior.
  */
 export default function ComparativoPage() {
-  const [semanaB, setSemanaB] = useState('sem-anterior')
+  // '' = lo que elija el servidor por defecto.
+  const [semanaA, setSemanaA] = useState('')
+  const [semanaB, setSemanaB] = useState('')
   const navigate = useNavigate()
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['comparativo', semanaB],
-    queryFn: () => informeService.comparativo(semanaB),
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ['comparativo', semanaA, semanaB],
+    queryFn: () => informeService.comparativo({ semanaA, semanaB }),
+    placeholderData: (prev) => prev,
   })
 
   if (isLoading || !data) {
@@ -62,28 +70,29 @@ export default function ComparativoPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <div>
           <h1 className="text-base font-semibold text-gray-900">Históricos de semanas</h1>
-          <p className="text-xs text-gray-500">Compara la semana actual contra cualquiera de las últimas 52</p>
+          <p className="text-xs text-gray-500">Compara dos semanas cualesquiera de las últimas 52</p>
         </div>
-        <div className="flex gap-2 items-center flex-wrap">
-          <span className="text-xs text-gray-500">Comparar contra:</span>
-          <select className="input w-auto text-xs" value={semanaB} onChange={(e) => setSemanaB(e.target.value)}>
-            <option value="sem-anterior">Semana anterior</option>
-            <option value="sem-mes-anterior">Misma semana del mes anterior</option>
-            <option value="sem-trimestre-anterior">Misma semana del trimestre anterior</option>
-          </select>
+        <div className="flex gap-2 items-center">
+          {isFetching && <Spinner size="sm" />}
           <button className="btn text-xs" onClick={exportarCSV}>📊 Exportar CSV</button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-        <div className="card">
-          <div className="text-xs text-gray-400 mb-1">A</div>
-          <div className="text-sm font-medium text-gray-900">{a.label}</div>
-        </div>
-        <div className="card">
-          <div className="text-xs text-gray-400 mb-1">B (comparación)</div>
-          <div className="text-sm font-medium text-gray-900">{b.label}</div>
-        </div>
+        <SelectorSemana
+          titulo="Semana A"
+          semana={data.semana_a}
+          semanas={data.semanas ?? []}
+          excluir={data.semana_b?.id}
+          onChange={(id) => { setSemanaA(id); setSemanaB('') }}
+        />
+        <SelectorSemana
+          titulo="Semana B (comparación)"
+          semana={data.semana_b}
+          semanas={data.semanas ?? []}
+          excluir={data.semana_a?.id}
+          onChange={setSemanaB}
+        />
       </div>
 
       {!hayComparacion && (
@@ -135,6 +144,28 @@ export default function ComparativoPage() {
           </LineChart>
         </ResponsiveContainer>
       </div>
+    </div>
+  )
+}
+
+function SelectorSemana({ titulo, semana, semanas, excluir, onChange }) {
+  return (
+    <div className="card">
+      <label className="label">{titulo}</label>
+      <select className="input text-sm" value={semana?.id ?? ''} onChange={(e) => onChange(e.target.value)}>
+        {!semana && <option value="">— sin datos —</option>}
+        {semanas.filter((s) => s.id !== excluir).map((s) => (
+          <option key={s.id} value={s.id}>{s.label}{s.en_curso ? ' (en curso)' : ''}</option>
+        ))}
+      </select>
+      {semana && (
+        <div className="mt-1.5 flex gap-1.5">
+          {semana.en_curso
+            ? <Badge variant="amber">En curso</Badge>
+            : <Badge variant="gray">Completa</Badge>}
+          {semana.cerrada && <Badge variant="green">Cerrada</Badge>}
+        </div>
+      )}
     </div>
   )
 }
