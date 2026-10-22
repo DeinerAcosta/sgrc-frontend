@@ -150,7 +150,7 @@ function RechazarModal({ solicitud, motivo, setMotivo, rechazando, doRechazar, o
         </div>
         <div className="px-5 py-4 space-y-3">
           <div>
-            <label className="label">Motivo del rechazo (mínimo 5 caracteres) *</label>
+            <label className="label">Motivo del rechazo (mínimo 5 caracteres) <span className="text-red-600">*</span></label>
             <textarea
               className="input resize-none"
               rows={3}

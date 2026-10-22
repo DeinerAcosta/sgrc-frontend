@@ -38,7 +38,7 @@ const INFORMES = [
   { to: '/app/informes/subutilizacion',     icon: '⏰', label: 'Tiempos ociosos' },
   { to: '/app/informes/ocupacion',          icon: '🏥', label: 'Ocupación consultorios' },
   { to: '/app/informes/cierre-semanas',     icon: '🔒', label: 'Cumplimiento de cierre' },
-  { to: '/app/comparativo',                 icon: '↔️',  label: 'Comparativo semanal' },
+  { to: '/app/comparativo',                 icon: '↔️',  label: 'Históricos de semanas' },
 ]
 
 export default function DashboardDirectivoPage() {

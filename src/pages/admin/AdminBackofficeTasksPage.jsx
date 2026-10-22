@@ -170,7 +170,7 @@ function TareaModal({ tarea, onClose, onSaved }) {
         </div>
         <div className="px-5 py-4 space-y-4">
           <div>
-            <label className="label">Nombre *</label>
+            <label className="label">Nombre <span className="text-red-600">*</span></label>
             <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ej: Confirmación de citas" />
           </div>
           <div>
@@ -178,7 +178,7 @@ function TareaModal({ tarea, onClose, onSaved }) {
             <textarea className="input resize-none" rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           </div>
           <div>
-            <label className="label">Tiempo estimado por unidad (minutos) *</label>
+            <label className="label">Tiempo estimado por unidad (minutos) <span className="text-red-600">*</span></label>
             <input className="input" type="number" min="1" value={form.estimated_minutes} onChange={(e) => setForm({ ...form, estimated_minutes: parseInt(e.target.value) || 0 })} />
             <div className="text-xs text-gray-500 mt-1">Permite comparar tiempo real vs estimado en informes de productividad</div>
           </div>
@@ -231,7 +231,7 @@ function AprobarModal({ tarea, onClose, onSaved }) {
             </div>
           )}
           <div>
-            <label className="label">Nombre *</label>
+            <label className="label">Nombre <span className="text-red-600">*</span></label>
             <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </div>
           <div>
@@ -239,7 +239,7 @@ function AprobarModal({ tarea, onClose, onSaved }) {
             <textarea className="input resize-none" rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Describe brevemente qué incluye la tarea..." />
           </div>
           <div>
-            <label className="label">Tiempo estimado por unidad (min) *</label>
+            <label className="label">Tiempo estimado por unidad (min) <span className="text-red-600">*</span></label>
             <input className="input" type="number" min="1" max="480" value={form.estimated_minutes} onChange={(e) => setForm({ ...form, estimated_minutes: parseInt(e.target.value) || 0 })} />
           </div>
           <div className="bg-green-50 border border-green-100 rounded-lg px-3 py-2 text-xs text-green-800">
@@ -276,7 +276,7 @@ function RechazarModal({ tarea, onClose, onSaved }) {
         </div>
         <div className="px-5 py-4 space-y-3">
           <div>
-            <label className="label">Motivo del rechazo (mínimo 5 caracteres) *</label>
+            <label className="label">Motivo del rechazo (mínimo 5 caracteres) <span className="text-red-600">*</span></label>
             <textarea className="input resize-none" rows={3} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ej: Ya existe una tarea similar, no aplica al modelo operativo, etc." />
           </div>
           <div className="bg-amber-50 border border-amber-100 rounded-lg p-2 text-xs text-amber-800">

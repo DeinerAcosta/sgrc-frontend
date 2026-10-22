@@ -16,8 +16,8 @@ const TOOLTIPS_AUSENTISMO = {
   'Tipo': 'Rol del recurso: oftalmólogo, optómetra, técnico, auxiliar, asesor, anestesiólogo, etc.',
   'Sede': 'Sede(s) donde trabaja el recurso',
   'Ausencias': 'Total de ausencias CONFIRMADAS del recurso en el período seleccionado. Las pendientes o rechazadas no cuentan.',
-  'Programadas': 'Ausencias reportadas con MÁS de 15 días de anticipación (dio tiempo a reprogramar pacientes).',
-  'Imprevistas': 'Ausencias reportadas con 15 días o MENOS de anticipación (impacto operativo alto).',
+  'Programadas': 'Ausencias reportadas con 20 días o MÁS de anticipación (dio tiempo a reprogramar pacientes).',
+  'Imprevistas': 'Ausencias reportadas con MENOS de 20 días de anticipación (impacto operativo alto).',
   'Días': 'Suma de días totales de ausencia (fecha fin − fecha inicio + 1 por cada ausencia).',
   'Pac. afectados': 'Suma de pacientes que quedaron sin atención en todas las ausencias. Se calcula día por día por RN-18/19.',
   'Costo estimado': 'Costo de oportunidad estimado = pacientes afectados × costo por consulta (según parámetro vigente en la fecha).',
@@ -34,8 +34,8 @@ Anticipación = días entre la FECHA DE REPORTE de la ausencia y la FECHA DE INI
 ┌─────────────────────────────────────────────────────────────────────┐
 │ Programada / Imprevista                                             │
 ├─────────────────────────────────────────────────────────────────────┤
-│ Anticipación > 15 días  →  PROGRAMADA (hay tiempo de reprogramar)   │
-│ Anticipación ≤ 15 días  →  IMPREVISTA (impacto operativo alto)      │
+│ Anticipación ≥ 20 días  →  PROGRAMADA (hay tiempo de reprogramar)   │
+│ Anticipación < 20 días  →  IMPREVISTA (impacto operativo alto)      │
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -90,6 +90,18 @@ const CONFIG = {
     porSemana: true,
     sinFiltroTipo: true,  // ya está fijado a asesor_servicios en backend
   },
+  // 3667/3668 · Por asesor: ocupación, backoffice y ausentismo. Sin pacientes
+  // ni costo: los asesores no atienden pacientes.
+  'indicadores-asesores': {
+    title: 'Indicadores de asesores',
+    desc: 'Por asesor: horas de atención y de backoffice de la semana frente a su tope, y sus ausencias de los últimos 90 días.',
+    cols: ['Asesor', 'Sede', 'Horas atención', 'Horas backoffice', '% Backoffice', 'Tope semanal', 'Ausencias (90 d)', 'Días ausente (90 d)', 'Imprevistas (90 d)', 'Anticipación prom. (días)', '% Ocupación'],
+    keys: ['resource', 'site', 'h_atencion', 'h_backoffice', 'pct_backoffice', 'h_tope', 'ausencias_90d', 'dias_ausente_90d', 'imprevistas_90d', 'anticipacion_prom', 'pct_ocupacion'],
+    meta: 80,
+    fn: informeService.indicadoresAsesores,
+    porSemana: true,
+    sinFiltroTipo: true,
+  },
   productividad: {
     title: 'Productividad por recurso',
     desc: 'Horas y pacientes programados vs ejecutados por recurso. Incluye TODOS los recursos activos (los sin actividad aparecen con 0h al final). Promedios calculados sobre horas ejecutadas dividido por semanas o meses del rango.',
@@ -100,7 +112,7 @@ const CONFIG = {
   },
   ausentismo: {
     title: 'Ausentismo y ranking',
-    desc: 'Ranking de recursos por número de ausencias, pacientes afectados y costo estimado. Programadas: reportadas con >15 días de anticipación. Imprevistas: ≤15 días. Quejas estimadas: 9% de pacientes afectados si la anticipación fue >30 días, 8% si fue menor.',
+    desc: 'Ranking de recursos por número de ausencias, pacientes afectados y costo estimado. Programadas: reportadas con 20 días o más de anticipación. Imprevistas: menos de 20 días. Quejas estimadas: 9% de pacientes afectados si la anticipación fue >30 días, 8% si fue menor.',
     cols: ['Recurso', 'Tipo', 'Sede', 'Ausencias', 'Programadas', 'Imprevistas', 'Días', 'Pac. afectados', 'Costo estimado', 'Quejas'],
     keys: ['resource', 'type', 'site', 'absences', 'programadas', 'imprevistas', 'dias', 'pac_afectados', 'cost', 'quejas'],
     // Columnas visibles SOLO para gerencia+supervisor+directivo (ago-2026):
@@ -136,7 +148,7 @@ const CONFIG = {
   },
   'ausentismo-impacto': {
     title: 'Ausentismo e impacto económico',
-    desc: 'Ranking de ausencias por recurso con su impacto económico. Programadas: reportadas con >15 días de anticipación. Imprevistas: ≤15 días. Quejas estimadas: 9% de pacientes afectados si la anticipación fue >30 días, 8% si fue menor.',
+    desc: 'Ranking de ausencias por recurso con su impacto económico. Programadas: reportadas con 20 días o más de anticipación. Imprevistas: menos de 20 días. Quejas estimadas: 9% de pacientes afectados si la anticipación fue >30 días, 8% si fue menor.',
     cols: ['Recurso', 'Tipo', 'Sede', 'Ausencias', 'Programadas', 'Imprevistas', 'Días', 'Pac. afectados', 'Quejas', 'Costo oportunidad', 'Costo personal', 'Costo total'],
     // PROYECTOS-3255 #3.2: claves explicitas para blindar el orden ante nuevos campos backend.
     keys: ['resource', 'type', 'site', 'absences', 'programadas', 'imprevistas', 'dias', 'pac_afectados', 'quejas', 'opportunity_cost', 'costo_personal', 'total'],
@@ -499,15 +511,15 @@ export default function InformePage() {
             <div className="text-lg font-semibold text-gray-900">{kpis.totalAusencias}</div>
             <div className="text-[10px] text-gray-400">confirmadas</div>
           </div>
-          <div className="card p-3 border-l-4 border-l-green-400" title="Ausencias reportadas con MÁS de 15 días de anticipación (dio tiempo a reprogramar)">
+          <div className="card p-3 border-l-4 border-l-green-400" title="Ausencias reportadas con 20 días o más de anticipación (dio tiempo a reprogramar)">
             <div className="text-[10px] uppercase tracking-wide text-green-700 mb-1">📅 Programadas</div>
             <div className="text-lg font-semibold text-green-700">{kpis.programadas}</div>
-            <div className="text-[10px] text-gray-400">&gt; 15 días anticipación</div>
+            <div className="text-[10px] text-gray-400">≥ 20 días anticipación</div>
           </div>
-          <div className="card p-3 border-l-4 border-l-amber-400" title="Ausencias reportadas con 15 días o menos de anticipación (impacto operativo alto)">
+          <div className="card p-3 border-l-4 border-l-amber-400" title="Ausencias reportadas con menos de 20 días de anticipación (impacto operativo alto)">
             <div className="text-[10px] uppercase tracking-wide text-amber-700 mb-1">⚡ Imprevistas</div>
             <div className="text-lg font-semibold text-amber-700">{kpis.imprevistas}</div>
-            <div className="text-[10px] text-gray-400">≤ 15 días anticipación</div>
+            <div className="text-[10px] text-gray-400">&lt; 20 días anticipación</div>
           </div>
           <div className="card p-3" title="Pacientes que quedaron sin atender por las ausencias del período (RN-18/19)">
             <div className="text-[10px] uppercase tracking-wide text-gray-500 mb-1">Pac. afectados</div>
@@ -535,8 +547,8 @@ export default function InformePage() {
               <div className="flex-1 min-w-0">
                 <div className="font-medium mb-1">📖 Cómo leer este informe</div>
                 <ul className="space-y-0.5 text-blue-800">
-                  <li>• <strong>📅 Programada</strong>: ausencia reportada con <strong>MÁS de 15 días</strong> de anticipación (permite reprogramar pacientes con tiempo).</li>
-                  <li>• <strong>⚡ Imprevista</strong>: ausencia reportada con <strong>15 días o menos</strong> de anticipación (impacto operativo alto).</li>
+                  <li>• <strong>📅 Programada</strong>: ausencia reportada con <strong>20 días o más</strong> de anticipación (permite reprogramar pacientes con tiempo).</li>
+                  <li>• <strong>⚡ Imprevista</strong>: ausencia reportada con <strong>menos de 20 días</strong> de anticipación (impacto operativo alto).</li>
                   <li>• <strong>🎫 Quejas estimadas</strong>: <strong>9%</strong> de pacientes afectados si anticipación &gt;30 días, <strong>8%</strong> si ≤30 días. Redondeo estándar por ausencia individual.</li>
                 </ul>
               </div>

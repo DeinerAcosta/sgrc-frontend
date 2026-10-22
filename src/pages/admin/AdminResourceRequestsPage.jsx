@@ -172,7 +172,7 @@ function DecisionModal({ solicitud, accion, onClose, onConfirm, isPending }) {
               : <>Vas a rechazar la solicitud de <strong>{solicitud?.requester?.name}</strong>. Debes dar un motivo claro.</>}
           </div>
           <div>
-            <label className="label">{requiereMotivo ? 'Motivo del rechazo *' : 'Comentario / nota (opcional)'}</label>
+            <label className="label">{requiereMotivo ? <>Motivo del rechazo <span className="text-red-600">*</span></> : 'Comentario / nota (opcional)'}</label>
             <textarea
               className="input resize-none"
               rows={3}

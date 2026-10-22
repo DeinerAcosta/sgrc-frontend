@@ -33,6 +33,44 @@ import { GRUPOS_AUSENCIAS } from '@/utils/helpers'
 export const RAIZ_AUSENCIAS = '/app/ausencias-coord'
 
 /**
+ * DÓNDE ATERRIZA CADA ROL AL ENTRAR
+ * =================================
+ *
+ * Oct-2026 · Esto estaba COPIADO EN TRES SITIOS —App.jsx, LoginPage y
+ * ChangePasswordPage— y las tres copias se habían ido separando:
+ *
+ *   · las dos de autenticación tenían la clave `resource` en vez de
+ *     `recurso`, así que ese rol nunca encontraba su destino y caía en el
+ *     valor por defecto. Como el defecto era el mismo `/app/horario`, nadie
+ *     lo notó nunca.
+ *   · a ninguna de las dos le añadieron `reprogramador` cuando se creó el
+ *     rol. Caía en `/app/horario`, que ese rol NO puede abrir, el guardia lo
+ *     devolvía a `/app/horario`, y el usuario entraba a una pantalla en
+ *     blanco que se redirigía a sí misma.
+ *
+ * Un solo sitio, y que el guardia use este mismo mapa para rebotar: así un
+ * rol nuevo no puede volver a quedarse sin casa.
+ */
+export const RUTA_DE_ENTRADA = {
+  recurso:       '/app/horario',
+  coordinador:   '/app/dashboard-coord',
+  directivo:     '/app/dashboard',
+  // Oct-2026 · La líder de reprogramación (María Duarte) entra con este rol:
+  // su trabajo es el proceso de ausencias, no los catálogos.
+  supervisor:    '/app/ausencias-coord',   // = RAIZ_AUSENCIAS; literal para que qa:menu lo lea
+  gerencia:      '/app/dashboard',
+  reprogramador: '/app/mis-reprogramaciones',
+}
+
+/**
+ * La casa de este rol. Nunca devuelve algo que el rol no pueda abrir, que es
+ * justo el bucle que se quiere evitar.
+ */
+export function rutaDeEntrada(rol) {
+  return RUTA_DE_ENTRADA[rol] ?? '/app/perfil'
+}
+
+/**
  * Submenú de Gestión de ausencias: una opción por grupo de personal, las mismas
  * que las tarjetas. Se arma desde GRUPOS_AUSENCIAS para que menú y tarjetas no
  * puedan desincronizarse: si mañana se agrega un grupo, sale en los dos sitios.
@@ -47,25 +85,21 @@ export const HIJOS_AUSENCIAS = GRUPOS_AUSENCIAS.map((g) => ({
 // Gerencia y supervisor tenían estas tres secciones duplicadas. Definirlas una
 // sola vez evita que se desincronicen cuando se agregue una pantalla.
 
-const CATALOGOS = {
-  clave: 'catalogos', icon: '🏢', label: 'Catálogos maestros',
-  descripcion: 'La información base del sistema: dónde se atiende, con quién y bajo qué motivos.',
+// 21-oct · Hector: "organizar los módulos que queden en uno solo y se llame
+// Configuración". Catálogos maestros y Configuración eran dos grupos con lo
+// mismo de fondo: la información base con la que trabaja el sistema.
+const CONFIGURACION = {
+  clave: 'configuracion', icon: '⚙️', label: 'Configuración',
+  descripcion: 'La información base del sistema y los valores con los que calcula: sedes, personal, motivos, costos, metas y calendario.',
   children: [
     { to: '/app/admin/sedes',             label: 'Sedes y consultorios', descripcion: 'Sedes, sus consultorios y la especialidad de cada uno' },
     { to: '/app/admin/recursos',          label: 'Recursos',             descripcion: 'Catálogo de profesionales, auxiliares, técnicos y asesores' },
     { to: '/app/admin/usuarios',          label: 'Usuarios',             descripcion: 'Quién entra al sistema y con qué rol' },
     { to: '/app/admin/motivos-ausencia',  label: 'Motivos de ausencia',  descripcion: 'Catálogo de motivos y su familia' },
     { to: '/app/admin/tareas-backoffice', label: 'Tareas de backoffice', descripcion: 'Catálogo de tareas asignables' },
-  ],
-}
-
-const CONFIGURACION = {
-  clave: 'configuracion', icon: '⚙️', label: 'Configuración',
-  descripcion: 'Los valores con los que el sistema calcula: costos, metas y calendario.',
-  children: [
-    { to: '/app/admin/parametros', label: 'Parámetros de costo', descripcion: 'Costo por tipo de consulta y por reprogramación' },
-    { to: '/app/admin/metas',      label: 'Metas del sistema',   descripcion: 'Metas de ocupación y utilización, jornada semanal, avisos' },
-    { to: '/app/admin/festivos',   label: 'Festivos',            descripcion: 'Calendario oficial de Colombia' },
+    { to: '/app/admin/parametros',        label: 'Parámetros de costo',  descripcion: 'Costo por tipo de consulta y por reprogramación' },
+    { to: '/app/admin/metas',             label: 'Metas del sistema',    descripcion: 'Metas de ocupación y utilización, jornada semanal, avisos' },
+    { to: '/app/admin/festivos',          label: 'Festivos',             descripcion: 'Calendario oficial de Colombia' },
   ],
 }
 
@@ -85,6 +119,11 @@ const GESTION_AUSENCIAS = {
   children: [
     ...HIJOS_AUSENCIAS,
     { to: '/app/ausencias-cronograma', label: 'Cronograma', descripcion: 'Vista mensual de todas las ausencias' },
+    // Oct-2026 · El coordinador reprograma las agendas de técnicos, auxiliares
+    // y asesores de su sede; las de profesionales son de la líder. Antes no
+    // tenía ninguna puerta a eso: podía abrir un caso desde el listado, pero
+    // nada le decía cuáles le tocaban.
+    { to: '/app/mis-reprogramaciones', label: 'Mis reprogramaciones', descripcion: 'Las agendas caídas que te toca reprogramar' },
   ],
 }
 
@@ -147,12 +186,14 @@ export const NAV_ITEMS = {
 
   directivo: [
     { to: '/app/dashboard', icon: '📊', label: 'Dashboard ejecutivo' },
+    { to: '/app/comparativo', icon: '🗂️', label: 'Históricos de semanas' },
     {
       clave: 'ocupacion', icon: '🏥', label: 'Ocupación',
       descripcion: 'Qué tanto se usa la capacidad instalada.',
       children: [
         { to: '/app/informes/ocupacion',          label: 'Consultorios', descripcion: 'Horas usadas frente a horas disponibles' },
         { to: '/app/informes/ocupacion-asesores', label: 'Asesores',     descripcion: 'Ocupación del área de asesoría' },
+        { to: '/app/informes/indicadores-asesores', label: 'Indicadores de asesores', descripcion: 'Ocupación, backoffice y ausentismo por asesor' },
       ],
     },
     PRODUCTIVIDAD,
@@ -165,24 +206,24 @@ export const NAV_ITEMS = {
       descripcion: 'Cómo se está cerrando cada semana.',
       children: [
         { to: '/app/informes/cierre-semanas', label: 'Cierre de semanas',  descripcion: 'Qué sedes cerraron y cuándo' },
-        { to: '/app/comparativo',             label: 'Comparativo semanal', descripcion: 'Una semana frente a otra' },
       ],
     },
     { to: '/app/perfil', icon: '👤', label: 'Mi perfil' },
   ],
 
+  // Oct-2026 · María Duarte, la líder de reprogramación, entra como supervisor
+  // y hace el proceso completo igual que gerencia (Hector: "si se supone que
+  // Duarte como supervisor es la que realiza el proceso igual como gerencia,
+  // ¿por qué no aparece todo el proceso?"). Antes este menú solo tenía lo
+  // administrativo: Gestión de ausencias, el Programador y el tablero de
+  // Reprogramaciones no estaban, aunque las rutas sí la dejaban entrar.
   supervisor: [
-    CATALOGOS,
+    { to: '/app/reprogramaciones', icon: '🔄', label: 'Reprogramaciones' },
+    GESTION_AUSENCIAS,
+    // Para mover agendas y, con motivo, corregir una semana cerrada.
+    { to: '/app/programador', icon: '📅', label: 'Programador' },
     CONFIGURACION,
     SOLICITUDES,
-    {
-      clave: 'operativa', icon: '🗓️', label: 'Gestión operativa',
-      descripcion: 'Intervención sobre la operación en curso.',
-      children: [
-        { to: '/app/ausencias-cronograma', label: 'Cronograma de ausencias', descripcion: 'Vista mensual de todas las sedes' },
-        { to: '/app/programador',          label: 'Editar semana cerrada',   descripcion: 'Corregir con motivo, queda en auditoría' },
-      ],
-    },
     { to: '/app/admin/auditoria', icon: '🔍', label: 'Auditoría' },
     { to: '/app/perfil',          icon: '👤', label: 'Mi perfil' },
   ],
@@ -190,19 +231,24 @@ export const NAV_ITEMS = {
   // Sep-2026 · Rol acotado: una sola persona reprograma las agendas caídas.
   // Antes usaba el perfil de gerencia y veía 26 entradas de las que usa dos.
   reprogramador: [
-    { to: '/app/reprogramaciones', icon: '🔄', label: 'Reprogramaciones' },
-    {
-      // Solo profesionales. No es una elección de la pantalla: el backend
-      // recorta la consulta por tipo de recurso (absenceController.list).
-      clave: 'ausencias-prof', icon: '⚠️', label: 'Ausencias de profesionales',
-      descripcion: 'Las ausencias que dejan pacientes sin atender.',
-      children: [
-        { to: `${RAIZ_AUSENCIAS}?grupo=profesionales`, label: 'Pendientes y gestión', descripcion: 'Ausencias por revisar y gestionar' },
-        { to: '/app/ausencias-cronograma',             label: 'Cronograma',           descripcion: 'Vista mensual' },
-      ],
-    },
-    { to: '/app/programador', icon: '📅', label: 'Agenda (consulta)' },
-    { to: '/app/perfil',      icon: '👤', label: 'Mi perfil' },
+    // Oct-2026 · Este perfil es el de QUIEN RECIBE el encargo, no el de la
+    // líder. Hector: "este perfil es para las personas que Duarte asigna, no
+    // para Duarte".
+    //
+    // Tenía el menú de la líder y eso era un agujero: desde "Pendientes y
+    // gestión" entraba a TODAS las ausencias de profesionales y podía
+    // repartirlas. Su trabajo es otro — llamar a los pacientes de los casos
+    // que le pasaron y cerrarlos.
+    //
+    // La líder ya no pasa por aquí: usa el perfil de supervisor, que tiene
+    // Gestión de ausencias completa y puede asignar.
+    { to: '/app/mis-reprogramaciones', icon: '📋', label: 'Mis reprogramaciones' },
+    // Oct-2026 · Aquí estaba el Programador como "Agenda (consulta)" y fue un
+    // error mío: abre vacío pidiendo elegir sede, y trae "Copiar semana
+    // anterior" y "Cerrar semana", que no son suyos. Hector: "¿este
+    // programador para qué es?". En su lugar va el cronograma de SUS casos.
+    { to: '/app/mis-reprogramaciones?vista=cronograma', icon: '🗓️', label: 'Cronograma' },
+    { to: '/app/perfil', icon: '👤', label: 'Mi perfil' },
   ],
 
   gerencia: [
@@ -213,6 +259,9 @@ export const NAV_ITEMS = {
         { to: '/app/dashboard',                   label: 'Dashboard ejecutivo',   descripcion: 'Indicadores de la semana en curso' },
         { to: '/app/informes/ocupacion',          label: 'Ocupación consultorios', descripcion: 'Horas usadas frente a disponibles' },
         { to: '/app/informes/ocupacion-asesores', label: 'Ocupación asesores',     descripcion: 'Ocupación del área de asesoría' },
+        { to: '/app/informes/indicadores-asesores', label: 'Indicadores de asesores', descripcion: 'Ocupación, backoffice y ausentismo por asesor' },
+        // 21-oct · Hector: el comparativo pasa a Vista ejecutiva como "Históricos de semanas".
+        { to: '/app/comparativo',             label: 'Históricos de semanas', descripcion: 'Una semana frente a otra' },
       ],
     },
     PRODUCTIVIDAD,
@@ -223,12 +272,12 @@ export const NAV_ITEMS = {
       clave: 'cierre', icon: '🔒', label: 'Cierre y control',
       descripcion: 'Cómo se está cerrando cada semana.',
       children: [
-        { to: '/app/informes/cierre-semanas', label: 'Cierre de semanas',   descripcion: 'Qué sedes cerraron y cuándo' },
-        { to: '/app/comparativo',             label: 'Comparativo semanal', descripcion: 'Una semana frente a otra' },
-        { to: '/app/programador',             label: 'Editar semana cerrada', descripcion: 'Corregir con motivo, queda en auditoría' },
+        // 21-oct · Hector: "Editar semana cerrada" = "Planeación semanal", y
+        // "Cierre de semanas" queda segunda.
+        { to: '/app/programador',             label: 'Planeación semanal', descripcion: 'Programar la semana; con motivo, corregir una ya cerrada' },
+        { to: '/app/informes/cierre-semanas', label: 'Cierre de semanas',  descripcion: 'Qué sedes cerraron y cuándo' },
       ],
     },
-    CATALOGOS,
     CONFIGURACION,
     SOLICITUDES,
     { to: '/app/admin/auditoria', icon: '🔍', label: 'Auditoría' },

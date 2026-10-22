@@ -275,7 +275,7 @@ function MotivoModal({ motivo, onClose, onSaved }) {
 
         <div className="px-5 py-4 space-y-3 overflow-y-auto">
           <div>
-            <label className="label">Nombre *</label>
+            <label className="label">Nombre <span className="text-red-600">*</span></label>
             <input
               className="input"
               value={form.name}
@@ -298,7 +298,7 @@ function MotivoModal({ motivo, onClose, onSaved }) {
           </div>
 
           <div>
-            <label className="label">Familia *</label>
+            <label className="label">Familia <span className="text-red-600">*</span></label>
             <select
               className="input"
               value={form.family}

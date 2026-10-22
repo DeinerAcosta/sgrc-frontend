@@ -218,6 +218,22 @@ export const authService = {
 }
 
 // ============ SEDES ============
+/** 3583 · Bloqueos de una sede completa (los ponen supervisor y gerencia). */
+export const bloqueoSedeService = {
+  list: async () => {
+    if (!DEMO_MODE) return api.get('/site-blocks')
+    return ok([])
+  },
+  crear: async (data) => {
+    if (!DEMO_MODE) return api.post('/site-blocks', data)
+    return ok({ id: 'demo', ...data })
+  },
+  levantar: async (id) => {
+    if (!DEMO_MODE) return api.put(`/site-blocks/${id}/lift`)
+    return ok({ id })
+  },
+}
+
 export const sedeService = {
   list: async () => {
     if (!DEMO_MODE) return api.get('/sites')
@@ -317,6 +333,11 @@ export const recursoService = {
 
 // ============ SEMANAS ============
 export const semanaService = {
+  /** 3583 · Qué cambió en la programación de la semana, quién y cuándo. */
+  cambios: async (semanaId, sedeId) => {
+    if (!DEMO_MODE) return api.get(`/weeks/${semanaId}/changes`, { params: sedeId ? { site_id: sedeId } : {} })
+    return ok([])
+  },
   list: async (params = {}) => {
     if (!DEMO_MODE) return api.get('/weeks', { params })
     return ok(_semanas)
@@ -532,6 +553,10 @@ export const asignacionService = {
     _asignaciones[i] = { ..._asignaciones[i], ...data }
     return ok(_asignaciones[i])
   },
+  /** 3739 · Turno en contingencia: lo marca el coordinador (sale naranja). */
+  marcarContingencia: async (id) => api.put(`/assignments/${id}/contingency`),
+  /** 3739 · La líder o gerencia pone los pacientes y lo aprueba. */
+  aprobarContingencia: async (id, pacientes) => api.put(`/assignments/${id}/contingency/approve`, { patient_capacity: pacientes }),
   /** Edición rápida solo del campo pacientes_capacidad desde /app/ejecucion. */
   updatePacientesCapacidad: async (id, pacientesCapacidad) =>
     api.patch(`/assignments/${id}/patient-capacity`, { patient_capacity: pacientesCapacidad }),
@@ -588,6 +613,11 @@ export const asignacionService = {
 
 // ============ AUSENCIAS ============
 export const ausenciaService = {
+  /** Texto vigente de la autorización de datos personales y su versión. */
+  autorizacionDatos: async () => {
+    if (!DEMO_MODE) return api.get('/absences/data-consent')
+    return ok({ version: 'demo', texto: 'Autorizo el tratamiento de mis datos personales.', url: '#' })
+  },
   list: async (params = {}) => {
     if (!DEMO_MODE) return api.get('/absences', { params })
     let list = _ausencias
@@ -600,9 +630,41 @@ export const ausenciaService = {
     if (!DEMO_MODE) return api.put(`/absences/${id}/rescheduler`, { rescheduler_id: reschedulerId, notes })
     return ok({ ok: true })
   },
+  /** 3739 · Remunerada o no (lo asigna Agendas). */
+  cambiarRemuneracion: async (id, isPaid) => {
+    if (!DEMO_MODE) return api.put(`/absences/${id}/paid`, { is_paid: isPaid })
+    return ok({ id, is_paid: isPaid })
+  },
+  /** 3583 · Poner otra auxiliar en un turno que acompañaba la ausente. */
+  cubrirAuxiliar: async (id, assignmentId, assistantId) => {
+    if (!DEMO_MODE) return api.put(`/absences/${id}/assistant-cover`, { assignment_id: assignmentId, assistant_id: assistantId })
+    return ok({ ok: true })
+  },
   /** El reprogramador da su caso por terminado. */
   resolverReprogramacion: async (id) => {
     if (!DEMO_MODE) return api.put(`/absences/${id}/rescheduler/done`)
+    return ok({ ok: true })
+  },
+  /** La lista de trabajo de quien reprograma. Quien recibe encargos ve los
+   *  suyos; el coordinador, lo que no es profesional de su sede. El reparto
+   *  lo decide el servidor, no esta llamada. */
+  misReprogramaciones: async (params = {}) => {
+    if (!DEMO_MODE) return api.get('/reschedules/mine', { params })
+    return ok({ casos: [], resumen: { abiertos: 0, cerrados: 0, pacientes_impactados: 0, pacientes_pendientes: 0 } })
+  },
+  /** Cuántos pacientes contestaron y cuántos no. El total de llamados sale
+   *  de la suma: no se manda para que no pueda descuadrar. */
+  registrarLlamadas: async (id, { reached, noAnswer, tramos }) => {
+    // Oct-2026 · `tramos`: las llamadas de cada médico que cubre.
+    if (!DEMO_MODE) return api.put(`/absences/${id}/call-log`, tramos
+      ? { tramos: tramos.map((t) => ({ assignment_id: t.assignmentId, reached: t.reached, no_answer: t.noAnswer })) }
+      : { reached, no_answer: noAnswer })
+    return ok({ ok: true })
+  },
+  /** Los pacientes REALES del caso, que pone la líder (oct-2026). null
+   *  devuelve el caso al estimado del sistema. */
+  corregirPacientes: async (id, patientsConfirmed) => {
+    if (!DEMO_MODE) return api.put(`/absences/${id}/patients`, { patients_confirmed: patientsConfirmed })
     return ok({ ok: true })
   },
   /** Contexto completo para la pantalla de reemplazo: las franjas que se
@@ -902,6 +964,11 @@ export const notificacionService = {
 // Aceptan params (desde, hasta, sede_id, tipo_recurso) que se pasan como query
 // string al backend. En modo demo los mocks son fijos y los params se ignoran.
 export const informeService = {
+  /** 3660 · La gestión de cada reprogramador en el período (para la líder). */
+  gestionReprogramadores: async (params = {}) => {
+    if (!DEMO_MODE) return api.get('/reports/reschedulers', { params })
+    return ok({ rango: params, reprogramadores: [], totales: null })
+  },
   ocupacion: async (params = {}) => {
     if (!DEMO_MODE) return api.get('/reports/occupancy', { params })
     return ok(INFORME_OCUPACION)
@@ -921,6 +988,10 @@ export const informeService = {
   },
   ocupacionAsesores: async (params = {}) => {
     if (!DEMO_MODE) return api.get('/reports/advisor-occupancy', { params })
+    return ok([])
+  },
+  indicadoresAsesores: async (params = {}) => {
+    if (!DEMO_MODE) return api.get('/reports/advisor-indicators', { params })
     return ok([])
   },
   productividad: async (params = {}) => {

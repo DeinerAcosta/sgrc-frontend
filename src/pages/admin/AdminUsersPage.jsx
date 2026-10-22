@@ -510,12 +510,12 @@ function UsuarioModal({ usuario, onClose, onSaved }) {
               🔐 La contraseña inicial será <strong>SGRC2026!</strong>. El usuario podrá cambiarla después desde su perfil.
             </div>
           )}
-          <div><label className="label">Nombre completo *</label><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-          <div><label className="label">Correo *</label><input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+          <div><label className="label">Nombre completo <span className="text-red-600">*</span></label><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+          <div><label className="label">Correo <span className="text-red-600">*</span></label><input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
           <div><label className="label">Celular (WhatsApp)</label><input className="input" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
 
           <div>
-            <label className="label">Rol *</label>
+            <label className="label">Rol <span className="text-red-600">*</span></label>
             <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
               {Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
             </select>
@@ -530,7 +530,7 @@ function UsuarioModal({ usuario, onClose, onSaved }) {
 
           {form.role === 'recurso' && (
             <div>
-              <label className="label">Tipo de recurso *</label>
+              <label className="label">Tipo de recurso <span className="text-red-600">*</span></label>
               <select
                 className="input"
                 value={form.resourceType}
@@ -624,7 +624,7 @@ function UsuarioModal({ usuario, onClose, onSaved }) {
 
           {requiereMotivo && (
             <div>
-              <label className="label">Motivo del cambio de estado *</label>
+              <label className="label">Motivo del cambio de estado <span className="text-red-600">*</span></label>
               <textarea className="input resize-none" rows={2} value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
               <div className="text-xs text-amber-700 mt-1">Quedará en el log de auditoría</div>
             </div>

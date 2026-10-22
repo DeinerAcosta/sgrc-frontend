@@ -7,11 +7,12 @@ import { es } from 'date-fns/locale'
 import { asignacionService, semanaService, sedeService, festivoService, recursoService, consultorioService, ausenciaService } from '@/services/api'
 import { useAuthStore } from '@/store/authStore'
 import { Badge, Spinner, EmptyState } from '@/components/ui'
-import { DIAS_LABEL, DIAS, semanaLabel, diasDeSemana, parseFechaLocal, normalizarTexto, TIPOS_RECURSO } from '@/utils/helpers'
+import { DIAS_LABEL, DIAS, semanaLabel, diasDeSemana, parseFechaLocal, normalizarTexto, TIPOS_RECURSO, pacientesDelCaso } from '@/utils/helpers'
 import AsignacionModal from '@/pages/coordinator/AssignmentModal'
 import CerrarSemanaModal from '@/pages/coordinator/CloseWeekModal'
 import AsignarBackofficeModal from '@/pages/coordinator/AssignBackofficeModal'
 import AvisoAusentesSemanaAnterior from '@/pages/coordinator/PreviousAbsencesModal'
+import CambiosSemanaModal from '@/pages/coordinator/WeekChangesModal'
 import { useConfirm } from '@/contexts/ConfirmContext'
 
 // Oct-2026 · Aquí vivía SLOT_COLOR, que pintaba cada casilla según el TIPO de
@@ -245,6 +246,7 @@ export default function ProgramadorPage() {
   })
 
   const [verAvisoAusentes, setVerAvisoAusentes] = useState(false)
+  const [verCambios, setVerCambios] = useState(false)
   // Mapa "ausenciaId" -> ausencia, para que la casilla de reprogramación
   // pueda decir DE QUIÉN son los pacientes que se están atendiendo ahí.
   const ausenciaPorId = useMemo(() => {
@@ -498,7 +500,7 @@ export default function ProgramadorPage() {
   useEffect(() => {
     if (vueltaHecha.current || !caso?.cuenta?.resuelto || !caso?.ausencia?.id) return
     vueltaHecha.current = true
-    toast.success(`Listo: los ${caso.cuenta.pacientes_impactados} pacientes quedaron reubicados.`)
+    toast.success(`Listo: los ${caso.cuenta.pacientes_impactados} pacientes quedaron reprogramados.`)
     navegar(`/app/reemplazo/${caso.ausencia.id}`)
   }, [caso, navegar])
 
@@ -531,6 +533,33 @@ export default function ProgramadorPage() {
   // el coordinador ve el mismo número que la dirección, sin sobreestimar slots cortos.
   const HORAS_DIA_CONSULTORIO = 11
   const consultoriosActivos = consultorios.filter((c) => c.active).length
+
+  // 3664 · Desde el aviso de ausentes: abre la asignación ya llena, como
+  // reposición de esa ausencia (queda azul y cuenta en el caso). El día es el
+  // que el profesional dijo que repondría si cae en esta semana; si no, el
+  // mismo día de la semana que faltó. Las validaciones de siempre (solape,
+  // tope de horas, tope de pacientes) bloquean igual que en cualquier casilla.
+  const programarReposicion = (a, t) => {
+    const cons = consultorios.find((c) => c.id === t.room_id)
+    if (!cons || !semanaActual) {
+      toast.error(`El consultorio ${t.room_name ?? ''} no está en la sede que estás viendo.`)
+      return
+    }
+    const propuesta = a.fecha_reposicion_propuesta ? String(a.fecha_reposicion_propuesta).slice(0, 10) : null
+    const desde = String(ausentesPrev?.semana_destino?.desde ?? '').slice(0, 10)
+    const hasta = String(ausentesPrev?.semana_destino?.hasta ?? '').slice(0, 10)
+    const diaPropuesto = propuesta && propuesta >= desde && propuesta <= hasta
+      ? DIAS[(new Date(propuesta + 'T00:00:00Z').getUTCDay() + 6) % 7]
+      : t.weekday
+    setVerAvisoAusentes(false)
+    setModalData({
+      roomId: cons.id, room: cons, day: diaPropuesto, weekId: semanaActual.id,
+      recursoPrecargado: a.resource.id,
+      recursoPrecargadoNombre: a.resource.name,
+      cubreAusenciaId: a.absence_id,
+      franjaCaida: { start_time: t.start_time, end_time: t.end_time, patient_capacity: t.patient_capacity },
+    })
+  }
   const horasAsignadas = asignaciones.reduce((acc, a) => {
     if (!a.resource_id || !a.start_time || !a.end_time) return acc
     const [hi_h, hi_m] = a.start_time.split(':').map(Number)
@@ -623,16 +652,16 @@ export default function ProgramadorPage() {
                 .map((f) => format(parseFechaLocal(f), "EEEE d 'de' MMMM", { locale: es }))
                 .join(' · ')}</strong></>
             ) : caso.ausencia.dias?.length ? <> · ausente el <strong>{caso.ausencia.dias.join(', ')}</strong></> : null}
-            {caso.ausencia.patients_affected ? <> · <strong>{caso.ausencia.patients_affected} pacientes</strong> por reubicar</> : null}
+            {pacientesDelCaso(caso.ausencia) ? <> · <strong>{pacientesDelCaso(caso.ausencia)} pacientes</strong> por reprogramar</> : null}
             {caso.cuenta && caso.cuenta.pacientes_impactados > 0 && (
               <div className="mt-1">
                 {caso.cuenta.resuelto ? (
                   <span className="text-emerald-800 font-semibold">
-                    ✅ Los {caso.cuenta.pacientes_impactados} pacientes ya tienen dónde ir. Volvé al caso para cerrarlo.
+                    ✅ Los {caso.cuenta.pacientes_impactados} pacientes ya tienen médico o día nuevo. Vuelve al caso para repartirlo.
                   </span>
                 ) : (
                   <span className="text-amber-900">
-                    <strong>{caso.cuenta.pacientes_cubiertos}</strong> de <strong>{caso.cuenta.pacientes_impactados}</strong> pacientes reubicados ·{" "}
+                    <strong>{caso.cuenta.pacientes_cubiertos}</strong> de <strong>{caso.cuenta.pacientes_impactados}</strong> pacientes reprogramados ·{" "}
                     <strong className="text-red-700">faltan {caso.cuenta.pacientes_pendientes}</strong>
                   </span>
                 )}
@@ -640,7 +669,7 @@ export default function ProgramadorPage() {
             )}
             {caso.franjas?.length > 0 && (
               <div className="mt-1 text-amber-800">
-                Se cayeron {caso.franjas.length} franja{caso.franjas.length === 1 ? '' : 's'}:{' '}
+                {caso.franjas.length === 1 ? 'Jornada afectada' : 'Jornadas afectadas'}:{' '}
                 {caso.franjas.map((f, i) => (
                   <span key={f.assignment_id}>
                     {i > 0 && ' · '}
@@ -651,11 +680,12 @@ export default function ProgramadorPage() {
                 ))}
               </div>
             )}
-            <div className="text-amber-700 mt-0.5">
-              {quienAtiende === 'mismo'
-                ? 'Va precargado al asignar. Cambia de sede arriba para ver dónde hay espacio.'
-                : 'Se hace cargo OTRO profesional: elígelo al asignar. Cambia de sede arriba para ver dónde hay espacio.'}
-            </div>
+            {/* Para "otro profesional" Hector pidió quitar la indicación. */}
+            {quienAtiende === 'mismo' && (
+              <div className="text-amber-700 mt-0.5">
+                Va precargado al asignar. Cambia de sede arriba para ver dónde hay espacio.
+              </div>
+            )}
           </div>
           <button
             className="btn text-xs flex-shrink-0"
@@ -665,8 +695,8 @@ export default function ProgramadorPage() {
               // como un caso queda a medias y nadie se entera.
               if (caso.cuenta && !caso.cuenta.resuelto && caso.cuenta.pacientes_pendientes > 0) {
                 const salir = await confirm({
-                  title: `Quedan ${caso.cuenta.pacientes_pendientes} pacientes sin reubicar`,
-                  message: 'Todavía no tienen dónde ir. Podés volver al caso y seguir después, pero el caso sigue abierto.',
+                  title: `Quedan ${caso.cuenta.pacientes_pendientes} pacientes sin reprogramar`,
+                  message: 'Todavía no tienen médico ni día nuevo. Puedes volver al caso y seguir después, pero el caso sigue abierto.',
                   confirmLabel: 'Continuar Reprogramación',
                   cancelLabel: 'Permanecer Aquí',
                 })
@@ -697,7 +727,7 @@ export default function ProgramadorPage() {
           {!sedePropia && (
             <div className="mt-2">
               {tieneVariasSedes && (
-                <label className="text-xs text-gray-500 block mb-1">
+                <label className="text-xs font-semibold text-gray-700 block mb-1">
                   📍 Sede a programar ({sedesDisponibles.length} disponibles):
                 </label>
               )}
@@ -746,6 +776,9 @@ export default function ProgramadorPage() {
               🔶 Faltaron la semana pasada ({ausentesPrevLista.length})
               {ausentesSinProgramar > 0 && ` · ${ausentesSinProgramar} sin programar`}
             </button>
+          )}
+          {semanaActual && (
+            <button className="btn" onClick={() => setVerCambios(true)}>🕘 Cambios</button>
           )}
           {semanaActual && !isCerrada && (
             <button className="btn" style={{ borderColor: '#d1fae5', color: '#065f46' }} onClick={() => {
@@ -1088,11 +1121,14 @@ export default function ProgramadorPage() {
                           // un vistazo; el tipo ya se sabe por el consultorio, que
                           // está en la fila. Rojo manda sobre azul: si la persona
                           // faltó, da igual de dónde salió ese turno.
+                          // 3739 · Naranja = turno en contingencia (después del rojo).
                           const claseSlot = ausente
                             ? 'slot-ausente'
-                            : esReemplazo
-                              ? 'slot-repro'
-                              : 'slot-normal'
+                            : a.contingency
+                              ? 'slot-contingencia'
+                              : esReemplazo
+                                ? 'slot-repro'
+                                : 'slot-normal'
                           // Solo la reprogramación que cae sobre otra casilla de
                           // la misma celda se monta encima. Lo demás, separado.
                           const seMontaEncima = esReemplazo && idx > 0
@@ -1133,6 +1169,9 @@ export default function ProgramadorPage() {
                                     recursoPrecargadoNombre: quienAtiende === 'mismo' ? caso.ausencia.resource?.name : undefined,
                                     cubreAusenciaId: caso.ausencia.id,
                                     franjaCaida: caso.franjas?.[0],
+                                    // Tope de "pacientes reales": no se reprograman
+                                    // más pacientes de los que faltan.
+                                    pacientesPorReprogramar: caso.cuenta?.pacientes_pendientes,
                                   })
                                   return
                                 }
@@ -1153,6 +1192,8 @@ export default function ProgramadorPage() {
                                 despareja. Las líneas sin dato van con un espacio
                                 duro para que la altura no dependa del contenido. */}
                             <div className="font-medium text-xs leading-tight truncate text-gray-900" title={a.resource?.name}>
+                              {/* 3583 · El permiso por horas lleva su ícono, aparte del color. */}
+                              {ausente?.is_partial && <span className="mr-0.5" title={`Por horas: ${ausente.absence_start_time ?? ''}–${ausente.absence_end_time ?? ''}`}>⏱</span>}
                               {nombreCorto(a.resource?.name)}
                             </div>
                             <div className="text-xs leading-tight text-gray-700">{a.start_time}–{a.end_time}</div>
@@ -1160,7 +1201,7 @@ export default function ProgramadorPage() {
                               {a.assistant ? `Aux: ${nombreCorto(a.assistant.name)}` : ' '}
                             </div>
                             <div className="text-xs leading-tight text-gray-600">
-                              {a.resource?.type !== 'asesor_servicios' ? `${a.patient_capacity} pac.` : ' '}
+                              {a.resource?.type === 'asesor_servicios' ? ' ' : a.contingency ? '— pac.' : `${a.patient_capacity} pac.`}
                             </div>
 
                             {/* EL DETALLE, AL PASAR EL MOUSE.
@@ -1181,8 +1222,9 @@ export default function ProgramadorPage() {
                               {ausente && (
                                 <div className="text-red-800 mt-0.5">
                                   ⛔ Ausente · {ausente.motivo_catalogo ?? ausente.type}
+                                  {ausente.is_partial && ausente.absence_start_time ? ` · ⏱ ${ausente.absence_start_time}–${ausente.absence_end_time}` : ''}
                                   {ausente.status === 'pendiente' ? ' (sin confirmar)' : ''}
-                                  {ausente.patients_affected ? ' · ' + ausente.patients_affected + ' pac. afectados' : ''}
+                                  {pacientesDelCaso(ausente) ? ' · ' + pacientesDelCaso(ausente) + ' pac. afectados' : ''}
                                 </div>
                               )}
                               {esReemplazo && (
@@ -1261,6 +1303,7 @@ export default function ProgramadorPage() {
                                 recursoPrecargadoNombre: quienAtiende === 'mismo' ? caso?.ausencia?.resource?.name : undefined,
                                 cubreAusenciaId: caso?.ausencia?.id,
                                 franjaCaida: caso?.franjas?.[0],
+                                pacientesPorReprogramar: caso?.cuenta?.pacientes_pendientes,
                               }
                               // Si tiene servicio alternativo, primero pedir cuál usar
                               if (cons.alt_specialty) setPickerServicio(ctx)
@@ -1287,6 +1330,7 @@ export default function ProgramadorPage() {
             { bg: 'bg-emerald-50 border-emerald-300', label: 'Asignación normal' },
             { bg: 'bg-blue-50 border-blue-400',       label: 'Reprogramación' },
             { bg: 'bg-red-50 border-red-400',         label: 'Ausente' },
+            { bg: 'bg-orange-50 border-orange-400',   label: 'Contingencia' },
           ].map((l) => (
             <div key={l.label} className="flex items-center gap-1.5">
               <span className={`w-3 h-3 rounded border-2 ${l.bg}`} />
@@ -1329,11 +1373,16 @@ export default function ProgramadorPage() {
         />
       )}
 
+      {verCambios && semanaActual && (
+        <CambiosSemanaModal semanaId={semanaActual.id} sedeId={sedeId} onClose={() => setVerCambios(false)} />
+      )}
+
       {verAvisoAusentes && (
         <AvisoAusentesSemanaAnterior
           datos={ausentesPrev}
           cargando={loadAusentesPrev}
           onClose={() => setVerAvisoAusentes(false)}
+          onProgramar={canEdit ? programarReposicion : undefined}
         />
       )}
 

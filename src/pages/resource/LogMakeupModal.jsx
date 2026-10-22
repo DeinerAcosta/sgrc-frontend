@@ -105,7 +105,7 @@ export default function RegistrarReposicionModal({ ausencia, onClose }) {
           </div>
 
           <div>
-            <label className="label">Fecha de la reposición *</label>
+            <label className="label">Fecha de la reposición <span className="text-red-600">*</span></label>
             <input
               type="date"
               className="input"
@@ -117,7 +117,7 @@ export default function RegistrarReposicionModal({ ausencia, onClose }) {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">Hora inicio *</label>
+              <label className="label">Hora inicio <span className="text-red-600">*</span></label>
               <input
                 type="time"
                 className="input"
@@ -126,7 +126,7 @@ export default function RegistrarReposicionModal({ ausencia, onClose }) {
               />
             </div>
             <div>
-              <label className="label">Hora fin *</label>
+              <label className="label">Hora fin <span className="text-red-600">*</span></label>
               <input
                 type="time"
                 className="input"
@@ -140,7 +140,7 @@ export default function RegistrarReposicionModal({ ausencia, onClose }) {
           )}
 
           <div>
-            <label className="label">Tipo de reposición *</label>
+            <label className="label">Tipo de reposición <span className="text-red-600">*</span></label>
             <select
               className="input"
               value={form.makeup_type}
@@ -190,7 +190,7 @@ export default function RegistrarReposicionModal({ ausencia, onClose }) {
           </div>
 
           <div>
-            <label className="label">Motivo / justificación *</label>
+            <label className="label">Motivo / justificación <span className="text-red-600">*</span></label>
             <textarea
               className="input resize-none"
               rows={3}

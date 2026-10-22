@@ -95,7 +95,7 @@ export default function RegistroPage() {
 
           <div className="space-y-3">
             <div>
-              <label className="label">Nombre completo *</label>
+              <label className="label">Nombre completo <span className="text-red-600">*</span></label>
               <input
                 className="input"
                 value={form.name}
@@ -106,7 +106,7 @@ export default function RegistroPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="label">Email corporativo *</label>
+                <label className="label">Email corporativo <span className="text-red-600">*</span></label>
                 <input
                   className="input"
                   type="email"
@@ -116,7 +116,7 @@ export default function RegistroPage() {
                 />
               </div>
               <div>
-                <label className="label">Celular *</label>
+                <label className="label">Celular <span className="text-red-600">*</span></label>
                 <input
                   className="input"
                   type="tel"
@@ -128,7 +128,7 @@ export default function RegistroPage() {
             </div>
 
             <div>
-              <label className="label">Rol solicitado *</label>
+              <label className="label">Rol solicitado <span className="text-red-600">*</span></label>
               <select className="input" value={form.role} onChange={(e) => set('role', e.target.value)}>
                 {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
               </select>
@@ -137,7 +137,7 @@ export default function RegistroPage() {
             {esRecurso && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="label">Tipo de profesional *</label>
+                  <label className="label">Tipo de profesional <span className="text-red-600">*</span></label>
                   <select
                     className="input"
                     value={form.resource_type}

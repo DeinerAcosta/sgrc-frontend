@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { sedeService, consultorioService, usuarioService } from '@/services/api'
 import { Badge, Spinner, EmptyState } from '@/components/ui'
 import { useDirtyClose } from '@/hooks/useDirtyClose'
+import BloqueosSedePanel from '@/pages/admin/SiteBlocksPanel'
 import { ESPECIALIDADES as ESPECIALIDADES_GLOBAL, ESPECIALIDADES_EXIGEN_APOYO } from '@/utils/helpers'
 
 // Catálogo único — incluye "asesoria" (área de asesores) para que el modal
@@ -38,6 +39,8 @@ export default function AdminSedesPage() {
           <button className="btn-primary" onClick={() => setShowSede({})}>+ Nueva sede</button>
         </div>
       </div>
+
+      {!isLoading && sedes.length > 0 && <BloqueosSedePanel sedes={sedes} />}
 
       {isLoading ? (
         <div className="flex justify-center py-8"><Spinner /></div>
@@ -260,7 +263,11 @@ function Modal({ title, children, onClose }) {
   )
 }
 
-function Field({ label, children }) { return <div><label className="label">{label}</label>{children}</div> }
+function Field({ label, children }) {
+  // 21-oct · El asterisco de obligatorio va en rojo, como en el resto de la app.
+  const req = typeof label === 'string' && label.endsWith(' *')
+  return <div><label className="label">{req ? <>{label.slice(0, -2)} <span className="text-red-600">*</span></> : label}</label>{children}</div>
+}
 
 function ModalFooter({ onCancel, onSave, saving, disabled }) {
   return (

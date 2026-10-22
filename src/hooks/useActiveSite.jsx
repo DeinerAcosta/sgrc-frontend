@@ -65,7 +65,7 @@ export function useSedeActiva() {
     return (
       <div className={className}>
         {tieneVariasSedes && (
-          <label className="text-xs text-gray-500 block mb-1">
+          <label className="text-xs font-semibold text-gray-700 block mb-1">
             📍 Sede ({sedesDisponibles.length} disponibles):
           </label>
         )}

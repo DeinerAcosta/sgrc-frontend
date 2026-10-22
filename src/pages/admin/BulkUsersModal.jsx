@@ -285,10 +285,10 @@ export default function BulkUsuariosModal({ onClose, onSaved }) {
               <table className="w-full text-xs min-w-[800px]">
                 <thead className="bg-gray-50 text-gray-500 sticky top-0">
                   <tr>
-                    <th className="px-2 py-2 text-left w-44">Nombre *</th>
-                    <th className="px-2 py-2 text-left w-56">Email *</th>
+                    <th className="px-2 py-2 text-left w-44">Nombre <span className="text-red-600">*</span></th>
+                    <th className="px-2 py-2 text-left w-56">Email <span className="text-red-600">*</span></th>
                     <th className="px-2 py-2 text-left w-32">Celular</th>
-                    <th className="px-2 py-2 text-left w-32">Rol *</th>
+                    <th className="px-2 py-2 text-left w-32">Rol <span className="text-red-600">*</span></th>
                     <th className="px-2 py-2 text-left w-32">Tipo (si recurso)</th>
                     <th className="px-2 py-2 text-left">Especialidad</th>
                     <th className="px-2 py-2 text-left w-44">Sede(s)</th>

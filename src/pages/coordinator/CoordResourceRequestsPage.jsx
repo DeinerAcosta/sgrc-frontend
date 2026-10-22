@@ -162,7 +162,7 @@ function NuevaSolicitudModal({ onClose, onSaved }) {
         <div className="px-5 py-4 space-y-3 overflow-y-auto">
 
           <div>
-            <label className="label">Tipo de solicitud *</label>
+            <label className="label">Tipo de solicitud <span className="text-red-600">*</span></label>
             <select className="input" value={form.requestType} onChange={(e) => setForm({ ...form, requestType: e.target.value, resourceId: '', newResourceType: '' })}>
               <option value="prestamo">Préstamo de un recurso existente</option>
               <option value="alta_nueva">Alta de un recurso nuevo (no existe en el sistema)</option>
@@ -170,7 +170,7 @@ function NuevaSolicitudModal({ onClose, onSaved }) {
           </div>
 
           <div>
-            <label className="label">Sede destino *</label>
+            <label className="label">Sede destino <span className="text-red-600">*</span></label>
             <select className="input" value={form.targetSiteId} onChange={(e) => setForm({ ...form, targetSiteId: e.target.value })}>
               <option value="">— Elige la sede donde necesitas el recurso —</option>
               {sedes.filter((s) => s.active).sort((a, b) => a.name.localeCompare(b.name)).map((s) => (
@@ -181,7 +181,7 @@ function NuevaSolicitudModal({ onClose, onSaved }) {
 
           {form.requestType === 'prestamo' ? (
             <div>
-              <label className="label">Recurso a prestar *</label>
+              <label className="label">Recurso a prestar <span className="text-red-600">*</span></label>
               <select className="input" value={form.resourceId} onChange={(e) => setForm({ ...form, resourceId: e.target.value })}>
                 <option value="">— Elige el recurso —</option>
                 {recursos.sort((a, b) => a.name.localeCompare(b.name)).map((r) => {
@@ -194,7 +194,7 @@ function NuevaSolicitudModal({ onClose, onSaved }) {
           ) : (
             <>
               <div>
-                <label className="label">Tipo de recurso nuevo *</label>
+                <label className="label">Tipo de recurso nuevo <span className="text-red-600">*</span></label>
                 <select className="input" value={form.newResourceType} onChange={(e) => setForm({ ...form, newResourceType: e.target.value })}>
                   <option value="">— Elige el tipo —</option>
                   {TIPOS_RECURSO.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
@@ -225,7 +225,7 @@ function NuevaSolicitudModal({ onClose, onSaved }) {
           </div>
 
           <div>
-            <label className="label">Justificación * <span className="text-gray-400">(mín 10 caracteres)</span></label>
+            <label className="label">Justificación <span className="text-red-600">*</span> <span className="text-gray-400">(mín 10 caracteres)</span></label>
             <textarea
               className="input resize-none"
               rows={4}

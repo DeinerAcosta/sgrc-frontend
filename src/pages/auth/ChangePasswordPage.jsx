@@ -4,15 +4,11 @@ import { useMutation } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { authService } from '@/services/api'
 import { useAuthStore } from '@/store/authStore'
+import { rutaDeEntrada } from '@/config/nav'
 import { Spinner, PasswordInput } from '@/components/ui'
 
-const ROUTES = {
-  resource:     '/app/horario',
-  coordinador: '/app/dashboard-coord',
-  directivo:   '/app/dashboard',
-  supervisor:  '/app/admin/sedes',
-  gerencia:    '/app/dashboard',
-}
+// Oct-2026 · Tercera copia del mapa de destinos, con los mismos dos errores
+// que la de LoginPage. Ahora sale de config/nav.js, que es el unico sitio.
 
 /**
  * Cambio obligatorio al primer ingreso (cuando el usuario fue creado por
@@ -32,7 +28,7 @@ export default function CambiarPasswordPage() {
       toast.success('Contraseña actualizada. ¡Bienvenido!')
       // Refrescar el user para limpiar debe_cambiar_password
       await refresh?.()
-      navigate(ROUTES[user?.role] ?? '/app/horario', { replace: true })
+      navigate(rutaDeEntrada(user?.role), { replace: true })
     },
     onError: (err) => toast.error(err?.message ?? 'Error al cambiar la contraseña'),
   })
@@ -64,16 +60,16 @@ export default function CambiarPasswordPage() {
 
           <div className="space-y-4">
             <div>
-              <label className="label">{obligatorio ? 'Contraseña provisional (la que llegó por email)' : 'Contraseña actual'} *</label>
+              <label className="label">{obligatorio ? 'Contraseña provisional (la que llegó por email)' : 'Contraseña actual'} <span className="text-red-600">*</span></label>
               <PasswordInput value={actual} onChange={(e) => setActual(e.target.value)} placeholder="••••••••" />
             </div>
             <div>
-              <label className="label">Nueva contraseña *</label>
+              <label className="label">Nueva contraseña <span className="text-red-600">*</span></label>
               <PasswordInput value={nueva} onChange={(e) => setNueva(e.target.value)} placeholder="Mínimo 8 caracteres" />
               {nueva && !longitudOk && <div className="text-xs text-red-600 mt-1">Debe tener al menos 8 caracteres.</div>}
             </div>
             <div>
-              <label className="label">Confirmar nueva contraseña *</label>
+              <label className="label">Confirmar nueva contraseña <span className="text-red-600">*</span></label>
               <PasswordInput value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Repítela" />
               {confirm && !coincide && <div className="text-xs text-red-600 mt-1">Las contraseñas no coinciden.</div>}
             </div>

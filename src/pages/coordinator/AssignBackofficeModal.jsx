@@ -140,7 +140,7 @@ export default function AsignarBackofficeModal({ auxiliar, onClose }) {
 
         <div className="px-5 py-4 space-y-4">
           <div>
-            <label className="label">Sede {auxSede?.city ? `(cualquiera de ${auxSede.city})` : ''} *</label>
+            <label className="label">Sede {auxSede?.city ? `(cualquiera de ${auxSede.city})` : ''} <span className="text-red-600">*</span></label>
             <select className="input" value={form.site_id} onChange={(e) => set('site_id', e.target.value)}>
               <option value="">Seleccionar sede...</option>
               {sedesPosibles.map((s) => <option key={s.id} value={s.id}>{s.name}{s.city ? ` · ${s.city}` : ''}</option>)}
@@ -148,7 +148,7 @@ export default function AsignarBackofficeModal({ auxiliar, onClose }) {
           </div>
 
           <div>
-            <label className="label">Tarea *</label>
+            <label className="label">Tarea <span className="text-red-600">*</span></label>
             <select className="input" value={form.backoffice_task_id} onChange={(e) => set('backoffice_task_id', e.target.value)}>
               <option value="">Seleccionar tarea...</option>
               {tareas.map((t) => <option key={t.id} value={t.id}>{t.name} · {t.estimated_minutes}min/u</option>)}
@@ -168,18 +168,18 @@ export default function AsignarBackofficeModal({ auxiliar, onClose }) {
 
             {!esRango ? (
               <div>
-                <label className="label">Fecha *</label>
+                <label className="label">Fecha <span className="text-red-600">*</span></label>
                 <input className="input" type="date" value={form.day} onChange={(e) => set('day', e.target.value)} />
               </div>
             ) : (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="label">Desde *</label>
+                    <label className="label">Desde <span className="text-red-600">*</span></label>
                     <input className="input" type="date" value={form.start_date} onChange={(e) => set('start_date', e.target.value)} />
                   </div>
                   <div>
-                    <label className="label">Hasta *</label>
+                    <label className="label">Hasta <span className="text-red-600">*</span></label>
                     <input className="input" type="date" value={form.end_date} min={form.start_date} onChange={(e) => set('end_date', e.target.value)} />
                   </div>
                 </div>
@@ -217,11 +217,11 @@ export default function AsignarBackofficeModal({ auxiliar, onClose }) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="label">Hora inicio *</label>
+              <label className="label">Hora inicio <span className="text-red-600">*</span></label>
               <input className="input" type="time" value={form.start_time} onChange={(e) => set('start_time', e.target.value)} />
             </div>
             <div>
-              <label className="label">Hora fin *</label>
+              <label className="label">Hora fin <span className="text-red-600">*</span></label>
               <input className="input" type="time" value={form.end_time} onChange={(e) => set('end_time', e.target.value)} />
             </div>
           </div>

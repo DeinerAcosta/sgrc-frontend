@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { ausenciaService, sedeService, reposicionService } from '@/services/api'
 import { useAuthStore } from '@/store/authStore'
 import { Badge, Spinner, EmptyState, Avatar, usePaginacion, Paginacion } from '@/components/ui'
-import { TIPOS_AUSENCIA, formatCOP, parseFechaLocal, GRUPOS_AUSENCIAS, tiposSinGrupo, TIPOS_QUE_IMPACTAN_PACIENTES } from '@/utils/helpers'
+import { TIPOS_AUSENCIA, formatCOP, parseFechaLocal, GRUPOS_AUSENCIAS, tiposSinGrupo, TIPOS_QUE_IMPACTAN_PACIENTES, pacientesDelCaso, formatFamiliaLabel, descargarCSV, palabraDelRecurso, coordSoloVe } from '@/utils/helpers'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import RegistrarAusenciaCoordModal from '@/pages/coordinator/CoordLogAbsenceModal'
@@ -14,23 +14,178 @@ import { useSedeActiva } from '@/hooks/useActiveSite'
 const TIPO_LABEL = Object.fromEntries(TIPOS_AUSENCIA.map((t) => [t.value, t.label]))
 
 /**
- * ¿Esta ausencia todavía necesita que alguien la gestione?
+ * LA ETAPA DEL CASO, en el orden del proceso.
  *
- * No es lo mismo que "está pendiente". Son dos preguntas:
- *   · `status`            ¿ocurrió la ausencia?       → pendiente | confirmada
- *   · `reschedule_status` ¿ya se gestionó la agenda?  → null | asignada | resuelta
+ * Hector fijó el proceso: la líder "selecciona el día o el reemplazo, y
+ * entonces asigna al reprogramador"; el caso termina cuando quien llama lo da
+ * por terminado. Es decir:
  *
- * Una ausencia CONFIRMADA con 33 pacientes sin reubicar es el caso más urgente
- * que hay, y antes no aparecía como pendiente de nadie porque la pestaña solo
- * miraba la primera pregunta.
+ *   por confirmar → por cubrir → por repartir → llamando → terminada
  *
- * Queda fuera la rechazada (no ocurrió) y la que no dejó pacientes tirados: si
- * nadie se quedó sin atender, no hay agenda que reubicar.
+ * Sale de tres datos de la ausencia: si ocurrió (`status`), quién la lleva
+ * (`reschedule_status`) y cuántos de sus pacientes ya tienen médico o día
+ * nuevo (`patients_covered`, que calcula el servidor). Antes la lista mezclaba
+ * "falta cubrir" y "falta repartir" en un solo "por gestionar", y un caso con
+ * todos sus pacientes cubiertos seguía diciendo "por gestionar" mientras el
+ * botón ya decía "Ver detalles".
+ *
+ * Técnicos, auxiliares y asesores no se reparten: el coordinador los cubre y
+ * los da por terminados él mismo. Por eso su paso intermedio es "por
+ * terminar", no "por repartir".
  */
-const necesitaGestion = (a) => {
-  if (a.status === 'rechazada') return false
-  if (a.status === 'pendiente') return true
-  return (a.patients_affected ?? 0) > 0 && a.reschedule_status !== 'resuelta'
+const PROFESIONALES = new Set(GRUPOS_AUSENCIAS.find((g) => g.key === 'profesionales')?.tipos ?? [])
+
+const ETAPAS = {
+  por_confirmar: { orden: 0, label: 'por confirmar', color: 'amber', abierta: true },
+  por_cubrir:    { orden: 1, label: 'por cubrir',    color: 'red',   abierta: true },
+  por_repartir:  { orden: 2, label: 'por repartir',  color: 'amber', abierta: true },
+  por_terminar:  { orden: 2, label: 'por terminar',  color: 'amber', abierta: true },
+  llamando:      { orden: 3, label: 'llamando',      color: 'blue',  abierta: false },
+  terminada:     { orden: 4, label: 'terminada',     color: 'green', abierta: false },
+  sin_agenda:    { orden: 5, label: 'sin pacientes', color: 'gray',  abierta: false },
+  // 21-oct · Asesores: no se mueve agenda ni se reparte; solo se registra y se
+  // mira el detalle. Confirmada es su último paso.
+  registrada:    { orden: 5, label: 'confirmada',    color: 'green', abierta: false },
+  rechazada:     { orden: 6, label: 'rechazada',     color: 'red',   abierta: false },
+}
+
+const etapaDe = (a) => {
+  if (a.status === 'rechazada') return 'rechazada'
+  if (a.status === 'pendiente') return 'por_confirmar'
+  if (a.resource?.type === 'asesor_servicios') return 'registrada'
+  if (a.reschedule_status === 'resuelta') return 'terminada'
+  // 3583 · Una auxiliar no deja pacientes propios, pero sí turnos sin auxiliar:
+  // por cubrir mientras quede alguno; cubiertos todos, por terminar.
+  const turnosAux = (a.assistant_shifts_pending ?? 0) + (a.assistant_shifts_covered ?? 0)
+  if (turnosAux > 0) return (a.assistant_shifts_pending ?? 0) > 0 ? 'por_cubrir' : 'por_terminar'
+  // Sin pacientes afectados no hay agenda que mover: un auxiliar o un asesor,
+  // o un profesional que ese día no tenía consulta.
+  // Con el número real si la líder lo puso: puede decir que no había nadie.
+  if (pacientesDelCaso(a) === 0) return 'sin_agenda'
+  if (a.reschedule_status === 'asignada') return 'llamando'
+  if ((a.patients_covered ?? 0) === 0) return 'por_cubrir'
+  return PROFESIONALES.has(a.resource?.type) ? 'por_repartir' : 'por_terminar'
+}
+
+/**
+ * ¿Le toca a quien mira hacer algo? "Llamando" ya está en manos del
+ * reprogramador: para la líder es para consultar, no para gestionar.
+ */
+// 21-oct · Al coordinador no le toca nada en la ausencia de un profesional.
+const pideAccion = (a, rol) => ETAPAS[etapaDe(a)].abierta && !coordSoloVe(rol, a.resource?.type)
+
+// Oct-2026 · Dentro de cada etapa, la registrada más recientemente arriba
+// (Hector: acababa de crear una y salía tercera, detrás de otras más viejas).
+// Antes era por fecha de la ausencia, la más antigua primero.
+const registradaEn = (a) => String(a.reported_at ?? a.created_at ?? '')
+const ordenarPorEstado = (lista) => [...lista].sort((x, y) =>
+  ETAPAS[etapaDe(x)].orden - ETAPAS[etapaDe(y)].orden ||
+  registradaEn(y).localeCompare(registradaEn(x)))
+
+/**
+ * FILTROS DE LA LISTA (PROYECTOS-3398 §5 y 3583 "filtro por estado").
+ *
+ * Dependientes: cada filtro solo ofrece lo que existe dentro de los demás ya
+ * elegidos, así nunca queda una combinación que dé vacío sin explicación. La
+ * familia del motivo es el padre del motivo: al cambiarla se limpia el motivo.
+ * Se filtra en el navegador sobre lo que ya trajo el servidor, que recorta por
+ * el alcance de quien mira: un coordinador no ve recursos de otra sede.
+ */
+const FILTROS_VACIOS = { recurso: '', familia: '', motivo: '', clasificacion: '', remunerada: '', etapa: '', desde: '', hasta: '' }
+
+const familiaDe = (a) => a.reason_ref?.family ?? 'ausencia_profesional'
+const motivoDe = (a) => a.reason_ref?.code ?? a.type
+const motivoLabel = (a) => a.reason_ref?.name ?? TIPO_LABEL[a.type] ?? a.type
+const dia = (v) => String(v ?? '').slice(0, 10)
+
+const CUMPLE = {
+  recurso: (a, v) => a.resource?.id === v,
+  familia: (a, v) => familiaDe(a) === v,
+  motivo: (a, v) => motivoDe(a) === v,
+  clasificacion: (a, v) => (v === 'programada') === !!a.is_planned,
+  remunerada: (a, v) => (v === 'si') === !!a.remunerada,
+  etapa: (a, v) => etapaDe(a) === v,
+  desde: (a, v) => dia(a.end_date) >= v,
+  hasta: (a, v) => dia(a.start_date) <= v,
+}
+
+// Las que cumplen todos los filtros menos los de `excepto`.
+const filtrar = (lista, filtros, excepto = []) =>
+  lista.filter((a) => Object.entries(filtros).every(([k, v]) => !v || excepto.includes(k) || CUMPLE[k](a, v)))
+
+const opcionesUnicas = (lista, valor, etiqueta) =>
+  [...new Map(lista.map((a) => [valor(a), etiqueta(a)])).entries()]
+    .filter(([v]) => v)
+    .sort((x, y) => String(x[1]).localeCompare(String(y[1]), 'es'))
+
+/**
+ * 3739 · "La relación de los profesionales asociados a cada ausencia", con si
+ * es remunerada o no: la lista tal como está filtrada, en CSV.
+ */
+function descargarRelacion(filas) {
+  const etapaTxt = (a) => ETAPAS[etapaDe(a)].label
+  descargarCSV(
+    `relacion-ausencias-${new Date().toISOString().slice(0, 10)}.csv`,
+    ['Recurso', 'Tipo de recurso', 'Motivo', 'Desde', 'Hasta', 'Por horas', 'Remunerada', 'Clasificación', 'Anticipación (días)', 'Estado'],
+    filas.map((a) => [
+      a.resource?.name, a.resource?.type, motivoLabel(a), dia(a.start_date), dia(a.end_date),
+      a.is_partial && a.absence_start_time ? `${a.absence_start_time}-${a.absence_end_time}` : '',
+      a.remunerada ? 'Sí' : 'No', a.is_planned ? 'Programada' : 'Imprevista', a.notice_days ?? 0, etapaTxt(a),
+    ]),
+  )
+}
+
+function FiltrosAusencias({ lista, filtros, onChange, mostradas, filtradas }) {
+  const set = (k, v) => onChange({ ...filtros, [k]: v, ...(k === 'familia' ? { motivo: '' } : {}) })
+  const activos = Object.values(filtros).some(Boolean)
+
+  const recursos = opcionesUnicas(filtrar(lista, filtros, ['recurso']), (a) => a.resource?.id, (a) => a.resource?.name)
+  const familias = opcionesUnicas(filtrar(lista, filtros, ['familia', 'motivo']), familiaDe, (a) => formatFamiliaLabel(familiaDe(a)))
+  const motivos = opcionesUnicas(filtrar(lista, filtros, ['motivo']), motivoDe, motivoLabel)
+  const etapas = opcionesUnicas(filtrar(lista, filtros, ['etapa']), etapaDe, (a) => ETAPAS[etapaDe(a)].label)
+    .sort((x, y) => ETAPAS[x[0]].orden - ETAPAS[y[0]].orden)
+
+  // Función y no componente: un componente definido aquí se volvería a montar
+  // en cada render y el desplegable perdería el foco.
+  const select = (k, label, opciones) => (
+    <label key={k} className="flex flex-col gap-0.5 min-w-[140px]">
+      <span className="text-[10px] uppercase tracking-wide font-semibold text-gray-600">{label}</span>
+      <select className="input py-1 text-xs" value={filtros[k]} onChange={(e) => set(k, e.target.value)}>
+        <option value="">Todos</option>
+        {opciones.map(([v, t]) => <option key={v} value={v}>{t}</option>)}
+      </select>
+    </label>
+  )
+
+  return (
+    <div className="card p-3 mb-3 flex flex-wrap items-end gap-3">
+      {select('recurso', 'Recurso', recursos)}
+      {select('familia', 'Familia del motivo', familias)}
+      {select('motivo', 'Motivo', motivos)}
+      {select('clasificacion', 'Clasificación', [['programada', 'Programada'], ['imprevista', 'Imprevista']])}
+      {select('remunerada', 'Remunerada', [['si', 'Sí'], ['no', 'No']])}
+      {select('etapa', 'Estado', etapas)}
+      <label className="flex flex-col gap-0.5">
+        <span className="text-[10px] uppercase tracking-wide font-semibold text-gray-600">Desde</span>
+        <input type="date" className="input py-1 text-xs" value={filtros.desde} onChange={(e) => set('desde', e.target.value)} />
+      </label>
+      <label className="flex flex-col gap-0.5">
+        <span className="text-[10px] uppercase tracking-wide font-semibold text-gray-600">Hasta</span>
+        <input type="date" className="input py-1 text-xs" value={filtros.hasta} min={filtros.desde || undefined} onChange={(e) => set('hasta', e.target.value)} />
+      </label>
+      <div className="flex items-center gap-2 ml-auto">
+        {activos && (
+          <>
+            <span className="text-xs text-gray-500">{mostradas} de {lista.length}</span>
+            <button type="button" className="btn-secondary text-xs" onClick={() => onChange(FILTROS_VACIOS)}>Limpiar filtros</button>
+          </>
+        )}
+        <button type="button" className="btn text-xs" disabled={!filtradas.length} onClick={() => descargarRelacion(filtradas)}>
+          ⬇ Descargar relación
+        </button>
+      </div>
+    </div>
+  )
 }
 
 export default function AusenciasCoordPage() {
@@ -45,6 +200,7 @@ export default function AusenciasCoordPage() {
   const [showRegistrar, setShowRegistrar] = useState(false)
   // Ausencia abierta en el modal de gestión (§6.1). null = cerrado.
   const [gestionando, setGestionando] = useState(null)
+  const [filtros, setFiltros] = useState(FILTROS_VACIOS)
   // Si la ausencia confirmada trae desea_reponer=true,
   // abrimos automáticamente el modal de proponer reposición (Fase 3) con la
   // ausencia preseleccionada para no obligar al coord a ir a otro sitio.
@@ -82,7 +238,7 @@ export default function AusenciasCoordPage() {
   const { data: ausencias = [], isLoading } = useQuery({
     queryKey: ['ausencias-coord', sedeId],
     // Sin filtro de estado en el servidor: "por gestionar" no es un estado de
-    // la ausencia, es el cruce de dos. Se filtra abajo con necesitaGestion.
+    // la ausencia, es el cruce de dos. Se filtra abajo con pideAccion.
     queryFn: () => ausenciaService.list({ site_id: sedeId }),
     enabled: tab === 'pendientes' || tab === 'todas',
   })
@@ -154,13 +310,27 @@ export default function AusenciasCoordPage() {
 
   // Solo las del grupo elegido. El backend no filtra por tipo de recurso, así
   // que se recorta aquí: la respuesta ya trae `resource.type` anidado.
-  const ausenciasGrupo = grupo
+  const delGrupo = grupo
     ? ausencias.filter((a) => grupo.tipos.includes(a.resource?.type))
     : ausencias
+  const ausenciasGrupo = filtrar(delGrupo, filtros)
 
-  const pendientes = ausenciasGrupo.filter(necesitaGestion)
+  // Al cambiar de grupo los filtros del anterior ya no aplican.
+  useEffect(() => { setFiltros(FILTROS_VACIOS) }, [grupo?.key])
+
+  // La pestaña "Por gestionar" es lo que le toca a quien mira: lo que está
+  // "llamando" ya está en manos del reprogramador y se ve en "Todas".
+  const pendientes = ausenciasGrupo.filter((a) => pideAccion(a, user?.role))
   const sel = ausenciasGrupo.find((a) => a.id === selected)
-  const pag = usePaginacion(ausenciasGrupo, 10)
+  // Oct-2026 · La pestaña filtra DE VERDAD. Antes la tabla paginaba siempre
+  // `ausenciasGrupo` —todas— y la pestaña solo cambiaba el contador: "Por
+  // gestionar (8)" mostraba veintidós filas, gestionadas incluidas.
+  const enLaTabla = useMemo(
+    () => ordenarPorEstado(tab === 'pendientes' ? pendientes : ausenciasGrupo),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tab, ausencias, grupo?.key, filtros],
+  )
+  const pag = usePaginacion(enLaTabla, 10)
 
   // Sep-2026 · El módulo se entra por una pantalla de tarjetas, una por grupo de
   // personal. Mientras no se elija grupo se muestran las tarjetas; al entrar en
@@ -221,6 +391,10 @@ export default function AusenciasCoordPage() {
         </div>
       </div>
 
+      {tab !== 'reposiciones' && (
+        <FiltrosAusencias lista={delGrupo} filtros={filtros} onChange={setFiltros} mostradas={ausenciasGrupo.length} filtradas={ausenciasGrupo} />
+      )}
+
       {tab === 'reposiciones' ? (
         <ReposicionesTab reposiciones={reposicionesPend} qc={qc} />
       ) : (
@@ -233,15 +407,21 @@ export default function AusenciasCoordPage() {
         <div className="card p-0 overflow-hidden">
           {isLoading ? (
             <div className="flex justify-center py-10"><Spinner /></div>
-          ) : ausenciasGrupo.length === 0 ? (
-            <EmptyState icon="✅" title="Sin ausencias" description="No hay ausencias en este estado" />
+          ) : enLaTabla.length === 0 ? (
+            <EmptyState
+              icon="✅"
+              title={tab === 'pendientes' ? 'Nada por gestionar' : 'Sin ausencias'}
+              description={tab === 'pendientes'
+                ? 'Todas las ausencias de este grupo están confirmadas y gestionadas.'
+                : 'No hay ausencias registradas en este grupo.'}
+            />
           ) : (
             <>
               <div className="overflow-auto max-h-[calc(100vh-290px)]">
                 <table className="w-full text-xs border-separate border-spacing-0 min-w-[620px]">
                   <thead>
                     <tr>
-                      {['Recurso', 'Motivo', 'Fechas', 'Antelación', 'Clasificación', 'Estado'].map((c) => (
+                      {['Recurso', 'Motivo', 'Fechas', 'Antelación', 'Clasificación', 'Remunerada', 'Estado'].map((c) => (
                         <th key={c} className="sticky top-0 z-10 bg-brand-800 text-white text-left font-semibold px-3 py-2 whitespace-nowrap">
                           {c}
                         </th>
@@ -267,8 +447,13 @@ export default function AusenciasCoordPage() {
                           </div>
                         </td>
                         <td className="px-3 py-2 border-b border-gray-100 text-gray-700">
-                          {TIPO_LABEL[a.type] ?? a.type}
-                          {a.is_partial && <Badge variant="blue" className="ml-1">Parcial</Badge>}
+                          {motivoLabel(a)}
+                          {/* 3583 · El permiso por horas se ve con ícono y sus horas, aparte del color del estado. */}
+                          {a.is_partial && (
+                            <Badge variant="blue" className="ml-1">
+                              ⏱ {a.absence_start_time && a.absence_end_time ? `${a.absence_start_time}–${a.absence_end_time}` : 'Por horas'}
+                            </Badge>
+                          )}
                         </td>
                         <td className="px-3 py-2 border-b border-gray-100 text-gray-600 whitespace-nowrap">
                           {format(parseFechaLocal(a.start_date), 'd MMM yyyy', { locale: es })}
@@ -284,23 +469,24 @@ export default function AusenciasCoordPage() {
                             {a.is_planned ? 'Programada' : 'Imprevista'}
                           </Badge>
                         </td>
+                        <td className="px-3 py-2 border-b border-gray-100 text-gray-700">
+                          {a.remunerada ? 'Sí' : 'No'}
+                        </td>
                         <td className="px-3 py-2 border-b border-gray-100">
                           <Badge variant={a.status === 'pendiente' ? 'amber' : a.status === 'confirmada' ? 'green' : 'red'}>
                             {a.status}
                           </Badge>
-                          {/* El segundo estado: el de la gestión. Sin esto, una
-                              confirmada y una confirmada-sin-reubicar se veían
-                              exactamente igual. */}
-                          {necesitaGestion(a) && a.status !== 'pendiente' && (
-                            <div className="mt-0.5">
-                              <Badge variant="amber">por gestionar</Badge>
-                            </div>
-                          )}
-                          {a.reschedule_status === 'resuelta' && (
-                            <div className="mt-0.5">
-                              <Badge variant="green">gestionada</Badge>
-                            </div>
-                          )}
+                          {/* El segundo estado: en qué paso del proceso va. Solo
+                              para las confirmadas: "pendiente" y "rechazada" ya
+                              lo dicen todo con el primero. */}
+                          {a.status === 'confirmada' && etapaDe(a) !== 'registrada' && (() => {
+                            const e = ETAPAS[etapaDe(a)]
+                            return (
+                              <div className="mt-0.5">
+                                <Badge variant={e.color}>{e.label}</Badge>
+                              </div>
+                            )
+                          })()}
                         </td>
                       </tr>
                     ))}
@@ -330,6 +516,16 @@ export default function AusenciasCoordPage() {
 
               <div className="space-y-2 text-xs">
                 <Row label="Tipo" value={TIPO_LABEL[sel.type] ?? sel.type} />
+                <RemuneradaEditable ausencia={sel} />
+                {sel.wants_makeup != null && (
+                  <Row
+                    label="Desea reponer"
+                    value={sel.wants_makeup
+                      ? ((sel.makeup_dates ?? (sel.makeup_date ? [String(sel.makeup_date).slice(0, 10)] : []))
+                          .map((f) => parseFechaLocal(f).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })).join(', ') || 'Sí, sin fechas')
+                      : `No${sel.makeup_notes ? ` · ${sel.makeup_notes}` : ''}`}
+                  />
+                )}
                 <Row label="Fechas" value={`${format(parseFechaLocal(sel.start_date), 'd MMM yyyy', { locale: es })} ${sel.end_date !== sel.start_date ? `— ${format(parseFechaLocal(sel.end_date), 'd MMM yyyy', { locale: es })}` : ''}`} />
                 <Row
                   label="Horario ausencia"
@@ -342,6 +538,9 @@ export default function AusenciasCoordPage() {
                 <FranjasAfectadas ausenciaId={sel.id} />
                 {sel.reason && <Row label="Motivo" value={sel.reason} />}
                 <Row label="Reportado" value={format(parseISO(sel.reported_at ?? sel.created_at), 'd MMM HH:mm', { locale: es })} />
+                {sel.data_consent_at && (
+                  <Row label="Datos personales" value={`Autorizó el ${format(parseISO(sel.data_consent_at), 'd MMM yyyy HH:mm', { locale: es })}`} />
+                )}
                 <Row label="Anticipación" value={`${sel.notice_days ?? '?'} días`} warn={(sel.notice_days ?? Infinity) < 30 && ['academico','vacaciones'].includes(sel.type)} />
               </div>
 
@@ -349,6 +548,9 @@ export default function AusenciasCoordPage() {
                 <div className="bg-red-50 rounded-lg p-3 space-y-1 text-xs">
                   <div className="font-medium text-red-800">Impacto calculado</div>
                   <Row label="Pacientes impactados" value={sel.patients_affected ?? 0} />
+                  {sel.patients_confirmed != null && (
+                    <Row label="Pacientes reales (líder)" value={sel.patients_confirmed} />
+                  )}
                   {sel.opportunity_cost && <Row label="Costo de oportunidad" value={formatCOP(sel.opportunity_cost)} />}
                   {sel.idle_staff_cost && <Row label="Costo personal inactivo" value={formatCOP(sel.idle_staff_cost)} />}
 
@@ -387,7 +589,11 @@ export default function AusenciasCoordPage() {
                   respuesta que todavía no puede saber. Ahora GESTIONAR lleva
                   directo a la pantalla, y qué pasa con la agenda se decide ahí,
                   franja por franja, con los candidatos a la vista. */}
-              <AccionDelCaso ausencia={sel} onIr={() => navigate(`/app/reemplazo/${sel.id}`)} />
+              {/* Asesores: solo el detalle. Si falta confirmarla, el caso es
+                  donde se confirma. */}
+              {(sel.resource?.type !== 'asesor_servicios' || sel.status === 'pendiente') && (
+                <AccionDelCaso ausencia={sel} onIr={() => navigate(`/app/reemplazo/${sel.id}`)} />
+              )}
             </div>
           )}
         </div>
@@ -397,6 +603,7 @@ export default function AusenciasCoordPage() {
       {showRegistrar && (
         <RegistrarAusenciaCoordModal
           sedeId={sedeId}
+          tipos={grupo?.tipos}
           onClose={() => setShowRegistrar(false)}
         />
       )}
@@ -458,11 +665,12 @@ const ACCIONES_AGENDA = [
  * en vez de un cero suelto, para que se lea de un vistazo cuál mirar primero.
  */
 function HubAusencias({ ausencias, cargando, Selector, onElegir, onRegistrar, children }) {
+  const { user } = useAuthStore()
   const conteos = (tipos) => {
     const delGrupo = ausencias.filter((a) => tipos.includes(a.resource?.type))
     return {
       total: delGrupo.length,
-      pendientes: delGrupo.filter(necesitaGestion).length,
+      pendientes: delGrupo.filter((a) => pideAccion(a, user?.role)).length,
     }
   }
   // Si alguien agrega un tipo de recurso y olvida meterlo en un grupo, sus
@@ -699,16 +907,43 @@ function AccionDelCaso({ ausencia, onIr }) {
     staleTime: 30_000,
   })
   const cuenta = data?.cuenta
-  const resuelto = !!cuenta?.resuelto
+
+  // Oct-2026 · El botón y el recuadro salen de la ETAPA del caso, la misma que
+  // ordena la lista (etapaDe). Antes cada uno tenía su propio criterio y se
+  // contradecían: con la agenda cubierta, la lista decía "por gestionar" y el
+  // botón "Ver detalles"; con el caso terminado sin médico, al revés.
+  //
+  // GESTIONAR solo cuando le toca a quien mira (por confirmar, por cubrir, por
+  // repartir, por terminar). "Llamando" ya está en manos del reprogramador:
+  // para la líder es para consultar.
+  const { user } = useAuthStore()
+  const etapa = etapaDe(ausencia)
+  const soloVe = coordSoloVe(user?.role, ausencia.resource?.type)
+  const accion = pideAccion(ausencia, user?.role)
+  const quien = palabraDelRecurso(ausencia.resource?.type)
+  const cubierto = !!cuenta?.resuelto
+  const total = pacientesDelCaso(ausencia)
+  const llamados = (ausencia.patients_reached ?? 0) + (ausencia.patients_no_answer ?? 0)
+  // 3739 · "Total de no contactados": los que no contestaron más los que
+  // faltan por llamar. Contactado = contestó.
+  const porLlamar = Math.max(0, total - llamados)
+  const noContactados = (ausencia.patients_no_answer ?? 0) + porLlamar
+
+  const siguiente = {
+    por_confirmar: 'Siguiente paso: confirmar si la ausencia ocurrió.',
+    por_cubrir: `Siguiente paso: cubrir la agenda, con otro ${quien} o moviéndola a otro día.`,
+    por_repartir: 'Siguiente paso: repartir el caso a quien va a llamar a los pacientes.',
+    por_terminar: 'Siguiente paso: darlo por terminado cuando los pacientes estén reprogramados.',
+  }[soloVe ? null : etapa]
 
   return (
     <div className="pt-3 border-t border-gray-100 space-y-2">
-      {resuelto && (
+      {/* Cuánto de la agenda tiene médico o día nuevo. "Los 10 pacientes tienen
+          dónde ir" solo se dice si de verdad los cubre alguien. */}
+      {etapa !== 'rechazada' && cubierto && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-xs text-emerald-900">
-          <div className="font-semibold">✅ Agenda reubicada</div>
-          <div className="mt-0.5">
-            Los {cuenta.pacientes_impactados} pacientes tienen dónde ir.
-          </div>
+          <div className="font-semibold">✅ Agenda cubierta</div>
+          <div className="mt-0.5">Los {cuenta.pacientes_impactados} pacientes tienen {quien} o día nuevo.</div>
           {cuenta.quienes_cubren.map((q, i) => (
             <div key={i} className="mt-0.5">
               · <strong>{q.nombre}</strong> — {q.dia} {q.desde}–{q.hasta} · {q.pacientes} pac.
@@ -716,18 +951,66 @@ function AccionDelCaso({ ausencia, onIr }) {
           ))}
         </div>
       )}
+      {['por_repartir', 'por_terminar'].includes(etapa) && !cubierto && cuenta && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-900">
+          <div className="font-semibold">Cubierta en parte</div>
+          <div className="mt-0.5">
+            {cuenta.pacientes_cubiertos} de {cuenta.pacientes_impactados} pacientes ya tienen {quien} o día nuevo.
+            {etapa === 'por_repartir' && ' Ya se puede repartir; el resto se puede seguir cubriendo.'}
+          </div>
+        </div>
+      )}
+      {etapa === 'llamando' && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-900">
+          <div className="font-semibold">📞 Llamando</div>
+          <div className="mt-0.5">
+            El caso está en manos del reprogramador.
+            {total > 0 && <> Lleva <strong>{llamados}</strong> de {total} pacientes llamados.</>}
+          </div>
+          {total > 0 && (
+            <div className="mt-0.5">
+              · <strong>{ausencia.patients_reached ?? 0}</strong> contestaron
+              · <strong>{noContactados}</strong> no contactados ({ausencia.patients_no_answer ?? 0} no contestaron, {porLlamar} por llamar)
+            </div>
+          )}
+        </div>
+      )}
+      {etapa === 'terminada' && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-xs text-emerald-900">
+          <div className="font-semibold">✅ Caso terminado</div>
+          {!cubierto && (
+            <div className="mt-0.5">Se dio por terminado sin un médico para toda la agenda: el resto se gestionó por llamada.</div>
+          )}
+          {llamados > 0 && (
+            <div className="mt-0.5">
+              · {llamados} llamados · <strong>{ausencia.patients_reached ?? 0}</strong> contestaron
+              · <strong>{noContactados}</strong> no contactados ({ausencia.patients_no_answer ?? 0} no contestaron{porLlamar > 0 ? `, ${porLlamar} sin llamar` : ''})
+            </div>
+          )}
+        </div>
+      )}
+      {etapa === 'rechazada' && (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-700">
+          <div className="font-semibold">Ausencia rechazada</div>
+          <div className="mt-0.5">No ocurrió, así que no hay agenda que reubicar.</div>
+        </div>
+      )}
+      {etapa === 'sin_agenda' && (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-700">
+          <div className="font-semibold">Sin pacientes que reubicar</div>
+          <div className="mt-0.5">Esta ausencia no dejó agenda caída.</div>
+        </div>
+      )}
 
       <button
-        className={`w-full justify-center ${resuelto ? 'btn' : 'btn-primary'}`}
+        className={`w-full justify-center ${accion ? 'btn-primary' : 'btn'}`}
         onClick={onIr}
       >
-        {resuelto ? '🔍 Ver detalles' : '⚙️ GESTIONAR'}
+        {accion ? '⚙️ GESTIONAR' : '🔍 Ver detalles'}
       </button>
 
       <div className="text-xs text-gray-400 text-center">
-        {resuelto
-          ? 'Abre el caso para revisar cómo quedó o reasignar'
-          : 'Abre la pantalla con las franjas que se cayeron: día, hora, sede y coordinador'}
+        {siguiente ?? 'Abre el caso para revisar cómo quedó'}
       </div>
     </div>
   )
@@ -758,15 +1041,56 @@ function FranjasAfectadas({ ausenciaId }) {
   if (franjas.length === 0) return null
   return (
     <div className="pt-1">
-      <div className="text-gray-400 mb-1">Agenda que se cayó</div>
+      <div className="text-gray-400 mb-1">Agenda afectada</div>
       {franjas.map((f) => (
         <div key={f.assignment_id} className="text-gray-800 font-medium leading-snug">
           <span className="capitalize">{f.weekday}</span> {f.start_time}–{f.end_time}
           <span className="font-normal text-gray-500"> · {f.site?.name} / {f.room?.name}</span>
           {f.patient_capacity ? <span className="font-normal text-gray-500"> · {f.patient_capacity} pac.</span> : null}
-          {f.reemplazo && <span className="text-blue-700"> · cubre {f.reemplazo.resource?.name}</span>}
+          {/* Con tramos, una franja puede estar cubierta solo en parte: decirlo,
+              en vez de "cubre X" como si ya no faltara nadie. */}
+          {f.cubierta && (f.tramos?.length ?? 0) > 0 && (
+            <span className="text-blue-700"> · cubre {f.tramos.map((t) => t.resource?.name).join(' · ')}</span>
+          )}
+          {!f.cubierta && (f.tramos?.length ?? 0) > 0 && (
+            <span className="text-amber-700"> · cubierta en parte, faltan {(f.huecos ?? []).reduce((n, h) => n + (h.pacientes ?? 0), 0)} pac.</span>
+          )}
         </div>
       ))}
+    </div>
+  )
+}
+
+/**
+ * 3739 · Remunerada o no. Lo asigna Agendas (la líder, gerencia, y el
+ * coordinador en lo de su reparto). La licencia remunerada lo es siempre.
+ */
+function RemuneradaEditable({ ausencia }) {
+  const qc = useQueryClient()
+  const { user } = useAuthStore()
+  const fija = ausencia.type === 'licencia_remunerada'
+  const puede = !fija && ausencia.status !== 'rechazada' && (
+    ['supervisor', 'gerencia'].includes(user?.role) ||
+    (user?.role === 'coordinador' && !PROFESIONALES.has(ausencia.resource?.type))
+  )
+  const { mutate, isPending } = useMutation({
+    mutationFn: (v) => ausenciaService.cambiarRemuneracion(ausencia.id, v),
+    onSuccess: () => { toast.success('Guardado.'); qc.invalidateQueries({ queryKey: ['ausencias-coord'] }) },
+    onError: (e) => toast.error(e?.message ?? 'No se pudo guardar'),
+  })
+  if (!puede) return <Row label="Remunerada" value={ausencia.remunerada ? 'Sí' : 'No'} />
+  return (
+    <div className="flex justify-between items-center gap-2">
+      <span className="text-gray-400">Remunerada</span>
+      <select
+        className="input py-0.5 text-xs w-20"
+        value={ausencia.remunerada ? 'si' : 'no'}
+        disabled={isPending}
+        onChange={(e) => mutate(e.target.value === 'si')}
+      >
+        <option value="si">Sí</option>
+        <option value="no">No</option>
+      </select>
     </div>
   )
 }

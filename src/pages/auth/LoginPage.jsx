@@ -4,17 +4,15 @@ import { useMutation } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { authService, DEMO_MODE } from '@/services/api'
 import { useAuthStore } from '@/store/authStore'
+import { rutaDeEntrada } from '@/config/nav'
 import { Spinner, Badge, PasswordInput } from '@/components/ui'
 import viuLogo from '@/assets/brand/viu-blanco-horizontal.png'
 import focaLogo from '@/assets/brand/foca-blanco.png'
 
-const ROUTES = {
-  resource:     '/app/horario',
-  coordinador: '/app/dashboard-coord',
-  directivo:   '/app/dashboard',
-  supervisor:  '/app/admin/sedes',
-  gerencia:    '/app/dashboard',
-}
+// Oct-2026 · El mapa de destinos vive en config/nav.js, junto al menú.
+// Aquí había una copia con la clave `resource` en vez de `recurso` —así que
+// ese rol nunca la encontraba— y sin `reprogramador`, que entraba a
+// /app/horario, no podía abrirlo, y quedaba en blanco.
 
 const DEMO_ROLES = [
   { role: 'recurso',     label: 'Recurso',     color: 'green',  desc: 'Auxiliar / médico / técnico — ve su propio horario' },
@@ -87,7 +85,7 @@ export default function LoginPage() {
       navigate('/cambiar-password', { replace: true })
       return
     }
-    navigate(ROUTES[user.role] ?? '/app/horario', { replace: true })
+    navigate(rutaDeEntrada(user.role), { replace: true })
   }
 
   const { mutate: doLogin, isPending } = useMutation({

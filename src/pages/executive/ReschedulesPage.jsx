@@ -38,6 +38,7 @@ const TABS = [
   { key: 'medicos',    label: 'Médicos' },
   { key: 'reposicion', label: 'Reposición & cobertura' },
   { key: 'causas',     label: 'Causas & especialidades' },
+  { key: 'reprogramadores', label: 'Gestión de reprogramadores' },
 ]
 
 const MESES_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
@@ -257,6 +258,7 @@ export default function ReprogramacionesPage() {
       {tab === 'medicos'    && <TabMedicos data={data} />}
       {tab === 'reposicion' && <TabReposicion data={data} />}
       {tab === 'causas'     && <TabCausas data={data} />}
+      {tab === 'reprogramadores' && <TabReprogramadores rango={rango} />}
 
       <div className="border-t border-gray-200 mt-8 pt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[11px] text-gray-500">
         <div>
@@ -265,6 +267,66 @@ export default function ReprogramacionesPage() {
         <div>Tablero analítico · uso interno gerencial · FOCA Fundación</div>
       </div>
     </div>
+  )
+}
+
+// =============================================================================
+// TAB · Gestión de reprogramadores (PROYECTOS-3398 §6.1 · 3660)
+// Por cada persona a la que la líder le repartió casos en el período: cuántos
+// lleva, cuántos pacientes quedaron con turno nuevo y cuántos por llamada, y
+// cómo van sus llamadas. El período cuenta por la fecha en que se le asignó.
+// =============================================================================
+function TabReprogramadores({ rango }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['gestion-reprogramadores', rango.desde, rango.hasta],
+    queryFn: () => informeService.gestionReprogramadores({ desde: rango.desde, hasta: rango.hasta }),
+    staleTime: 60 * 1000,
+  })
+  if (isLoading) return <div className="p-8 flex justify-center"><Spinner /></div>
+  const filas = data?.reprogramadores ?? []
+  const t = data?.totales
+  if (!filas.length || !t) {
+    return <EmptyState title="Sin casos repartidos" description="En este período no se le asignó ningún caso a un reprogramador." />
+  }
+  const COLS = [
+    ['casos', 'Casos'], ['llamando', 'Llamando'], ['terminados', 'Terminados'],
+    ['pacientes', 'Pacientes'], ['con_turno_nuevo', 'Con turno nuevo'], ['por_llamada', 'Por llamada'],
+    ['llamados', 'Llamados'], ['contestaron', 'Contestaron'], ['no_contestaron', 'No contestaron'], ['por_llamar', 'Por llamar'],
+  ]
+  return (
+    <>
+      <Panel eyebrow="Gestión · Reprogramadores" title="Casos y llamadas por reprogramador">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <KpiFoca label="Casos repartidos" value={fmtNum(t.casos)} color="text-brand-800" sub={`${fmtNum(t.terminados)} terminados · ${t.pct_terminados}%`} />
+          <KpiFoca label="Pacientes con turno nuevo" value={fmtNum(t.con_turno_nuevo)} color="text-blue-600" sub={`de ${fmtNum(t.pacientes)} pacientes`} />
+          <KpiFoca label="Contestaron" value={`${t.pct_contestaron}%`} color="text-green-600" sub={`${fmtNum(t.contestaron)} de ${fmtNum(t.llamados)} llamados`} />
+          <KpiFoca label="Por llamar" value={fmtNum(t.por_llamar)} color="text-amber-600" sub={`${fmtNum(t.no_contestaron)} no contestaron`} />
+        </div>
+      </Panel>
+
+      <div className="bg-white rounded-xl border border-gray-100 overflow-auto mb-6">
+        <table className="w-full text-xs border-separate border-spacing-0 min-w-[900px]">
+          <thead>
+            <tr>
+              {['Reprogramador', ...COLS.map(([, l]) => l), '% contestaron'].map((c) => (
+                <th key={c} className="sticky top-0 bg-brand-800 text-white text-left font-semibold px-3 py-2 whitespace-nowrap">{c}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {[...filas, t].map((f) => (
+              <tr key={f.id ?? 'total'} className={f.id ? 'hover:bg-gray-50' : 'bg-gray-50 font-semibold'}>
+                <td className="px-3 py-2 border-b border-gray-100 text-gray-900 whitespace-nowrap">{f.nombre}</td>
+                {COLS.map(([k]) => (
+                  <td key={k} className="px-3 py-2 border-b border-gray-100 text-gray-700 tabular-nums">{fmtNum(f[k])}</td>
+                ))}
+                <td className="px-3 py-2 border-b border-gray-100 text-gray-700 tabular-nums">{f.pct_contestaron}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   )
 }
 
@@ -282,15 +344,9 @@ function TabResumen({ data }) {
   const pctAntel = data.pct_antelacion_ok ?? 0
   const pctSinRep = 100 - tasaRep
   const promPorEvento = totalEventos > 0 ? (totalPac / totalEventos).toFixed(1) : '0'
-  const mediaAntel = data.antelacion_reporte
-    ? (function () {
-        // Aproximacion: uso ponderado del bucket para calcular la mediana estimada
-        const a = data.antelacion_reporte
-        const total = a.retroactivo + a.uno + a.dos_a_siete + a.ocho_a_treinta + a.mas_30
-        const acumulado = a.retroactivo * 0 + a.uno * 1 + a.dos_a_siete * 4 + a.ocho_a_treinta * 18 + a.mas_30 * 45
-        return total > 0 ? Math.round(acumulado / total) : 0
-      })()
-    : 0
+  // Oct-2026 · Promedio real de días de anticipación (lo calcula el servidor).
+  // Antes se estimaba con los rangos de la gráfica, y estaba mal alimentado.
+  const mediaAntel = data.antelacion_promedio ?? 0
 
   const porMes = data.por_mes ?? []
   const dataPorMes = porMes.map((m) => ({
@@ -303,7 +359,9 @@ function TabResumen({ data }) {
     { name: 'Repuestas', value: cubiertos, color: '#3b82f6' },
     { name: 'Sin reponer', value: sinCobertura, color: '#f97316' },
   ]
-  const repuestasCount = (data.makeups?.aprobadas ?? 0) + (data.makeups?.realizadas ?? 0)
+  // Oct-2026 · Repuesta = todos sus pacientes con turno nuevo (turnos que la
+  // cubren o reposición aprobada). Antes solo contaba reposiciones del médico.
+  const repuestasCount = k.repuestas ?? 0
   const sinReponerCount = Math.max(0, totalEventos - repuestasCount)
 
   // Top medico y % del total
@@ -326,9 +384,9 @@ function TabResumen({ data }) {
           <KpiFoca label="Reprogramaciones" value={fmtNum(totalEventos)} color="text-brand-800" sub="En la selección" />
           <KpiFoca label="Pacientes impactados" value={fmtNum(totalPac)} color="text-amber-600" sub={`${promPorEvento} por evento`} />
           <KpiFoca label="Tasa de reposición" value={`${tasaRep}%`} color="text-red-600" sub={`${pctSinRep}% no se repuso`} />
-          <KpiFoca label="Pacientes sin cobertura" value={fmtNum(sinCobertura)} color="text-red-600" sub="Sin reagenda registrada" />
+          <KpiFoca label="Pacientes sin cobertura" value={fmtNum(sinCobertura)} color="text-red-600" sub="Sin turno nuevo" />
           <KpiFoca label="Médicos involucrados" value={fmtNum(medicos)} color="text-brand-800" sub="Profesionales distintos" />
-          <KpiFoca label="Reporte con antelación" value={`${pctAntel}%`} color="text-blue-600" sub={`Mediana ${mediaAntel} días`} />
+          <KpiFoca label="Avisadas con 20+ días" value={`${pctAntel}%`} color="text-blue-600" sub={`Promedio ${mediaAntel} días`} />
         </div>
       </Panel>
 
@@ -416,10 +474,10 @@ function TabResumen({ data }) {
             body={`Las reprogramaciones operativas (cambio horario, formato) suman ${fmtNum(causaOperativaCount)} eventos: ${pctOperativa}% del total, en gran parte planificables.`}
           />
           <HallazgoCard
-            color="blue"
+            color={pctAntel >= 50 ? 'blue' : 'amber'}
             eyebrow="Antelación"
-            title="El aviso llega a tiempo"
-            body={`El ${pctAntel}% de los reportes se hace con antelación (mediana ${mediaAntel} días). El cuello de botella es reponer, no avisar.`}
+            title={pctAntel >= 50 ? 'La mayoría avisa a tiempo' : 'La mayoría avisa tarde'}
+            body={`El ${pctAntel}% de las ausencias se avisó con 20 días o más (programadas); en promedio, ${mediaAntel} días antes.`}
           />
           <HallazgoCard
             color="amber"
@@ -431,7 +489,7 @@ function TabResumen({ data }) {
             color="green"
             eyebrow="Cobertura"
             title="Pacientes cubiertos"
-            body={`Solo ${fmtNum(cubiertos)} pacientes quedaron en agendas repuestas frente a ${fmtNum(sinCobertura)} sin cobertura.`}
+            body={`${fmtNum(cubiertos)} pacientes ya tienen turno nuevo frente a ${fmtNum(sinCobertura)} sin cobertura.`}
           />
         </div>
       </Panel>
@@ -552,12 +610,12 @@ function TabReposicion({ data }) {
     { name: '8-30 d',     value: sla.ocho_a_treinta ?? 0, color: '#1e3a8a' },
     { name: '>30 d',      value: sla.mas_30 ?? 0, color: '#1e3a8a' },
   ]
+  // Oct-2026 · Alineado con la regla de 20 días: 20+ es programada.
   const dataAntel = [
-    { name: 'Retroact.', value: antel.retroactivo ?? 0, color: '#f97316' },
-    { name: '≤1 día',    value: antel.uno ?? 0,          color: '#f59e0b' },
-    { name: '2-7 d',     value: antel.dos_a_siete ?? 0,  color: '#1e3a8a' },
-    { name: '8-30 d',    value: antel.ocho_a_treinta ?? 0, color: '#1e3a8a' },
-    { name: '>30 d',     value: antel.mas_30 ?? 0,         color: '#1e3a8a' },
+    { name: 'Retroact.', value: antel.retroactivo ?? 0,       color: '#f97316' },
+    { name: '1-7 d',     value: antel.uno_a_siete ?? 0,       color: '#f59e0b' },
+    { name: '8-19 d',    value: antel.ocho_a_diecinueve ?? 0, color: '#f59e0b' },
+    { name: '20+ d',     value: antel.veinte_o_mas ?? 0,      color: '#1e3a8a' },
   ]
 
   return (
@@ -585,13 +643,13 @@ function TabReposicion({ data }) {
               <div className="h-full bg-blue-500" style={{ width: `${pctCub}%` }} />
             </div>
             <div className="text-[11px] text-gray-500 mt-2">
-              Por cada paciente cuya agenda se repuso, <strong className="text-orange-600">{ratio} pacientes</strong> quedaron sin reagenda registrada.
+              Por cada paciente con turno nuevo, <strong className="text-orange-600">{ratio} pacientes</strong> quedaron sin cobertura.
             </div>
           </div>
 
           <ChartCard
             title="Tasa de reposición por sede"
-            description="% de eventos repuestos sobre el total de cada sede"
+            description="% de ausencias repuestas sobre el total de cada sede (la sede donde se cayó la agenda)"
           >
             <div style={{ width: '100%', height: 220 }}>
               <ResponsiveContainer>
@@ -616,7 +674,7 @@ function TabReposicion({ data }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <ChartCard
           title="Oportunidad de la reposición (SLA)"
-          description="Cuándo se repone respecto a la fecha de ausencia · solo eventos repuestos"
+          description="Cuándo es el turno que cubre respecto a la fecha de la ausencia"
         >
           <div style={{ width: '100%', height: 220 }}>
             <ResponsiveContainer>
@@ -636,7 +694,7 @@ function TabReposicion({ data }) {
 
         <ChartCard
           title="Antelación del reporte"
-          description="Días entre el reporte y la fecha de la cita"
+          description="Días entre el aviso y el inicio de la ausencia · 20+ días = programada"
         >
           <div style={{ width: '100%', height: 220 }}>
             <ResponsiveContainer>

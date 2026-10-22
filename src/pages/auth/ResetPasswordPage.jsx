@@ -66,7 +66,7 @@ export default function ResetPasswordPage() {
 
           <div className="space-y-4">
             <div>
-              <label className="label">Nueva contraseña *</label>
+              <label className="label">Nueva contraseña <span className="text-red-600">*</span></label>
               <PasswordInput
                 value={nueva}
                 onChange={(e) => setNueva(e.target.value)}
@@ -78,7 +78,7 @@ export default function ResetPasswordPage() {
               )}
             </div>
             <div>
-              <label className="label">Confirmar nueva contraseña *</label>
+              <label className="label">Confirmar nueva contraseña <span className="text-red-600">*</span></label>
               <PasswordInput
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}

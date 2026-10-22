@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { Badge, Spinner, EmptyState } from '@/components/ui'
+import { RAIZ_AUSENCIAS } from '@/config/nav'
 
 /**
  * AVISO DE AUSENTES DE LA SEMANA ANTERIOR (PROYECTOS-3398 §7)
@@ -24,7 +25,7 @@ import { Badge, Spinner, EmptyState } from '@/components/ui'
  * en grande: es el dato con el que el coordinador decide en qué día ubicarlo, y
  * hasta ahora vivía enterrado en un campo de texto libre.
  */
-export default function AvisoAusentesSemanaAnterior({ datos, cargando, onClose }) {
+export default function AvisoAusentesSemanaAnterior({ datos, cargando, onClose, onProgramar }) {
   const navigate = useNavigate()
 
   const ausentes = datos?.ausentes ?? []
@@ -77,7 +78,7 @@ export default function AvisoAusentesSemanaAnterior({ datos, cargando, onClose }
                 agregan ahora, quedan fuera de la programación.
               </p>
               <div className="space-y-2">
-                {sinProgramar.map((a) => <FilaAusente key={a.absence_id} a={a} urgente />)}
+                {sinProgramar.map((a) => <FilaAusente key={a.absence_id} a={a} urgente onProgramar={onProgramar} />)}
               </div>
             </section>
           )}
@@ -92,7 +93,7 @@ export default function AvisoAusentesSemanaAnterior({ datos, cargando, onClose }
                 que decidas si ahí reponen la agenda que se cayó.
               </p>
               <div className="space-y-2">
-                {yaProgramados.map((a) => <FilaAusente key={a.absence_id} a={a} />)}
+                {yaProgramados.map((a) => <FilaAusente key={a.absence_id} a={a} onProgramar={onProgramar} />)}
               </div>
             </section>
           )}
@@ -102,7 +103,9 @@ export default function AvisoAusentesSemanaAnterior({ datos, cargando, onClose }
           <button
             type="button"
             className="btn text-xs"
-            onClick={() => { onClose(); navigate('/app/ausencias') }}
+            // Oct-2026 · Antes '/app/ausencias', que es "Mis ausencias" del
+            // recurso: al coordinador el guardia lo devolvía a su inicio.
+            onClick={() => { onClose(); navigate(RAIZ_AUSENCIAS) }}
           >
             Ir a Gestión de ausencias
           </button>
@@ -115,7 +118,7 @@ export default function AvisoAusentesSemanaAnterior({ datos, cargando, onClose }
   )
 }
 
-function FilaAusente({ a, urgente = false }) {
+function FilaAusente({ a, urgente = false, onProgramar }) {
   const r = a.resource
   return (
     <div className={`border rounded-lg p-3 ${urgente ? 'border-amber-300 bg-amber-50/60' : 'border-gray-150 bg-white'}`}>
@@ -144,10 +147,10 @@ function FilaAusente({ a, urgente = false }) {
         <div className="text-right flex-shrink-0">
           {/* §4 · La fecha que el profesional propuso para reponer. Es lo primero
               que el coordinador mira para saber dónde ubicarlo. */}
-          {a.fecha_reposicion_propuesta ? (
+          {(a.fechas_reposicion?.length ?? 0) > 0 ? (
             <>
               <div className="text-[10px] text-gray-500">Dijo que repondría</div>
-              <div className="text-xs font-semibold text-gray-900">{fechaCorta(a.fecha_reposicion_propuesta)}</div>
+              <div className="text-xs font-semibold text-gray-900">{a.fechas_reposicion.map(fechaCorta).join(', ')}</div>
             </>
           ) : a.desea_reponer === false ? (
             <Badge variant="gray">No repondrá</Badge>
@@ -170,6 +173,24 @@ function FilaAusente({ a, urgente = false }) {
           )}
         </div>
       </div>
+
+      {/* 3664 · Cada jornada que se cayó, con un botón que abre la asignación
+          ya llena: el mismo consultorio y horario, en el día que dijo que
+          repondría (o el mismo día de la semana si no dijo). */}
+      {onProgramar && a.desea_reponer !== false && a.turnos_caidos?.length > 0 && (
+        <div className="mt-2 pt-2 border-t border-gray-100 space-y-1">
+          {a.turnos_caidos.map((t, i) => (
+            <div key={i} className="flex items-center justify-between gap-2 text-[11px] text-gray-700">
+              <span className="capitalize">
+                {t.weekday} {t.start_time}–{t.end_time} · {t.room_name} · {t.patient_capacity} pac.
+              </span>
+              <button type="button" className="btn-primary text-[11px] py-1 px-2" onClick={() => onProgramar(a, t)}>
+                Programar reposición
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

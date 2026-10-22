@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { differenceInDays } from 'date-fns'
+import { differenceInDays, differenceInCalendarDays } from 'date-fns'
 import { recursoService, ausenciaService, motivoAusenciaService } from '@/services/api'
-import { GRUPOS_TIPO_AUSENCIA, TIPOS_RECURSO, parseFechaLocal, tiposDelGrupo } from '@/utils/helpers'
+import { GRUPOS_TIPO_AUSENCIA, TIPOS_RECURSO, parseFechaLocal, tiposDelGrupo, MOTIVO_RETRASO } from '@/utils/helpers'
 import { Spinner } from '@/components/ui'
 import { useDirtyClose } from '@/hooks/useDirtyClose'
 import { useAuthStore } from '@/store/authStore'
@@ -20,10 +20,13 @@ const REQUIEREN_ANTICIPACION = ['academico', 'vacaciones', 'licencia_remunerada'
  * Queda con flag `registrado_por_coordinador = true`.
  * Solo se permite hasta 7 días hacia atrás.
  */
-export default function RegistrarAusenciaCoordModal({ sedeId, onClose }) {
+export default function RegistrarAusenciaCoordModal({ sedeId, onClose, tipos }) {
   const qc = useQueryClient()
   const { user } = useAuthStore()
-  const [categoria, setCategoria] = useState('')
+  // 21-oct · Hector: dentro de un módulo (Asesores, Técnicos...) el registro
+  // viene ya en ese tipo de recurso; en la página general se elige entre todos.
+  const categorias = tipos?.length ? TIPOS_RECURSO.filter((t) => tipos.includes(t.value)) : TIPOS_RECURSO
+  const [categoria, setCategoria] = useState(categorias.length === 1 ? categorias[0].value : '')
   const [form, setForm] = useState({
     resource_id: '',
     reasonId: '',
@@ -48,6 +51,8 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose }) {
     staleTime: 5 * 60 * 1000,
   })
   const esMotivoRegional = form.motivoCodigo === 'regional'
+  // 3650 · El retraso siempre es por horas: debía empezar → empezó.
+  const esRetraso = form.motivoCodigo === MOTIVO_RETRASO
   const dirtySnapshot = { categoria, ...form }
   const { tryClose } = useDirtyClose(dirtySnapshot, onClose)
 
@@ -82,7 +87,9 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose }) {
   // Solo muestra el personal de la categoría elegida (RN-X: filtrar por tipo de recurso)
   const recursosFiltrados = categoria ? recursos.filter((r) => r.type === categoria) : []
 
-  const anticip = form.start_date ? differenceInDays(parseFechaLocal(form.start_date), new Date()) : null
+  // Días de calendario (oct-2026): el 20-oct, una ausencia del 9-nov son 20
+  // días, no 19 por la hora del registro. Igual que el servidor (lib/anticipacion).
+  const anticip = form.start_date ? differenceInCalendarDays(parseFechaLocal(form.start_date), new Date()) : null
   const alertaAnticip = REQUIEREN_ANTICIPACION.includes(form.type) && anticip !== null && anticip < 30
   const diasAtras = form.start_date ? differenceInDays(new Date(), parseFechaLocal(form.start_date)) : 0
   // Sep-14-2026: supervisor y gerencia pueden registrar ausencias retroactivas
@@ -108,6 +115,8 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose }) {
       reason_id: form.reasonId || undefined,
       regional_city: esMotivoRegional ? form.regional_city.trim() : undefined,
       grupo: undefined,   // solo organiza el formulario; no es un campo del backend
+      // 3739 · Lo elegido en el primer nivel queda como valor inicial; Agendas lo puede cambiar.
+      is_paid: form.grupo ? form.grupo === 'remunerada' : undefined,
       end_date: form.end_date || form.start_date,
       recorded_by_coordinator: true,
     }),
@@ -137,19 +146,19 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose }) {
 
         <div className="px-5 py-4 space-y-4">
           <div>
-            <label className="label">Categoría *</label>
+            <label className="label">Categoría <span className="text-red-600">*</span></label>
             <select
               className="input"
               value={categoria}
               onChange={(e) => { setCategoria(e.target.value); set('resource_id', '') }}
             >
-              <option value="">Seleccionar categoría...</option>
-              {TIPOS_RECURSO.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+              {categorias.length > 1 && <option value="">Seleccionar categoría...</option>}
+              {categorias.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
           </div>
 
           <div>
-            <label className="label">Recurso *</label>
+            <label className="label">Recurso <span className="text-red-600">*</span></label>
             <select
               className="input"
               value={form.resource_id}
@@ -170,7 +179,7 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose }) {
           {/* Primer nivel. Cambiarlo limpia el tipo: los del grupo anterior
               ya no aplican y dejarlo puesto guardaría una incoherencia. */}
           <div>
-            <label className="label">¿La ausencia es remunerada? *</label>
+            <label className="label">¿La ausencia es remunerada? <span className="text-red-600">*</span></label>
             <select
               className="input"
               value={form.grupo}
@@ -187,7 +196,7 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose }) {
           {/* Segundo nivel. */}
           {form.grupo && (
             <div>
-              <label className="label">Tipo de ausencia *</label>
+              <label className="label">Tipo de ausencia <span className="text-red-600">*</span></label>
               <select
                 className="input"
                 value={form.reasonId || form.type}
@@ -198,8 +207,9 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose }) {
                   setForm((f) => ({
                     ...f,
                     reasonId: sel?.id ?? '',
-                    motivoCodigo: sel?.value ?? '',
+                    motivoCodigo: sel?.code ?? sel?.value ?? '',
                     type: sel?.value ?? '',
+                    ...(sel?.code === MOTIVO_RETRASO ? { is_partial: true } : {}),
                     // Si cambia a un motivo distinto de "regional", limpiamos la ciudad.
                     regional_city: sel?.value === 'regional' ? f.regional_city : '',
                   }))
@@ -215,7 +225,7 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose }) {
 
           {esMotivoRegional && (
             <div>
-              <label className="label">Ciudad de cobertura *</label>
+              <label className="label">Ciudad de cobertura <span className="text-red-600">*</span></label>
               <input
                 className="input"
                 value={form.regional_city}
@@ -231,7 +241,7 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose }) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="label">Fecha inicio *</label>
+              <label className="label">Fecha inicio <span className="text-red-600">*</span></label>
               <input className="input" type="date" value={form.start_date} onChange={(e) => set('start_date', e.target.value)} />
             </div>
             <div>
@@ -245,6 +255,7 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose }) {
               <input
                 type="checkbox"
                 checked={form.is_partial}
+                disabled={esRetraso}
                 onChange={(e) => {
                   const v = e.target.checked
                   setForm((f) => ({ ...f, is_partial: v, absence_start_time: v ? f.absence_start_time : '', absence_end_time: v ? f.absence_end_time : '' }))
@@ -259,11 +270,11 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose }) {
             <div className="bg-gray-50 border border-gray-100 rounded-lg p-3 space-y-2">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="label">Hora inicio ausencia *</label>
+                  <label className="label">{esRetraso ? <>Hora en que debía empezar <span className="text-red-600">*</span></> : <>Hora inicio ausencia <span className="text-red-600">*</span></>}</label>
                   <input className="input" type="time" value={form.absence_start_time} onChange={(e) => set('absence_start_time', e.target.value)} />
                 </div>
                 <div>
-                  <label className="label">Hora fin ausencia *</label>
+                  <label className="label">{esRetraso ? <>Hora en que empezó <span className="text-red-600">*</span></> : <>Hora fin ausencia <span className="text-red-600">*</span></>}</label>
                   <input className="input" type="time" value={form.absence_end_time} onChange={(e) => set('absence_end_time', e.target.value)} />
                 </div>
               </div>
@@ -294,7 +305,7 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose }) {
               recomienda informar con 20 días antes. Solo advertencia — NO bloquea. */}
           {['oftalmologo','optometra','anestesiologo','otorrino','fonoaudiologa'].includes(categoria) && anticip !== null && anticip < 20 && anticip >= 0 && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
-              ⏱️ <strong>Anticipación</strong>: la política interna recomienda informar las ausencias médicas con <strong>al menos 20 días de anticipación</strong>. Estás registrando con solo <strong>{anticip} {anticip === 1 ? 'día' : 'días'}</strong>. Puedes continuar, pero quedará registrado.
+              ⏱️ Le recordamos que, según la política interna, las ausencias médicas deben informarse con <strong>al menos 20 días de anticipación</strong>. Su solicitud registra <strong>{anticip} {anticip === 1 ? 'día' : 'días'}</strong> de anticipación; sin embargo, puede continuar con el registro.
             </div>
           )}
 
@@ -311,7 +322,7 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose }) {
           )}
 
           <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 text-xs text-blue-800">
-            ℹ️ Quedará registrado en el log de auditoría que TÚ registraste esta ausencia en nombre del recurso.
+            ℹ️ Para garantizar la trazabilidad del proceso, quedará registrado en el historial de auditoría que usted realizó esta solicitud en nombre del recurso seleccionado.
           </div>
         </div>
 

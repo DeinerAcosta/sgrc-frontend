@@ -6,7 +6,7 @@ import {
 } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { ausenciaService, festivoService } from '@/services/api'
-import { GRUPOS_TIPO_AUSENCIA, parseFechaLocal, DIAS_LABEL, TIPOS_QUE_IMPACTAN_PACIENTES } from '@/utils/helpers'
+import { GRUPOS_TIPO_AUSENCIA, parseFechaLocal, DIAS_LABEL, TIPOS_QUE_IMPACTAN_PACIENTES, pacientesDelCaso } from '@/utils/helpers'
 import { useSedeActiva } from '@/hooks/useActiveSite'
 import { Badge } from '@/components/ui'
 
@@ -492,7 +492,7 @@ function DetalleAusencia({ data, porDia, onClose, onPickOne, onSeeDay }) {
             del médico al que acompaña. */}
         {TIPOS_QUE_IMPACTAN_PACIENTES.includes(a.resource?.type) && (
           <>
-            {a.patients_affected != null && <Kv k="Pacientes impactados" v={a.patients_affected} />}
+            {a.patients_affected != null && <Kv k="Pacientes impactados" v={pacientesDelCaso(a)} />}
             {a.opportunity_cost != null && (
               <Kv k="Costo oportunidad" v={new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Number(a.opportunity_cost))} />
             )}

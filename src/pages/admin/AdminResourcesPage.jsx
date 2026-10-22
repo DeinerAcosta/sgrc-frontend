@@ -314,11 +314,11 @@ function RecursoModal({ recurso, onClose, onSaved }) {
         </div>
         <div className="px-5 py-4 space-y-4 overflow-y-auto">
           <div>
-            <label className="label">Nombre completo *</label>
+            <label className="label">Nombre completo <span className="text-red-600">*</span></label>
             <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </div>
           <div>
-            <label className="label">Tipo de recurso *</label>
+            <label className="label">Tipo de recurso <span className="text-red-600">*</span></label>
             <select
               className="input"
               value={form.type}
@@ -387,14 +387,14 @@ function RecursoModal({ recurso, onClose, onSaved }) {
           </div>
           {requiereIntervalo && (
             <div>
-              <label className="label">Intervalo por paciente (minutos) *</label>
+              <label className="label">Intervalo por paciente (minutos) <span className="text-red-600">*</span></label>
               <input className="input" type="number" min="5" max="60" value={form.slot_minutes} onChange={(e) => setForm({ ...form, slot_minutes: parseInt(e.target.value) || 10 })} />
               <div className="text-xs text-amber-700 mt-1">RN-12: solo el supervisor puede modificar este campo</div>
             </div>
           )}
           <div className={`grid gap-3 ${esPorPaciente ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-3'}`}>
             <div>
-              <label className="label">Esquema de pago *</label>
+              <label className="label">Esquema de pago <span className="text-red-600">*</span></label>
               <select
                 className="input"
                 value={form.pay_scheme}
@@ -492,7 +492,7 @@ function RecursoModal({ recurso, onClose, onSaved }) {
                 <strong>RN-14:</strong> Las asignaciones futuras de este recurso NO se eliminan. Quedarán marcadas como "Sin cobertura — requiere reemplazo" y el coordinador debe resolverlas.
               </div>
               <div>
-                <label className="label">Motivo de inactivación *</label>
+                <label className="label">Motivo de inactivación <span className="text-red-600">*</span></label>
                 <textarea className="input resize-none" rows={2} value={form.deactivation_reason} onChange={(e) => setForm({ ...form, deactivation_reason: e.target.value })} placeholder="Ej: Cambio de área, fin de contrato, etc." />
               </div>
             </>

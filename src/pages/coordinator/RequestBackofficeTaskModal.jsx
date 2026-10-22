@@ -50,7 +50,7 @@ export default function SolicitarTareaBackofficeModal({ onClose }) {
 
         <div className="px-5 py-4 space-y-4">
           <div>
-            <label className="label">Nombre de la tarea *</label>
+            <label className="label">Nombre de la tarea <span className="text-red-600">*</span></label>
             <input
               className="input"
               value={form.name}

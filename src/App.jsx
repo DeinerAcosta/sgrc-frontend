@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
+import { rutaDeEntrada } from '@/config/nav'
 import { Spinner } from '@/components/ui'
 
 // ============================================================================
@@ -34,6 +35,7 @@ const MiEjecucionPage       = lazy(() => import('@/pages/resource/MyExecutionPag
 const DashboardCoordPage      = lazy(() => import('@/pages/coordinator/CoordDashboardPage'))
 const ProgramadorPage         = lazy(() => import('@/pages/coordinator/SchedulerPage'))
 const ReemplazoPage         = lazy(() => import('@/pages/coordinator/ReplacementPage'))
+const MisReprogramacionesPage = lazy(() => import('@/pages/coordinator/MyReschedulesPage'))
 const AusenciasCoordPage      = lazy(() => import('@/pages/coordinator/CoordAbsencesPage'))
 const AusenciasCronogramaPage = lazy(() => import('@/pages/coordinator/AbsencesTimelinePage'))
 const EjecucionPage           = lazy(() => import('@/pages/coordinator/ExecutionPage'))
@@ -77,22 +79,20 @@ function RequireAuth({ children, roles }) {
   if (!isAuthenticated) return <Navigate to="/login" replace />
   // Gerencia es super-usuario — bypasea cualquier check de roles
   if (user?.role === 'gerencia') return children
-  if (roles && !roles.includes(user?.role)) return <Navigate to="/app/horario" replace />
+  // Oct-2026 · Se rebota a la casa DEL ROL, no a un destino fijo.
+  //
+  // Antes mandaba siempre a /app/horario, que no todos los roles pueden
+  // abrir: a quien no tenía permiso allí el guardia lo devolvía a
+  // /app/horario otra vez, y la ruta se redirigía a sí misma. El usuario veía
+  // una pantalla en blanco sin ninguna pista de qué pasaba. Con el mapa de
+  // entrada el destino siempre es una ruta que ese rol sí puede abrir.
+  if (roles && !roles.includes(user?.role)) return <Navigate to={rutaDeEntrada(user?.role)} replace />
   return children
 }
 
 function RoleRedirect() {
   const { user } = useAuthStore()
-  const routes = {
-    recurso:     '/app/horario',
-    coordinador: '/app/dashboard-coord',
-    directivo:   '/app/dashboard',
-    supervisor:  '/app/admin/sedes',
-    gerencia:    '/app/dashboard',  // gerencia aterriza en el dashboard ejecutivo
-    // Sep-2026 · Aterriza en su módulo, que es lo único que hace.
-    reprogramador: '/app/reprogramaciones',
-  }
-  return <Navigate to={routes[user?.role] ?? '/app/horario'} replace />
+  return <Navigate to={rutaDeEntrada(user?.role)} replace />
 }
 
 export default function App() {
@@ -122,20 +122,28 @@ export default function App() {
 
           {/* COORDINADOR */}
           <Route path="dashboard-coord" element={<RequireAuth roles={['coordinador', 'supervisor']}><DashboardCoordPage /></RequireAuth>} />
-          <Route path="programador" element={<RequireAuth roles={['coordinador', 'supervisor', 'gerencia', 'reprogramador']}><ProgramadorPage /></RequireAuth>} />
+          <Route path="programador" element={<RequireAuth roles={['coordinador', 'supervisor', 'gerencia']}><ProgramadorPage /></RequireAuth>} />
           {/* Oct-2026 · Faltaban gerencia y supervisor. Gerencia tiene "Gestión
               de ausencias" en su menú (nav.js) pero la ruta la rebotaba — el
               mismo caso que /app/programador. Y supervisor ya entraba a
               /reemplazo y al cronograma del mismo módulo, así que bloquear solo
               esta pantalla dejaba sin destino al botón "Volver a Gestión de
               ausencias" para los dos. */}
-          <Route path="ausencias-coord" element={<RequireAuth roles={['coordinador', 'supervisor', 'gerencia', 'reprogramador']}><AusenciasCoordPage /></RequireAuth>} />
+          {/* Oct-2026 · Sin 'reprogramador': desde aquí se ven y se reparten
+              TODAS las ausencias de profesionales, y eso es de la líder, que
+              ahora entra como supervisor. Quien recibe el encargo trabaja
+              contra mis-reprogramaciones. */}
+          <Route path="ausencias-coord" element={<RequireAuth roles={['coordinador', 'supervisor', 'gerencia']}><AusenciasCoordPage /></RequireAuth>} />
           {/* Oct-2026 · La pantalla completa de reemplazo. Reemplaza al modal
               "Buscar reemplazo", que solo sabia de una franja. */}
-          <Route path="reemplazo/:ausenciaId" element={<RequireAuth roles={['coordinador', 'supervisor', 'gerencia', 'reprogramador']}><ReemplazoPage /></RequireAuth>} />
+          <Route path="reemplazo/:ausenciaId" element={<RequireAuth roles={['coordinador', 'supervisor', 'gerencia']}><ReemplazoPage /></RequireAuth>} />
+          {/* Oct-2026 · La lista de trabajo de quien reprograma. Misma pantalla
+              para la líder y para el coordinador: lo que cambia es qué trae, y
+              eso lo reparte el servidor por tipo de recurso. */}
+          <Route path="mis-reprogramaciones" element={<RequireAuth roles={['coordinador', 'supervisor', 'gerencia', 'reprogramador']}><MisReprogramacionesPage /></RequireAuth>} />
           {/* Igual que la de arriba: el Cronograma cuelga de "Gestión de
               ausencias" en el menú, así que gerencia también lo ve enlazado. */}
-          <Route path="ausencias-cronograma" element={<RequireAuth roles={['coordinador', 'supervisor', 'gerencia', 'reprogramador']}><AusenciasCronogramaPage /></RequireAuth>} />
+          <Route path="ausencias-cronograma" element={<RequireAuth roles={['coordinador', 'supervisor', 'gerencia']}><AusenciasCronogramaPage /></RequireAuth>} />
           <Route path="ejecucion" element={<RequireAuth roles={['coordinador', 'supervisor']}><EjecucionPage /></RequireAuth>} />
           <Route path="recursos-coord" element={<RequireAuth roles={['coordinador', 'supervisor']}><RecursosCoordPage /></RequireAuth>} />
           <Route path="backoffice-coord" element={<RequireAuth roles={['coordinador']}><BackofficeCoordPage /></RequireAuth>} />
@@ -147,7 +155,9 @@ export default function App() {
           <Route path="informes/:tipo" element={<RequireAuth roles={['coordinador', 'directivo', 'supervisor']}><InformePage /></RequireAuth>} />
           <Route path="comparativo" element={<RequireAuth roles={['directivo']}><ComparativoPage /></RequireAuth>} />
           <Route path="productividad-recurso" element={<RequireAuth roles={['directivo']}><ProductividadRecursoPage /></RequireAuth>} />
-          <Route path="reprogramaciones" element={<RequireAuth roles={['directivo', 'supervisor', 'reprogramador']}><ReprogramacionesPage /></RequireAuth>} />
+          {/* El tablero de indicadores es de dirección y supervisión. Quien
+              recibe los encargos no decide con gráficas del mes. */}
+          <Route path="reprogramaciones" element={<RequireAuth roles={['directivo', 'supervisor']}><ReprogramacionesPage /></RequireAuth>} />
 
           {/* SUPERVISOR */}
           <Route path="admin/sedes" element={<RequireAuth roles={['supervisor']}><AdminSedesPage /></RequireAuth>} />

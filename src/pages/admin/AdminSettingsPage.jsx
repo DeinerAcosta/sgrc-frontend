@@ -169,7 +169,7 @@ function ParametroModal({ tipoFijo, esNuevoTipo, onClose, onSaved }) {
         <div className="px-5 py-4 space-y-4">
           {esNuevoTipo && (
             <div>
-              <label className="label">Identificador del tipo *</label>
+              <label className="label">Identificador del tipo <span className="text-red-600">*</span></label>
               <input
                 className="input"
                 value={tipoSlug}
@@ -182,14 +182,14 @@ function ParametroModal({ tipoFijo, esNuevoTipo, onClose, onSaved }) {
             </div>
           )}
           <div>
-            <label className="label">Costo operativo de reprogramación (COP) *</label>
+            <label className="label">Costo operativo de reprogramación (COP) <span className="text-red-600">*</span></label>
             <input className="input" type="number" min="0" value={costoReprog} onChange={(e) => setCostoReprog(e.target.value)} placeholder="Ej. 15955" />
             <div className="text-xs text-gray-500 mt-1">
               Costo total todo incluido: cita perdida + quejas + costos jurídicos + logística de respuesta.
             </div>
           </div>
           <div>
-            <label className="label">Vigente desde *</label>
+            <label className="label">Vigente desde <span className="text-red-600">*</span></label>
             <input className="input" type="date" value={vigenteDesde} onChange={(e) => setVigenteDesde(e.target.value)} />
             <div className="text-xs text-gray-500 mt-1">Las ausencias con fecha igual o posterior usarán este costo.</div>
           </div>

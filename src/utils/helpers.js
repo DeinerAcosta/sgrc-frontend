@@ -66,9 +66,14 @@ export const GRUPOS_TIPO_AUSENCIA = [
     value: 'no_remunerada',
     label: 'No remunerada',
     descripcion: 'El tiempo no trabajado no se paga.',
-    tipos: ['licencia_no_remunerada', 'no_presentacion', 'otra'],
+    // 3650 · 'retraso_inicio' es un motivo del catálogo, no del enum. También
+    // pendiente de confirmar con nómina si un retraso se paga.
+    tipos: ['licencia_no_remunerada', 'no_presentacion', 'retraso_inicio', 'otra'],
   },
 ]
+
+/** Motivo del catálogo que se registra por horas (debía empezar → empezó). */
+export const MOTIVO_RETRASO = 'retraso_inicio'
 
 /**
  * Los tipos de un grupo, listos para pintar en el segundo select.
@@ -80,10 +85,16 @@ export const GRUPOS_TIPO_AUSENCIA = [
 export function tiposDelGrupo(grupo, catalogo = []) {
   const g = GRUPOS_TIPO_AUSENCIA.find((x) => x.value === grupo)
   if (!g) return []
-  return g.tipos.map((code) => {
+  return g.tipos.flatMap((code) => {
     const base = TIPOS_AUSENCIA.find((t) => t.value === code)
     const delCatalogo = catalogo.find((m) => m.code === code)
-    return { id: delCatalogo?.id ?? null, value: code, label: delCatalogo?.name ?? base?.label ?? code }
+    // Un motivo que solo existe en el catálogo (no en el enum) viaja como
+    // tipo 'otra' con su id: el backend lo enlaza por el id. Sin catálogo
+    // cargado no se ofrece, porque no habría cómo enlazarlo.
+    if (!base) {
+      return delCatalogo ? [{ id: delCatalogo.id, value: 'otra', code, label: delCatalogo.name }] : []
+    }
+    return [{ id: delCatalogo?.id ?? null, value: code, code, label: delCatalogo?.name ?? base?.label ?? code }]
   })
 }
 
@@ -457,4 +468,31 @@ export function utilizacionSemanal(r = {}) {
     cerca: pct >= 90 && !r.is_overtime,
     festivos: r.festivos_en_semana ?? 0,
   }
+}
+
+/**
+ * Los pacientes de un caso de reprogramación: el número REAL que puso la
+ * líder, o el estimado del sistema si no lo ha puesto. Misma regla que
+ * `pacientesDelCaso` en el servidor (src/lib/pacientesDelCaso.js): si cada
+ * pantalla eligiera su número, una diría "faltan 12" y el servidor
+ * rechazaría el 11.
+ */
+export const pacientesDelCaso = (a) => a?.patients_confirmed ?? a?.patients_affected ?? 0
+
+/**
+ * Cómo se nombra a quien cubre, según el tipo del ausente: "Cambiar de médico"
+ * no tiene sentido en el caso de un técnico (Hector, 21-oct).
+ */
+export function palabraDelRecurso(tipo) {
+  if (GRUPOS_AUSENCIAS.find((g) => g.key === 'profesionales')?.tipos.includes(tipo)) return 'médico'
+  return { tecnico: 'técnico', auxiliar: 'auxiliar', asesor_servicios: 'asesor' }[tipo] ?? 'recurso'
+}
+
+/**
+ * 21-oct · Hector: el coordinador registra la ausencia de un profesional pero
+ * no la gestiona (eso es de la líder): solo ve el detalle. Igual que el
+ * servidor (lib/resourceTypes `coordSoloVe`).
+ */
+export function coordSoloVe(rol, tipoRecurso) {
+  return rol === 'coordinador' && !!GRUPOS_AUSENCIAS.find((g) => g.key === 'profesionales')?.tipos.includes(tipoRecurso)
 }

@@ -4,7 +4,7 @@ import { useAuthStore } from '@/store/authStore'
 import { ausenciaService, recursoService } from '@/services/api'
 import { AlertRow, BarProgress, KpiCard, Spinner, SectionHeader } from '@/components/ui'
 import { Badge } from '@/components/ui'
-import { formatHoras } from '@/utils/helpers'
+import { formatHoras, pacientesDelCaso } from '@/utils/helpers'
 import { useNavigate } from 'react-router-dom'
 import { useSedeActiva } from '@/hooks/useActiveSite'
 
@@ -88,7 +88,7 @@ export default function DashboardCoordPage() {
                   key={a.id}
                   tipo="rojo"
                   titulo={`Ausencia sin confirmar — ${a.resource?.name}`}
-                  subtitulo={`${a.patients_affected ?? '?'} pac. · ${a.type}`}
+                  subtitulo={`${a.patients_affected != null ? pacientesDelCaso(a) : '?'} pac. · ${a.type}`}
                   actionLabel="Ver"
                   onAction={() => navigate('/app/ausencias-coord')}
                 />

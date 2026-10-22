@@ -112,11 +112,11 @@ function AsignacionCard({ asignacion, onSaved }) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="label">Unidades completadas *</label>
+              <label className="label">Unidades completadas <span className="text-red-600">*</span></label>
               <input className="input" type="number" min="0" value={unidades} onChange={(e) => setUnidades(e.target.value)} />
             </div>
             <div>
-              <label className="label">Tiempo real (min) *</label>
+              <label className="label">Tiempo real (min) <span className="text-red-600">*</span></label>
               <input className="input" type="number" min="0" value={tiempoReal} onChange={(e) => setTiempoReal(e.target.value)} />
             </div>
           </div>

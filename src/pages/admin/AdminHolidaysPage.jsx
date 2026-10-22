@@ -153,11 +153,11 @@ function FestivoModal({ onClose, onSaved }) {
         </div>
         <div className="px-5 py-4 space-y-4">
           <div>
-            <label className="label">Fecha *</label>
+            <label className="label">Fecha <span className="text-red-600">*</span></label>
             <input className="input" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
           </div>
           <div>
-            <label className="label">Descripción *</label>
+            <label className="label">Descripción <span className="text-red-600">*</span></label>
             <input className="input" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Ej: Cierre por mantenimiento, festividad local..." />
           </div>
         </div>

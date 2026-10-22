@@ -23,9 +23,15 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
     // Oct-2026 · Cuando se llega desde "Mover la agenda", el modal sabe a quién
     // se está reubicando y a qué ausencia pertenece el movimiento.
     recursoPrecargado, recursoPrecargadoNombre, cubreAusenciaId, franjaCaida,
+    // Oct-2026 · Cuántos pacientes faltan por reprogramar en ese caso. Hector:
+    // "en pacientes reales no aceptar una cantidad mayor a la que debe ser
+    // repro: si son 20, bloquear 21 en adelante".
+    pacientesPorReprogramar,
   } = data
   const editando = !!asignacion
   const { user } = useAuthStore()
+  // 3739 · En una casilla vacía también se puede crear el turno en contingencia.
+  const [enContingencia, setEnContingencia] = useState(false)
   const esSupervisor = user?.role === 'supervisor' || user?.role === 'gerencia'
 
   // Cuando la SEDE del consultorio ya tiene cierre semanal, solo el supervisor/
@@ -108,6 +114,8 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
   // de la sede, que es quien conoce a su equipo. Quien reubica la agenda
   // decide QUIÉN atiende, no CON QUIÉN.
   const esReprogramacion = !!cubreAusenciaId && !editando
+  // Solo en una reprogramación hay tope: lo que falta por reprogramar del caso.
+  const topePacientes = esReprogramacion && pacientesPorReprogramar > 0 ? pacientesPorReprogramar : null
   const requiereAuxAdicional = _exigeApoyoPorEspecialidad && !sinAuxiliar && !esReprogramacion
   const [conflicto, setConflicto] = useState(null)
   // El resumen previo a guardar. null = cerrado. { conflicto } se llena solo
@@ -226,6 +234,8 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
         is_replacement:     cubreAusenciaId ? true : undefined,
         covered_absence_id: cubreAusenciaId || undefined,
         assume_overlap:     cubreAusenciaId && (form.assume_overlap || extra.assume_overlap) ? true : undefined,
+        // 3739 · Crear el turno ya en contingencia (casilla vacía).
+        contingency:        !editando && enContingencia ? true : undefined,
       }
       return editando
         ? asignacionService.update(asignacion.id, payload)
@@ -304,9 +314,21 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
       <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div>
-            <h2 className="text-sm font-semibold text-gray-900">
-              {editando ? 'Editar asignación' : 'Nueva asignación'}
-            </h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-sm font-semibold text-gray-900">
+                {editando ? 'Editar asignación' : 'Nueva asignación'}
+              </h2>
+              {/* 3739 · Hector: "Crear contingencia", arriba al lado del título. */}
+              {!editando && ['coordinador', 'supervisor', 'gerencia'].includes(user?.role) && (
+                <button
+                  type="button"
+                  className={`text-[11px] px-2 py-0.5 rounded-md border ${enContingencia ? 'border-orange-500 bg-orange-100 text-orange-900 font-semibold' : 'border-orange-300 text-orange-800 bg-orange-50 hover:bg-orange-100'}`}
+                  onClick={() => setEnContingencia((v) => !v)}
+                >
+                  {enContingencia ? '🟧 Crear contingencia ✓' : '🟧 Crear contingencia'}
+                </button>
+              )}
+            </div>
             <p className="text-xs text-gray-500">
               {consultorio.name} · {diaLabel}
               {esServicioAlternativo && (
@@ -325,16 +347,14 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
               sin que nadie lo haya dicho en voz alta. */}
           {cubreAusenciaId && !editando && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-900">
-              🔀 Estás reubicando la agenda de <strong>{recursoPrecargadoNombre ?? 'el profesional ausente'}</strong>.
-              <div className="text-amber-700 mt-0.5">
-                Este turno queda registrado como la reprogramación de esa ausencia. Podés cambiar
-                el profesional si quien lo cubre es otro.
-              </div>
+              🔀 Se reprograma la agenda {recursoPrecargadoNombre
+                ? <>de <strong>{recursoPrecargadoNombre}</strong></>
+                : 'del profesional ausente'}
             </div>
           )}
           {/* Recurso principal — buscable */}
           <div>
-            <label className="label">Recurso principal * <span className="text-gray-400 font-normal">({recursos.length} disponibles)</span></label>
+            <label className="label">Recurso principal <span className="text-red-600">*</span> <span className="text-gray-400 font-normal">({recursos.length} disponibles)</span></label>
             <SearchableSelect
               value={form.resource_id}
               onChange={(id) => set('resource_id', id)}
@@ -358,55 +378,43 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
           {/* Franja horaria */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="label">Hora inicio *</label>
+              <label className="label">Hora inicio <span className="text-red-600">*</span></label>
               <input className="input" type="time" min="07:00" max="19:00" value={form.start_time} onChange={(e) => set('start_time', e.target.value)} />
             </div>
             <div>
-              <label className="label">Hora fin *</label>
+              <label className="label">Hora fin <span className="text-red-600">*</span></label>
               <input className="input" type="time" min="07:00" max="19:00" value={form.end_time} onChange={(e) => set('end_time', e.target.value)} />
             </div>
           </div>
 
           {/* PROYECTOS-3255 #2.1: capacidad y campo de pacientes ocultos para asesores.
               Los asesores hacen recepcion/gestion; no atienden pacientes con cita. */}
+          {/* Oct-2026 · Hector pidió quitar "Capacidad calculada", el
+              "(opcional · si lo conoces de la agenda externa)" y el aviso de
+              "Sobrescribirá el cálculo". Queda solo el campo. */}
           {form.resource_id && recursoSel?.type !== 'asesor_servicios' && (
-            <div className="space-y-2">
-              <div className="bg-blue-50 rounded-lg px-3 py-2 text-xs text-blue-800">
-                📊 Capacidad calculada: <strong>{capacidad} pacientes</strong>
-                {/* Regla v4 (jul-2026): turnos ≥ 6h descuentan almuerzo, EXCEPTO
-                    técnicos con 07:00-13:00 o 13:00-19:00 exactos (corridos). */}
-                {(() => {
-                  const dur = parseInt(form.end_time) - parseInt(form.start_time)
-                  if (dur < 6) return null
-                  const esTecCorrido = recursoSel?.type === 'tecnico' &&
-                    ((form.start_time === '07:00' && form.end_time === '13:00') ||
-                     (form.start_time === '13:00' && form.end_time === '19:00'))
-                  if (esTecCorrido) {
-                    return <> · <span title="Técnico con turno partido de ayudas diagnósticas: trabaja corrido sin receso">sin descuento de almuerzo (técnico turno corrido)</span></>
-                  }
-                  const dur30 = ['oftalmologo','anestesiologo','optometra','fonoaudiologa','otorrino'].includes(recursoSel?.type)
-                  return <> · descontando {dur30 ? '30 min' : '1 h'} de almuerzo</>
-                })()}
-              </div>
-              <div>
-                <label className="label">
-                  Pacientes programados reales <span className="text-gray-400 font-normal">(opcional · si lo conoces de la agenda externa)</span>
-                </label>
-                <input
-                  className="input"
-                  type="number"
-                  min="0"
-                  max="200"
-                  placeholder={`Vacío = usar ${capacidad} (capacidad calculada)`}
-                  value={form.expected_patients}
-                  onChange={(e) => set('expected_patients', e.target.value)}
-                />
-                {form.expected_patients !== '' && Number(form.expected_patients) !== capacidad && (
-                  <div className="text-[11px] text-amber-700 mt-1">
-                    ⚠️ Sobrescribirá el cálculo: se guardarán <strong>{form.expected_patients} pacientes</strong> en lugar de {capacidad}.
-                  </div>
+            <div>
+              <label className="label">
+                Pacientes programados reales
+                {topePacientes != null && (
+                  <span className="text-gray-400 font-normal"> (máx. {topePacientes})</span>
                 )}
-              </div>
+              </label>
+              <input
+                className="input"
+                type="number"
+                min="0"
+                max={topePacientes ?? 200}
+                placeholder={`Vacío = ${topePacientes != null ? Math.min(capacidad, topePacientes) : capacidad}`}
+                value={form.expected_patients}
+                onChange={(e) => {
+                  // En una reprogramación no se aceptan más pacientes de los que
+                  // faltan por reprogramar: si son 20, el 21 no entra.
+                  const v = e.target.value
+                  if (topePacientes != null && v !== '' && Number(v) > topePacientes) return
+                  set('expected_patients', v)
+                }}
+              />
             </div>
           )}
 
@@ -507,7 +515,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                     {auxHorarioDistinto && (
                       <div className="grid grid-cols-2 gap-2 mt-2">
                         <div>
-                          <label className="text-[11px] text-gray-500">Aux hora inicio</label>
+                          <label className="text-[11px] font-semibold text-gray-600">Aux hora inicio</label>
                           <input
                             className="input"
                             type="time"
@@ -518,7 +526,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                           />
                         </div>
                         <div>
-                          <label className="text-[11px] text-gray-500">Aux hora fin</label>
+                          <label className="text-[11px] font-semibold text-gray-600">Aux hora fin</label>
                           <input
                             className="input"
                             type="time"
@@ -576,7 +584,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                       {aux2HorarioDistinto && (
                         <div className="grid grid-cols-2 gap-2 mt-2">
                           <div>
-                            <label className="text-[11px] text-gray-500">Aux #2 hora inicio</label>
+                            <label className="text-[11px] font-semibold text-gray-600">Aux #2 hora inicio</label>
                             <input
                               className="input"
                               type="time"
@@ -587,7 +595,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                             />
                           </div>
                           <div>
-                            <label className="text-[11px] text-gray-500">Aux #2 hora fin</label>
+                            <label className="text-[11px] font-semibold text-gray-600">Aux #2 hora fin</label>
                             <input
                               className="input"
                               type="time"
@@ -626,7 +634,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                 </div>
               </div>
               <div>
-                <label className="label text-amber-900">Directivo que autoriza *</label>
+                <label className="label text-amber-900">Directivo que autoriza <span className="text-red-600">*</span></label>
                 <select
                   className="input"
                   value={form.authorized_by_id}
@@ -642,7 +650,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
               </div>
               <div>
                 <label className="label text-amber-900">
-                  Motivo de la autorización * <span className="text-amber-700 font-normal">(mín 5 caracteres · queda en auditoría)</span>
+                  Motivo de la autorización <span className="text-red-600">*</span> <span className="text-amber-700 font-normal">(mín 5 caracteres · queda en auditoría)</span>
                 </label>
                 <textarea
                   className="input resize-none"
@@ -659,7 +667,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
           {requiereMotivo && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3">
               <label className="label text-red-900">
-                Motivo de modificación de sede cerrada * <span className="text-red-700 font-normal">(mín 5 caracteres — queda en el log de auditoría)</span>
+                Motivo de modificación de sede cerrada <span className="text-red-600">*</span> <span className="text-red-700 font-normal">(mín 5 caracteres — queda en el log de auditoría)</span>
               </label>
               <textarea
                 className="input resize-none"
@@ -757,6 +765,8 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
           )}
         </div>
 
+        {editando && <Contingencia asignacion={asignacion} onSaved={onSaved} />}
+
         <div className="px-5 py-4 border-t border-gray-100 flex flex-col-reverse sm:flex-row gap-2">
           {editando && (
             <button
@@ -777,6 +787,77 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * 3739 punto 4 · TURNO EN CONTINGENCIA (agenda colchón). Hector, 21-oct.
+ * El coordinador lo marca: sale naranja en el Programador y los pacientes
+ * quedan vacíos. La líder de reprogramación (o gerencia) pone los pacientes y
+ * lo aprueba: vuelve a su color normal.
+ */
+function Contingencia({ asignacion, onSaved }) {
+  const { user } = useAuthStore()
+  const confirm = useConfirm()
+  const [pacientes, setPacientes] = useState('')
+  const puedeMarcar = ['coordinador', 'supervisor', 'gerencia'].includes(user?.role)
+  const puedeAprobar = ['supervisor', 'gerencia'].includes(user?.role)
+  const { mutate: marcar, isPending: marcando } = useMutation({
+    mutationFn: () => asignacionService.marcarContingencia(asignacion.id),
+    onSuccess: () => { toast.success('Turno en contingencia.'); onSaved() },
+    onError: (e) => toast.error(e?.message ?? 'No se pudo marcar'),
+  })
+  const { mutate: aprobar, isPending: aprobando } = useMutation({
+    mutationFn: () => asignacionService.aprobarContingencia(asignacion.id, Number(pacientes)),
+    onSuccess: () => { toast.success('Contingencia aprobada.'); onSaved() },
+    onError: (e) => toast.error(e?.message ?? 'No se pudo aprobar'),
+  })
+  const n = Number(pacientes)
+  const valido = pacientes !== '' && Number.isInteger(n) && n >= 0
+
+  if (!asignacion.contingency) {
+    if (!puedeMarcar) return null
+    return (
+      <div className="px-5 pb-3">
+        <button
+          type="button"
+          className="text-xs px-3 py-1.5 rounded-lg border border-orange-300 text-orange-800 bg-orange-50 hover:bg-orange-100 disabled:opacity-50"
+          disabled={marcando}
+          onClick={async () => {
+            const si = await confirm({
+              title: 'Marcar en contingencia',
+              message: 'El turno queda en naranja y sus pacientes vacíos hasta que la líder los ponga y lo apruebe.',
+              confirmLabel: 'Sí, marcar',
+              cancelLabel: 'Cancelar',
+            })
+            if (si) marcar()
+          }}
+        >
+          {marcando ? <Spinner size="sm" /> : '🟧 Marcar en contingencia'}
+        </button>
+      </div>
+    )
+  }
+  return (
+    <div className="mx-5 mb-3 bg-orange-50 border border-orange-300 rounded-lg px-3 py-2 text-xs text-orange-900 space-y-2">
+      <div className="font-semibold">🟧 En contingencia · pacientes sin poner</div>
+      {puedeAprobar && (
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="text-xs text-gray-700">
+            <span className="block mb-1 font-semibold text-gray-700">Pacientes</span>
+            <input
+              type="number" min="0" inputMode="numeric"
+              className="input w-24 py-1 text-xs tabular-nums"
+              value={pacientes}
+              onChange={(e) => setPacientes(e.target.value)}
+            />
+          </label>
+          <button type="button" className="btn-primary text-xs" disabled={!valido || aprobando} onClick={() => aprobar()}>
+            {aprobando ? <Spinner size="sm" /> : 'Aprobar'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

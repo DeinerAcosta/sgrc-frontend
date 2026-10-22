@@ -183,7 +183,7 @@ export default function AdminMetasPage() {
         <div className="card">
           <SectionHeader title="Guardar cambios" />
           <div>
-            <label className="label">Motivo del cambio *</label>
+            <label className="label">Motivo del cambio <span className="text-red-600">*</span></label>
             <textarea
               className="input resize-none"
               rows={2}

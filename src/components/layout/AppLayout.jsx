@@ -169,6 +169,22 @@ export default function AppLayout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Oct-2026 · Dos opciones con la MISMA ruta y distinta consulta (Mis
+  // reprogramaciones y su ?vista=cronograma): NavLink solo mira la ruta y las
+  // marcaba a las dos. La que pide una consulta se marca si coincide; la otra,
+  // si ninguna hermana la reclama.
+  const coincideConsulta = (to) => {
+    const qs = to?.split('?')[1]
+    if (!qs) return false
+    const actual = new URLSearchParams(location.search)
+    return [...new URLSearchParams(qs)].every(([k, v]) => actual.get(k) === v)
+  }
+  const estaActivo = (to, isActive) => {
+    if (!isActive) return false
+    if (to.includes('?')) return coincideConsulta(to)
+    return !navItems.some((o) => o.to && o.to !== to && o.to.split('?')[0] === to && coincideConsulta(o.to))
+  }
+
   const sidebarBody = (mobile) => (
     <>
       {/* Brand — colapsado va centrado, igual que los iconos de abajo. Con
@@ -263,7 +279,7 @@ export default function AppLayout() {
                  ${(sidebarOpen || mobile)
                    ? 'items-start gap-2.5 px-2.5 py-[7px]'
                    : 'items-center justify-center px-0 py-2'}
-                 ${isActive ? 'bg-blue-50 text-brand-800 font-semibold' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`
+                 ${estaActivo(item.to, isActive) ? 'bg-blue-50 text-brand-800 font-semibold' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`
               }
               title={!sidebarOpen && !mobile ? item.label : undefined}
             >
