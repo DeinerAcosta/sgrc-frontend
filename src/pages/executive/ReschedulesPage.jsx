@@ -402,8 +402,8 @@ function TabResumen({ data }) {
           <KpiFoca label="Tasa de reposición" value={`${tasaRep}%`} color="text-red-600" sub={`${pctSinRep}% no se repuso`} />
           <KpiFoca label="Pacientes sin cobertura" value={fmtNum(sinCobertura)} color="text-red-600" sub="Sin turno nuevo" />
           <KpiFoca label="Profesionales involucrados" value={fmtNum(medicos)} color="text-brand-800" sub="Personas distintas" />
-          <KpiFoca label="Avisadas con 20+ días" value={`${pctAntel}%`} color="text-blue-600" sub={`Promedio ${mediaAntel} días`} />
-          <KpiFoca label="Avisadas con menos de 20 días" value={`${pctMenos20}%`} color="text-amber-600" sub={`${fmtNum(avisadasMenos20)} de ${fmtNum(totalEventos)} · imprevistas`} />
+          <KpiFoca label="Aviso +20 días" value={`${pctAntel}%`} color="text-blue-600" sub={`Promedio ${mediaAntel} ${mediaAntel === 1 ? 'día' : 'días'}`} />
+          <KpiFoca label="Aviso -20 días" value={`${pctMenos20}%`} color="text-amber-600" sub={`${fmtNum(avisadasMenos20)} de ${fmtNum(totalEventos)} · imprevistas`} />
         </div>
       </Panel>
 
