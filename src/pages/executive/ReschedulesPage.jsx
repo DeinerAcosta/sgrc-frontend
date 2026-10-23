@@ -353,6 +353,11 @@ function TabResumen({ data }) {
   const cubiertos = data.pacientes_cubiertos ?? 0
   const medicos = data.medicos_involucrados ?? 0
   const pctAntel = data.pct_antelacion_ok ?? 0
+  // 23-oct · Hector pidió también el de menos de 20 días (imprevistas): son
+  // las demás franjas de la misma antelación que usa el de 20+.
+  const ant = data.antelacion_reporte ?? {}
+  const avisadasMenos20 = (ant.retroactivo ?? 0) + (ant.uno_a_siete ?? 0) + (ant.ocho_a_diecinueve ?? 0)
+  const pctMenos20 = totalEventos > 0 ? Math.round((avisadasMenos20 / totalEventos) * 1000) / 10 : 0
   const pctSinRep = 100 - tasaRep
   const promPorEvento = totalEventos > 0 ? (totalPac / totalEventos).toFixed(1) : '0'
   // Oct-2026 · Promedio real de días de anticipación (lo calcula el servidor).
@@ -391,13 +396,14 @@ function TabResumen({ data }) {
         title="Pulso de la reprogramación de agendas"
         description="Reprogramaciones gestionadas en el rango seleccionado y su impacto en pacientes, cobertura y comportamiento operativo. Usa la segmentación superior para aislar un mes."
       >
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
           <KpiFoca label="Reprogramaciones" value={fmtNum(totalEventos)} color="text-brand-800" sub="En la selección" />
           <KpiFoca label="Pacientes impactados" value={fmtNum(totalPac)} color="text-amber-600" sub={`${promPorEvento} por evento`} />
           <KpiFoca label="Tasa de reposición" value={`${tasaRep}%`} color="text-red-600" sub={`${pctSinRep}% no se repuso`} />
           <KpiFoca label="Pacientes sin cobertura" value={fmtNum(sinCobertura)} color="text-red-600" sub="Sin turno nuevo" />
           <KpiFoca label="Profesionales involucrados" value={fmtNum(medicos)} color="text-brand-800" sub="Personas distintas" />
           <KpiFoca label="Avisadas con 20+ días" value={`${pctAntel}%`} color="text-blue-600" sub={`Promedio ${mediaAntel} días`} />
+          <KpiFoca label="Avisadas con menos de 20 días" value={`${pctMenos20}%`} color="text-amber-600" sub={`${fmtNum(avisadasMenos20)} de ${fmtNum(totalEventos)} · imprevistas`} />
         </div>
       </Panel>
 
