@@ -432,18 +432,20 @@ function TabResumen({ data }) {
           title="¿Se repuso la agenda?"
           description="Repuestas vs. no repuestas (en la selección)"
         >
-          <div className="flex items-center gap-3">
-            <div style={{ width: 130, height: 130 }} className="shrink-0">
+          {/* 23-oct · Hector: el círculo centrado en la tarjeta (con la misma
+              altura que la tendencia de al lado). */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-6" style={{ minHeight: 260 }}>
+            <div style={{ width: 190, height: 190 }} className="shrink-0">
               <ResponsiveContainer>
                 <PieChart>
-                  <Pie data={donutData} dataKey="value" innerRadius={40} outerRadius={60} paddingAngle={2}>
+                  <Pie data={donutData} dataKey="value" innerRadius={58} outerRadius={88} paddingAngle={2}>
                     {donutData.map((d, i) => <Cell key={i} fill={d.color} />)}
                   </Pie>
                   <Tooltip formatter={(v) => fmtNum(v) + ' pac.'} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className="text-xs space-y-2 flex-1 min-w-0">
+            <div className="text-xs space-y-3">
               <div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-sm bg-blue-500" />
