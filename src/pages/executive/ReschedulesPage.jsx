@@ -407,7 +407,7 @@ function TabResumen({ data }) {
         </div>
       </Panel>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-6">
         <ChartCard
           title="Tendencia mensual de reprogramaciones"
           description="Barras = pacientes afectados · línea = nº de reprogramaciones · por mes de gestión"
@@ -547,7 +547,7 @@ function TabMedicos({ data }) {
         </div>
       </Panel>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-6">
         <ChartCard
           title="Eventos por profesional — ¿repuso o no?"
           description="Azul = repuestos · coral = sin reponer · ordenado por pacientes afectados"
