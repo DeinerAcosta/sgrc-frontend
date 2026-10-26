@@ -350,22 +350,24 @@ function TabReprogramadores({ rango }) {
       </Panel>
 
       <div className="bg-white rounded-xl border border-gray-100 overflow-auto mb-6">
-        <table className="w-full text-xs border-separate border-spacing-0 min-w-[900px]">
+        {/* 26-oct · Hector: que la tabla quepa completa. Los títulos largos
+            bajan a dos líneas y los números van a la derecha. */}
+        <table className="w-full text-xs border-separate border-spacing-0 min-w-[760px]">
           <thead>
             <tr>
-              {['Reprogramador', ...COLS.map(([, l]) => l), '% contestaron'].map((c) => (
-                <th key={c} className="sticky top-0 bg-brand-800 text-white text-left font-semibold px-3 py-2 whitespace-nowrap">{c}</th>
+              {['Reprogramador', ...COLS.map(([, l]) => l), '% contestaron'].map((c, i) => (
+                <th key={c} className={`sticky top-0 bg-brand-800 text-white font-semibold px-2 py-2 leading-tight align-bottom ${i === 0 ? 'text-left' : 'text-right'}`}>{c}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {[...filas, t].map((f) => (
               <tr key={f.id ?? 'total'} className={f.id ? 'hover:bg-gray-50' : 'bg-gray-50 font-semibold'}>
-                <td className="px-3 py-2 border-b border-gray-100 text-gray-900 whitespace-nowrap">{f.nombre}</td>
+                <td className="px-2 py-2 border-b border-gray-100 text-gray-900 whitespace-nowrap">{f.nombre}</td>
                 {COLS.map(([k]) => (
-                  <td key={k} className="px-3 py-2 border-b border-gray-100 text-gray-700 tabular-nums">{fmtNum(f[k])}</td>
+                  <td key={k} className="px-2 py-2 border-b border-gray-100 text-gray-700 tabular-nums text-right">{fmtNum(f[k])}</td>
                 ))}
-                <td className="px-3 py-2 border-b border-gray-100 text-gray-700 tabular-nums">{f.pct_contestaron}%</td>
+                <td className="px-2 py-2 border-b border-gray-100 text-gray-700 tabular-nums text-right">{f.pct_contestaron}%</td>
               </tr>
             ))}
           </tbody>
