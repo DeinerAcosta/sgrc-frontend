@@ -8,7 +8,7 @@ import { format, startOfMonth, startOfYear, endOfMonth } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { informeService, sedeService } from '@/services/api'
 import { Spinner, EmptyState } from '@/components/ui'
-import { TIPOS_RECURSO, parseFechaLocal } from '@/utils/helpers'
+import { TIPOS_RECURSO, TIPOS_AUSENCIA, parseFechaLocal } from '@/utils/helpers'
 import focaLogo from '@/assets/brand/foca-azul.png'
 
 // ============================================================================
@@ -20,12 +20,24 @@ import focaLogo from '@/assets/brand/foca-azul.png'
 // TODOS los datos vienen del backend (endpoint /reprogramaciones-dashboard).
 // ============================================================================
 
+// 23-oct · Hector: colores de los gráficos como los del logo FOCA (marino,
+// azul del iris y verde menta). Los tonos de las series se ajustaron para que
+// se distingan entre sí (también con daltonismo) y se lean sobre blanco:
+// validados con el validador de paletas (todas las pruebas pasan).
+const FOCA = {
+  marino: '#1B2A6C',   // barras de una sola serie
+  azul:   '#3651B0',   // "sin reponer" y lo pendiente
+  iris:   '#4F95E8',   // segunda serie / resaltado
+  menta:  '#2E9C7C',   // "repuestas" y lo favorable
+  claro:  '#8FB5DA',   // meses no elegidos en la tendencia
+}
+
 const FAMILIAS = [
-  { value: 'reprogramacion_operativa', label: 'Reprogramación operativa', color: '#1e3a8a' },
-  { value: 'ausencia_profesional',     label: 'Ausencia profesional',     color: '#f59e0b' },
-  { value: 'ajuste_cupos',             label: 'Ajuste de cupos',          color: '#93c5fd' },
-  { value: 'movilidad_regional',       label: 'Movilidad / Regional',     color: '#60a5fa' },
-  { value: 'calendario_festivo',       label: 'Calendario / Festivo',     color: '#f97316' },
+  { value: 'reprogramacion_operativa', label: 'Reprogramación operativa', color: FOCA.azul },
+  { value: 'ausencia_profesional',     label: 'Ausencia profesional',     color: FOCA.marino },
+  { value: 'ajuste_cupos',             label: 'Ajuste de cupos',          color: FOCA.claro },
+  { value: 'movilidad_regional',       label: 'Movilidad / Regional',     color: FOCA.iris },
+  { value: 'calendario_festivo',       label: 'Calendario / Festivo',     color: FOCA.menta },
   { value: 'otros',                    label: 'Otros',                    color: '#94a3b8' },
 ]
 const FAMILIA_COLOR = Object.fromEntries(FAMILIAS.map((f) => [f.value, f.color]))
@@ -57,13 +69,18 @@ function rangoAnio() {
 }
 
 // Header FOCA (estilo tablero gerencial: logo + titulo grande serif + chips)
-// 22-oct · QA (F6): tomaba la primera palabra y salía solo "Dr.". Ahora el
-// título (Dr., Dra., Tec.) más el primer nombre y el primer apellido.
+// 22-oct · QA (F6): tomaba la primera palabra y salía solo "Dr.".
+// 23-oct · Hector: primer nombre y primer apellido ("Ana Milena Escudero
+// Brito" → "Ana Escudero"). Con cuatro palabras o más el primer apellido es la
+// penúltima ("Jimmy de Jesus Mencias Mercado" → "Jimmy Mencias"); con tres,
+// la segunda ("Melina Patiño Ruiz" → "Melina Patiño"). El título se conserva.
 const nombreCorto = (nombre) => {
   if (!nombre) return '—'
   const p = nombre.trim().split(/\s+/)
   const titulo = /^(dr|dra|tec|téc|lic)\.?$/i.test(p[0]) ? p.shift() + ' ' : ''
-  return titulo + p.slice(0, 2).join(' ')
+  if (p.length <= 2) return titulo + p.join(' ')
+  const apellido = p.length >= 4 ? p[p.length - 2] : p[1]
+  return `${titulo}${p[0]} ${apellido}`
 }
 
 function HeaderFOCA({ rango, totalEventos, totalPacientes }) {
@@ -231,6 +248,16 @@ export default function ReprogramacionesPage() {
     staleTime: 60 * 1000,
   })
 
+  // 23-oct · La tendencia muestra siempre los meses del año (sale de la
+  // consulta de "Todos", que ya está en caché), con el mes elegido resaltado.
+  // Antes, al elegir un mes, la gráfica quedaba con una sola barra.
+  const paramsAnio = useMemo(() => ({ ...params, ...rangoAnio() }), [params])
+  const { data: dataAnio } = useQuery({
+    queryKey: ['reprogramaciones-dashboard', paramsAnio],
+    queryFn: () => informeService.reprogramacionesDashboard(paramsAnio),
+    staleTime: 60 * 1000,
+  })
+
   if (isLoading) {
     return <div className="p-8 flex justify-center"><Spinner /></div>
   }
@@ -265,7 +292,14 @@ export default function ReprogramacionesPage() {
         ))}
       </div>
 
-      {tab === 'resumen'    && <TabResumen data={data} />}
+      {tab === 'resumen'    && (
+        <TabResumen
+          data={data}
+          porMesAnio={dataAnio?.por_mes ?? data.por_mes ?? []}
+          mesActivo={mesActivo}
+          setMesActivo={setMesActivo}
+        />
+      )}
       {tab === 'medicos'    && <TabMedicos data={data} />}
       {tab === 'reposicion' && <TabReposicion data={data} />}
       {tab === 'causas'     && <TabCausas data={data} />}
@@ -344,7 +378,7 @@ function TabReprogramadores({ rango }) {
 // =============================================================================
 // TAB 1 — Resumen ejecutivo
 // =============================================================================
-function TabResumen({ data }) {
+function TabResumen({ data, porMesAnio, mesActivo, setMesActivo }) {
   const k = data.kpis ?? {}
   const totalEventos = k.total_ausencias ?? 0
   const totalPac = k.patients_affected ?? 0
@@ -364,16 +398,16 @@ function TabResumen({ data }) {
   // Antes se estimaba con los rangos de la gráfica, y estaba mal alimentado.
   const mediaAntel = data.antelacion_promedio ?? 0
 
-  const porMes = data.por_mes ?? []
-  const dataPorMes = porMes.map((m) => ({
+  const dataPorMes = porMesAnio.map((m) => ({
+    indice: Number(m.mes.slice(5, 7)) - 1,
     mes: MESES_ES_ABREV[Number(m.mes.slice(5, 7)) - 1] ?? m.mes,
     pacientes: m.pacientes,
     eventos: m.count,
   }))
 
   const donutData = [
-    { name: 'Repuestas', value: cubiertos, color: '#3b82f6' },
-    { name: 'Sin reponer', value: sinCobertura, color: '#f97316' },
+    { name: 'Repuestas', value: cubiertos, color: FOCA.menta },
+    { name: 'Sin reponer', value: sinCobertura, color: FOCA.azul },
   ]
   // Oct-2026 · Repuesta = todos sus pacientes con turno nuevo (turnos que la
   // cubren o reposición aprobada). Antes solo contaba reposiciones del médico.
@@ -411,7 +445,7 @@ function TabResumen({ data }) {
         <ChartCard
           title="Tendencia mensual de reprogramaciones"
           description="Barras = pacientes afectados · línea = nº de reprogramaciones · por mes de gestión"
-          right={<span className="text-[10px] text-gray-400">clic para filtrar</span>}
+          right={<span className="text-[10px] text-gray-400">{mesActivo === null ? 'clic en un mes para filtrar' : 'clic de nuevo para ver todos'}</span>}
         >
           <div style={{ width: '100%', height: 260 }}>
             <ResponsiveContainer>
@@ -421,8 +455,16 @@ function TabResumen({ data }) {
                 <YAxis yAxisId="left"  tick={{ fontSize: 10 }} />
                 <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
                 <Tooltip formatter={(v) => fmtNum(v)} />
-                <Bar yAxisId="left" dataKey="pacientes" fill="#1e3a8a" barSize={38} radius={[4, 4, 0, 0]} name="Pacientes" />
-                <Line yAxisId="right" type="monotone" dataKey="eventos" stroke="#f97316" strokeWidth={2.5} dot={{ r: 4 }} name="Reprogramaciones" />
+                <Bar
+                  yAxisId="left" dataKey="pacientes" barSize={38} radius={[4, 4, 0, 0]} name="Pacientes"
+                  cursor="pointer"
+                  onClick={(d) => setMesActivo(d?.indice === mesActivo ? null : d?.indice ?? null)}
+                >
+                  {dataPorMes.map((d) => (
+                    <Cell key={d.indice} fill={mesActivo === null || d.indice === mesActivo ? FOCA.marino : FOCA.claro} />
+                  ))}
+                </Bar>
+                <Line yAxisId="right" type="monotone" dataKey="eventos" stroke={FOCA.menta} strokeWidth={2.5} dot={{ r: 4 }} name="Reprogramaciones" />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -448,8 +490,8 @@ function TabResumen({ data }) {
             <div className="text-xs space-y-3">
               <div>
                 <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-blue-500" />
-                  <strong className="text-blue-600">{fmtNum(repuestasCount)} repuestas</strong>
+                  <span className="w-2.5 h-2.5 rounded-sm" style={{ background: FOCA.menta }} />
+                  <strong className="text-gray-900">{fmtNum(repuestasCount)} repuestas</strong>
                 </div>
                 <div className="text-[11px] text-gray-500 ml-4">
                   {(k.tasa_reposicion_pct ?? 0)}% · {fmtNum(cubiertos)} pac.
@@ -457,8 +499,8 @@ function TabResumen({ data }) {
               </div>
               <div>
                 <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-orange-500" />
-                  <strong className="text-orange-600">{fmtNum(sinReponerCount)} sin reponer</strong>
+                  <span className="w-2.5 h-2.5 rounded-sm" style={{ background: FOCA.azul }} />
+                  <strong className="text-gray-900">{fmtNum(sinReponerCount)} sin reponer</strong>
                 </div>
                 <div className="text-[11px] text-gray-500 ml-4">
                   {pctSinRep}% · {fmtNum(sinCobertura)} pac.
@@ -533,6 +575,7 @@ function TabMedicos({ data }) {
 
   // Ordenar por pacientes, top 12
   const top12 = [...rec].sort((a, b) => (b.pacientes ?? 0) - (a.pacientes ?? 0)).slice(0, 12).reverse()
+    .map((r) => ({ ...r, name: nombreCorto(r.name) }))
 
   return (
     <>
@@ -552,17 +595,17 @@ function TabMedicos({ data }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-6">
         <ChartCard
           title="Eventos por profesional — ¿repuso o no?"
-          description="Azul = repuestos · coral = sin reponer · ordenado por pacientes afectados"
+          description="Verde = repuestos · azul = sin reponer · ordenado por pacientes afectados"
         >
           <div style={{ width: '100%', height: Math.max(220, top12.length * 28) }}>
             <ResponsiveContainer>
               <BarChart data={top12} layout="vertical" margin={{ top: 5, right: 20, left: 100, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 10 }} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={100} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={100} interval={0} />
                 <Tooltip formatter={(v) => fmtNum(v)} />
-                <Bar dataKey="approved_makeups" stackId="a" fill="#3b82f6" name="Repuestos" />
-                <Bar dataKey={(r) => Math.max(0, (r.count ?? 0) - (r.approved_makeups ?? 0))} stackId="a" fill="#f97316" name="Sin reponer" />
+                <Bar dataKey="approved_makeups" stackId="a" fill={FOCA.menta} name="Repuestos" />
+                <Bar dataKey={(r) => Math.max(0, (r.count ?? 0) - (r.approved_makeups ?? 0))} stackId="a" fill={FOCA.azul} name="Sin reponer" />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -571,7 +614,7 @@ function TabMedicos({ data }) {
         <div className="space-y-3">
           <div className="bg-brand-800 text-white rounded-xl p-4">
             <div className="text-[10px] tracking-widest uppercase text-white/70 font-semibold">Caso prioritario</div>
-            <div className="font-semibold text-2xl mt-1">{lider?.name ?? '—'}</div>
+            <div className="font-semibold text-2xl mt-1">{nombreCorto(lider?.name)}</div>
             <div className="text-[11px] text-white/60 mt-0.5">{lider?.count ?? 0} eventos en la selección</div>
             <div className="grid grid-cols-3 gap-2 mt-3">
               <div className="bg-white/10 rounded-lg p-2 text-center">
@@ -597,7 +640,7 @@ function TabMedicos({ data }) {
               <div className="text-[10px] tracking-widest uppercase text-blue-700 font-semibold">Recomendación</div>
               <div className="font-semibold text-base text-gray-900 mt-1">Replicar a quienes sí reponen</div>
               <div className="text-xs text-gray-600 mt-1 leading-relaxed">
-                <strong>{mejorRep.name}</strong> repuso {mejorRep.approved_makeups} de {mejorRep.count} eventos. Documentar el modelo y estandarizarlo como protocolo de reposición.
+                <strong>{nombreCorto(mejorRep.name)}</strong> repuso {mejorRep.approved_makeups} de {mejorRep.count} eventos. Documentar el modelo y estandarizarlo como protocolo de reposición.
               </div>
             </div>
           )}
@@ -623,18 +666,18 @@ function TabReposicion({ data }) {
 
   const dataSede = porSede.map((s) => ({ name: s.name, pct: s.pct }))
   const dataSla = [
-    { name: 'Adelantada', value: sla.adelantada ?? 0, color: '#3b82f6' },
-    { name: 'Mismo día',  value: sla.mismo_dia ?? 0,  color: '#1e3a8a' },
-    { name: '1-7 d',      value: sla.uno_a_siete ?? 0, color: '#93c5fd' },
-    { name: '8-30 d',     value: sla.ocho_a_treinta ?? 0, color: '#1e3a8a' },
-    { name: '>30 d',      value: sla.mas_30 ?? 0, color: '#1e3a8a' },
+    { name: 'Adelantada', value: sla.adelantada ?? 0, color: FOCA.menta },
+    { name: 'Mismo día',  value: sla.mismo_dia ?? 0,  color: FOCA.claro },
+    { name: '1-7 d',      value: sla.uno_a_siete ?? 0, color: FOCA.iris },
+    { name: '8-30 d',     value: sla.ocho_a_treinta ?? 0, color: FOCA.azul },
+    { name: '>30 d',      value: sla.mas_30 ?? 0, color: FOCA.marino },
   ]
   // Oct-2026 · Alineado con la regla de 20 días: 20+ es programada.
   const dataAntel = [
-    { name: 'Retroact.', value: antel.retroactivo ?? 0,       color: '#f97316' },
-    { name: '1-7 d',     value: antel.uno_a_siete ?? 0,       color: '#f59e0b' },
-    { name: '8-19 d',    value: antel.ocho_a_diecinueve ?? 0, color: '#f59e0b' },
-    { name: '20+ d',     value: antel.veinte_o_mas ?? 0,      color: '#1e3a8a' },
+    { name: 'Retroact.', value: antel.retroactivo ?? 0,       color: FOCA.marino },
+    { name: '1-7 d',     value: antel.uno_a_siete ?? 0,       color: FOCA.azul },
+    { name: '8-19 d',    value: antel.ocho_a_diecinueve ?? 0, color: FOCA.iris },
+    { name: '20+ d',     value: antel.veinte_o_mas ?? 0,      color: FOCA.menta },
   ]
 
   return (
@@ -649,20 +692,20 @@ function TabReposicion({ data }) {
             <div className="font-semibold text-lg text-gray-900 mb-3">Pacientes: cubiertos vs. sin cobertura</div>
             <div className="flex items-center justify-around">
               <div className="text-center">
-                <div className="font-semibold text-4xl text-blue-600">{fmtNum(cubiertos)}</div>
+                <div className="font-semibold text-4xl" style={{ color: FOCA.menta }}>{fmtNum(cubiertos)}</div>
                 <div className="text-[10px] uppercase tracking-widest text-gray-500 mt-1">Con reposición</div>
               </div>
               <div className="text-2xl text-gray-300 font-semibold">vs</div>
               <div className="text-center">
-                <div className="font-semibold text-4xl text-orange-600">{fmtNum(sinCob)}</div>
+                <div className="font-semibold text-4xl" style={{ color: FOCA.azul }}>{fmtNum(sinCob)}</div>
                 <div className="text-[10px] uppercase tracking-widest text-gray-500 mt-1">Sin cobertura</div>
               </div>
             </div>
-            <div className="mt-4 h-2 bg-orange-500 rounded-full overflow-hidden">
-              <div className="h-full bg-blue-500" style={{ width: `${pctCub}%` }} />
+            <div className="mt-4 h-2 rounded-full overflow-hidden" style={{ background: FOCA.azul }}>
+              <div className="h-full" style={{ width: `${pctCub}%`, background: FOCA.menta }} />
             </div>
             <div className="text-[11px] text-gray-500 mt-2">
-              Por cada paciente con turno nuevo, <strong className="text-orange-600">{ratio} pacientes</strong> quedaron sin cobertura.
+              Por cada paciente con turno nuevo, <strong className="text-gray-900">{ratio} pacientes</strong> quedaron sin cobertura.
             </div>
           </div>
 
@@ -679,7 +722,7 @@ function TabReposicion({ data }) {
                   <Tooltip formatter={(v) => `${v}%`} />
                   <Bar dataKey="pct" radius={[4, 4, 0, 0]}>
                     {dataSede.map((d, i) => (
-                      <Cell key={i} fill={d.pct >= 80 ? '#3b82f6' : d.pct >= 50 ? '#f59e0b' : '#f97316'} />
+                      <Cell key={i} fill={d.pct >= 80 ? FOCA.menta : d.pct >= 50 ? FOCA.iris : FOCA.azul} />
                     ))}
                     <LabelList dataKey="pct" position="top" formatter={(v) => `${v}%`} style={{ fontSize: 10, fill: '#475569' }} />
                   </Bar>
@@ -745,13 +788,22 @@ function TabCausas({ data }) {
     name: f.label,
     value: f.count,
     pac: f.pacientes,
-    color: FAMILIA_COLOR[f.family] ?? '#94a3b8',
+    color: FAMILIA_COLOR[f.family] ?? FOCA.claro,
   }))
 
-  const topMotivos = (data.top_motivos ?? []).map((m) => ({
-    name: (m.name ?? m.code ?? '').charAt(0).toUpperCase() + (m.name ?? m.code ?? '').slice(1),
-    count: m.count,
-  })).reverse()
+  // 23-oct · Las ausencias sin motivo del catálogo llegan con el código del
+  // tipo ("licencia_no_remunerada"): se muestra su nombre.
+  const nombreMotivo = (m) => TIPOS_AUSENCIA.find((t) => t.value === (m.name ?? m.code))?.label ?? m.name ?? m.code ?? ''
+  // Un mismo motivo puede llegar dos veces (con y sin el motivo del catálogo
+  // enlazado): se suman por nombre para que salga una sola barra.
+  const porNombre = new Map()
+  for (const m of data.top_motivos ?? []) {
+    const n = nombreMotivo(m)
+    const name = n.charAt(0).toUpperCase() + n.slice(1)
+    porNombre.set(name, (porNombre.get(name) ?? 0) + (m.count ?? 0))
+  }
+  const topMotivos = [...porNombre].map(([name, count]) => ({ name, count }))
+    .sort((x, y) => x.count - y.count)
 
   const porEsp = (data.por_especialidad ?? []).map((e) => ({
     name: TIPO_LABEL[e.type] ?? e.type,
@@ -776,7 +828,7 @@ function TabCausas({ data }) {
     name: LABELS_DOW[i],
     pacientes: d.pacientes ?? 0,
     eventos: d.count ?? 0,
-    color: (d.pacientes ?? 0) === maxDia ? '#f97316' : '#1e3a8a',
+    color: (d.pacientes ?? 0) === maxDia ? FOCA.iris : FOCA.marino,
   }))
 
   return (
@@ -821,9 +873,9 @@ function TabCausas({ data }) {
                 <BarChart data={topMotivos} layout="vertical" margin={{ top: 5, right: 45, left: 100, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                   <XAxis type="number" tick={{ fontSize: 10 }} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={100} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={120} interval={0} />
                   <Tooltip />
-                  <Bar dataKey="count" fill="#1e3a8a" radius={[0, 4, 4, 0]}>
+                  <Bar dataKey="count" fill={FOCA.marino} radius={[0, 4, 4, 0]}>
                     <LabelList dataKey="count" position="right" style={{ fontSize: 10, fill: '#475569' }} />
                   </Bar>
                 </BarChart>
@@ -840,9 +892,9 @@ function TabCausas({ data }) {
               <BarChart data={porEsp} layout="vertical" margin={{ top: 5, right: 45, left: 100, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 10 }} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={100} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={100} interval={0} />
                 <Tooltip formatter={(v) => fmtNum(v)} />
-                <Bar dataKey="pacientes" fill="#3b82f6" radius={[0, 4, 4, 0]}>
+                <Bar dataKey="pacientes" fill={FOCA.iris} radius={[0, 4, 4, 0]}>
                   <LabelList dataKey="pacientes" position="right" formatter={(v) => fmtNum(v)} style={{ fontSize: 10, fill: '#475569' }} />
                 </Bar>
               </BarChart>
@@ -856,9 +908,9 @@ function TabCausas({ data }) {
               <BarChart data={topSub} layout="vertical" margin={{ top: 5, right: 45, left: 100, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 10 }} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={100} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={100} interval={0} />
                 <Tooltip formatter={(v) => fmtNum(v)} />
-                <Bar dataKey="pacientes" fill="#f59e0b" radius={[0, 4, 4, 0]}>
+                <Bar dataKey="pacientes" fill={FOCA.menta} radius={[0, 4, 4, 0]}>
                   <LabelList dataKey="pacientes" position="right" formatter={(v) => fmtNum(v)} style={{ fontSize: 10, fill: '#475569' }} />
                 </Bar>
               </BarChart>
@@ -880,7 +932,7 @@ function TabCausas({ data }) {
                 <Bar yAxisId="left" dataKey="pacientes" barSize={32} radius={[4, 4, 0, 0]} name="Pacientes">
                   {dataDow.map((d, i) => <Cell key={i} fill={d.color} />)}
                 </Bar>
-                <Line yAxisId="right" type="monotone" dataKey="eventos" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} name="Reprogramaciones" />
+                <Line yAxisId="right" type="monotone" dataKey="eventos" stroke={FOCA.menta} strokeWidth={2} dot={{ r: 3 }} name="Reprogramaciones" />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -892,9 +944,9 @@ function TabCausas({ data }) {
               <BarChart data={cruceTop} layout="vertical" margin={{ top: 5, right: 45, left: 150, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 10 }} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={150} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={150} interval={0} />
                 <Tooltip formatter={(v) => fmtNum(v)} />
-                <Bar dataKey="pacientes" fill="#1e3a8a" radius={[0, 4, 4, 0]}>
+                <Bar dataKey="pacientes" fill={FOCA.marino} radius={[0, 4, 4, 0]}>
                   <LabelList dataKey="pacientes" position="right" formatter={(v) => fmtNum(v)} style={{ fontSize: 10, fill: '#475569' }} />
                 </Bar>
               </BarChart>
