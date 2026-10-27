@@ -6,6 +6,8 @@ import { es } from 'date-fns/locale'
 import { authService } from '@/services/api'
 import { Badge, Spinner, EmptyState, SectionHeader, Avatar } from '@/components/ui'
 import { useDirtyClose } from '@/hooks/useDirtyClose'
+import { TIPOS_CON_SUBESPECIALIDAD } from '@/utils/helpers'
+import SelectSubespecialidad from '@/components/SelectSubespecialidad'
 
 const ESTADOS = [
   { value: 'pendiente', label: 'Pendientes' },
@@ -29,8 +31,10 @@ export default function AdminSolicitudesPage() {
     queryFn: () => authService.listSolicitudes({ status: estado }),
   })
 
+  const [subesp, setSubesp] = useState({})      // id de la solicitud → subespecialidad elegida
+  const [faltaSub, setFaltaSub] = useState(null)
   const { mutate: aprobar, isPending: aprobando } = useMutation({
-    mutationFn: (id) => authService.aprobarSolicitud(id),
+    mutationFn: ({ id, specialty }) => authService.aprobarSolicitud(id, specialty ? { specialty } : {}),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['solicitudes-registro'] })
       toast.success('Solicitud aprobada — email enviado al solicitante con la contraseña provisional')
@@ -92,6 +96,18 @@ export default function AdminSolicitudesPage() {
                       📧 {s.email}{s.phone ? ` · 📱 ${s.phone}` : ''}
                     </div>
                     {s.specialty && <div className="text-xs text-gray-500">Especialidad: {s.specialty}</div>}
+                    {/* Oct-2026 · PROYECTOS-3800: para aprobar un oftalmólogo u
+                        otorrino se elige su subespecialidad del catálogo. */}
+                    {s.status === 'pendiente' && TIPOS_CON_SUBESPECIALIDAD.includes(s.resource_type) && (
+                      <div className="mt-2 max-w-xs">
+                        <SelectSubespecialidad
+                          tipo={s.resource_type}
+                          value={subesp[s.id] ?? s.specialty ?? ''}
+                          error={faltaSub === s.id && !subesp[s.id]}
+                          onChange={(v) => setSubesp((m) => (m[s.id] === v ? m : { ...m, [s.id]: v }))}
+                        />
+                      </div>
+                    )}
                     <div className="text-xs text-gray-400 mt-1">
                       Solicitado el {format(parseISO(s.created_at), "d MMM yyyy 'a las' HH:mm", { locale: es })}
                     </div>
@@ -103,7 +119,10 @@ export default function AdminSolicitudesPage() {
                     <div className="flex flex-col gap-1">
                       <button
                         className="btn-success text-xs"
-                        onClick={() => aprobar(s.id)}
+                        onClick={() => {
+                          if (TIPOS_CON_SUBESPECIALIDAD.includes(s.resource_type) && !subesp[s.id]) { setFaltaSub(s.id); return }
+                          aprobar({ id: s.id, specialty: subesp[s.id] })
+                        }}
                         disabled={aprobando}
                       >
                         ✓ Aprobar

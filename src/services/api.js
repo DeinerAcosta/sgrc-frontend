@@ -201,8 +201,8 @@ export const authService = {
     if (!DEMO_MODE) return api.get('/users/requests', { params })
     return ok([])
   },
-  aprobarSolicitud: async (id) => {
-    if (!DEMO_MODE) return api.post(`/users/requests/${id}/approve`)
+  aprobarSolicitud: async (id, datos = {}) => {
+    if (!DEMO_MODE) return api.post(`/users/requests/${id}/approve`, datos)
     return ok({ ok: true })
   },
   rechazarSolicitud: async (id, motivo) => {
@@ -259,6 +259,14 @@ export const sedeService = {
 }
 
 // ============ RECURSOS ============
+// Oct-2026 · PROYECTOS-3800 · catálogo de subespecialidades por tipo de recurso.
+export const subespecialidadService = {
+  list: async (type) => {
+    if (!DEMO_MODE) return api.get('/subspecialties', { params: { type } })
+    return ok({ type, required: ['oftalmologo', 'otorrino'].includes(type), items: [] })
+  },
+}
+
 export const recursoService = {
   list: async (params = {}) => {
     if (!DEMO_MODE) return api.get('/resources', { params })

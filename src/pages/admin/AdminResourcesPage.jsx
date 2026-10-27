@@ -3,9 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { recursoService, usuarioService } from '@/services/api'
 import { Avatar, Badge, Spinner, EmptyState } from '@/components/ui'
-import { TIPOS_RECURSO, TIPOS_POR_PACIENTE, TIPOS_MULTI_CONSULTORIO, requiereIntervaloPorPaciente, TIPOS_CON_SUBESPECIALIDAD, EJEMPLO_SUBESPECIALIDAD} from '@/utils/helpers'
+import { TIPOS_RECURSO, TIPOS_POR_PACIENTE, TIPOS_MULTI_CONSULTORIO, requiereIntervaloPorPaciente, TIPOS_CON_SUBESPECIALIDAD} from '@/utils/helpers'
 import { useDirtyClose } from '@/hooks/useDirtyClose'
 import { useConfirm } from '@/contexts/ConfirmContext'
+import SelectSubespecialidad from '@/components/SelectSubespecialidad'
 
 const ESQUEMAS_PAGO = [
   { value: 'por_paciente', label: 'Por paciente' },
@@ -144,6 +145,9 @@ export default function AdminRecursosPage() {
   )
 }
 
+/** ¿El formulario cambia activo/inactivo respecto al recurso guardado? */
+const cambiaEstadoPrevio = (recurso, form) => !!recurso.id && form.active !== recurso.active
+
 function RecursoModal({ recurso, onClose, onSaved }) {
   const isNew = !recurso.id
   const [form, setForm] = useState({
@@ -177,10 +181,16 @@ function RecursoModal({ recurso, onClose, onSaved }) {
   // oftalmólogo: con agenda propia y con auxiliar obligatoria en consultorio.
   const requiereIntervalo = requiereIntervaloPorPaciente(form.type)
   const puedeMultiConsultorio = TIPOS_MULTI_CONSULTORIO.includes(form.type)
-  // La subespecialidad es TEXTO LIBRE, no una lista cerrada, así que el
-  // otorrino la tiene igual que el oftalmólogo; lo único que cambia es el
-  // ejemplo del placeholder.
+  // Oct-2026 · PROYECTOS-3800: la subespecialidad sale del catálogo y es
+  // obligatoria para oftalmólogo y otorrino (antes era texto libre opcional).
   const requiereEspecialidad = TIPOS_CON_SUBESPECIALIDAD.includes(form.type)
+  const [faltaSubespecialidad, setFaltaSubespecialidad] = useState(false)
+  // Desactivar a alguien no obliga a ponerle subespecialidad (igual que el servidor).
+  const exigirSubespecialidad = requiereEspecialidad && !(cambiaEstadoPrevio(recurso, form) && !form.active)
+  const guardar = () => {
+    if (exigirSubespecialidad && !form.specialty) { setFaltaSubespecialidad(true); return }
+    mutate()
+  }
   // Sep-2026 · SE DECIDE POR EL ESQUEMA, NO POR EL TIPO.
   // Antes esto era `form.type === 'oftalmologo' || form.type === 'fonoaudiologa'`,
   // y ese era el motivo por el que los 94 oftalmólogos con esquema 'fijo' y tope
@@ -353,15 +363,12 @@ function RecursoModal({ recurso, onClose, onSaved }) {
             </div>
           </div>
           {requiereEspecialidad && (
-            <div>
-              <label className="label">Subespecialidad</label>
-              <input
-                className="input"
-                value={form.specialty}
-                onChange={(e) => setForm({ ...form, specialty: e.target.value })}
-                placeholder={EJEMPLO_SUBESPECIALIDAD[form.type] ?? 'Subespecialidad'}
-              />
-            </div>
+            <SelectSubespecialidad
+              tipo={form.type}
+              value={form.specialty}
+              error={faltaSubespecialidad && !form.specialty}
+              onChange={(v) => setForm((f) => (f.specialty === v ? f : { ...f, specialty: v }))}
+            />
           )}
           {/* Multi-rol: el recurso aparece también en otros pools de apoyo */}
           <div className="bg-gray-50 border border-gray-100 rounded-lg p-3">
@@ -516,7 +523,7 @@ function RecursoModal({ recurso, onClose, onSaved }) {
           <button className="btn flex-1 justify-center" onClick={tryClose}>Cancelar</button>
           <button
             className="btn-primary flex-1 justify-center"
-            onClick={() => mutate()}
+            onClick={guardar}
             disabled={!form.name || (cambiaEstado && !form.active && !form.deactivation_reason) || isPending}
           >
             {isPending ? <Spinner size="sm" /> : (isNew ? 'Crear' : 'Guardar')}

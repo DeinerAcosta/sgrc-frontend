@@ -5,10 +5,11 @@ import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { usuarioService, sedeService } from '@/services/api'
 import { Avatar, Badge, Spinner, EmptyState } from '@/components/ui'
-import { ROLES, TIPOS_RECURSO } from '@/utils/helpers'
+import { ROLES, TIPOS_RECURSO, TIPOS_CON_SUBESPECIALIDAD } from '@/utils/helpers'
 import BulkUsuariosModal from '@/pages/admin/BulkUsersModal'
 import { useDirtyClose } from '@/hooks/useDirtyClose'
 import { useConfirm } from '@/contexts/ConfirmContext'
+import SelectSubespecialidad from '@/components/SelectSubespecialidad'
 
 /**
  * HU-S-02: Supervisor gestiona usuarios del sistema.
@@ -395,8 +396,12 @@ function UsuarioModal({ usuario, onClose, onSaved }) {
     leadCoordinatorId: usuario.lead_coordinator_id ?? null,
     // Tipo de recurso (auxiliar/tecnico/etc.) — solo aplica si rol=recurso
     resourceType: usuario.type ?? '',
+    // Oct-2026 · PROYECTOS-3800: al crear un oftalmólogo u otorrino se elige del catálogo.
+    specialty: '',
     reason: '',
   })
+  const pideSubespecialidad = isNew && form.role === 'recurso' && TIPOS_CON_SUBESPECIALIDAD.includes(form.resourceType)
+  const [faltaSubespecialidad, setFaltaSubespecialidad] = useState(false)
   const { tryClose } = useDirtyClose(form, onClose)
 
   const { data: sedes = [] } = useQuery({
@@ -554,6 +559,15 @@ function UsuarioModal({ usuario, onClose, onSaved }) {
             </div>
           )}
 
+          {pideSubespecialidad && (
+            <SelectSubespecialidad
+              tipo={form.resourceType}
+              value={form.specialty}
+              error={faltaSubespecialidad && !form.specialty}
+              onChange={(v) => setForm((f) => (f.specialty === v ? f : { ...f, specialty: v }))}
+            />
+          )}
+
           {(form.role === 'coordinador' || form.role === 'recurso') && (
             <div>
               <label className="label">
@@ -644,7 +658,10 @@ function UsuarioModal({ usuario, onClose, onSaved }) {
           <button className="btn flex-1 justify-center" onClick={tryClose}>Cancelar</button>
           <button
             className="btn-primary flex-1 justify-center"
-            onClick={() => mutate()}
+            onClick={() => {
+              if (pideSubespecialidad && !form.specialty) { setFaltaSubespecialidad(true); return }
+              mutate()
+            }}
             disabled={!form.name || !form.email || (isNew && form.role === 'recurso' && !form.resourceType) || (requiereMotivo && !form.reason) || isPending || removing}
           >
             {isPending ? <Spinner size="sm" /> : (isNew ? 'Crear' : 'Guardar')}
