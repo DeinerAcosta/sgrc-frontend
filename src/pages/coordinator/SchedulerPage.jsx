@@ -273,16 +273,25 @@ export default function ProgramadorPage() {
     return !(hasta <= asig.start_time || desde >= asig.end_time)
   }
 
-  // Mapa "recursoId|dia" -> ausencia. Se indexa por DIA y no solo por recurso
+  // Mapa "recursoId|dia" -> ausencias. Se indexa por DIA y no solo por recurso
   // porque una ausencia de martes a jueves no debe teñir el lunes: aqui el dato
   // ES el dia. Se memoiza porque la grilla se repinta cientos de veces.
+  // Oct-2026 · Es una LISTA: puede haber dos permisos el mismo día (08–09 y
+  // 09–10:30) y antes el segundo tapaba al primero.
   const ausenciasPorRecursoDia = useMemo(() => {
     const m = new Map()
     for (const a of ausenciasSemana?.ausencias ?? []) {
-      for (const dia of a.dias ?? []) m.set(a.resource?.id + '|' + dia, a)
+      for (const dia of a.dias ?? []) {
+        const k = a.resource?.id + '|' + dia
+        if (!m.has(k)) m.set(k, [])
+        m.get(k).push(a)
+      }
     }
     return m
   }, [ausenciasSemana])
+  // La ausencia de ese día que tumba este turno (o undefined).
+  const ausenciaDelTurno = (asig, dia) =>
+    (ausenciasPorRecursoDia.get(asig.resource?.id + '|' + dia) ?? []).find((au) => laTumbaLaAusencia(asig, au))
 
   // Se memoiza sobre `ausentesPrev`, no sobre la lista derivada: `?? []` crea un
   // array nuevo en cada render y eso recalculaba el Set en cada pintada de la
@@ -1061,7 +1070,7 @@ export default function ProgramadorPage() {
                     const fusionados = new Set()
                     const parejaDe = new Map()
                     for (const x of asigs) {
-                      const au = ausenciasPorRecursoDia.get(x.resource?.id + '|' + dia)
+                      const au = ausenciaDelTurno(x, dia)
                       const c = au && cubreA.get(au.id)
                       if (c && c.start_time === x.start_time && c.end_time === x.end_time) {
                         parejaDe.set(x.id, c)
@@ -1071,9 +1080,8 @@ export default function ProgramadorPage() {
                     return (
                       <td key={dia} className="p-1 align-top border-r border-gray-50 min-h-12">
                         {asigs.map((a, idx) => {
-                          const posibleAusencia = ausenciasPorRecursoDia.get(a.resource?.id + '|' + dia)
                           // Parcial: solo las franjas que pisa su horario.
-                          const ausente = laTumbaLaAusencia(a, posibleAusencia) ? posibleAusencia : undefined
+                          const ausente = ausenciaDelTurno(a, dia)
                           const esReemplazo = !!a.covered_absence_id
                           // Ya se pinta dentro del recuadro de su pareja.
                           if (fusionados.has(a.id)) return null
