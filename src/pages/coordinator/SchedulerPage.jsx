@@ -7,7 +7,7 @@ import { es } from 'date-fns/locale'
 import { asignacionService, semanaService, sedeService, festivoService, recursoService, consultorioService, ausenciaService } from '@/services/api'
 import { useAuthStore } from '@/store/authStore'
 import { Badge, Spinner, EmptyState } from '@/components/ui'
-import { DIAS_LABEL, DIAS, semanaLabel, diasDeSemana, parseFechaLocal, normalizarTexto, TIPOS_RECURSO, pacientesDelCaso } from '@/utils/helpers'
+import { DIAS_LABEL, DIAS, semanaLabel, diasDeSemana, parseFechaLocal, normalizarTexto, TIPOS_RECURSO, pacientesDelCaso, utilizacionSemanal } from '@/utils/helpers'
 import AsignacionModal from '@/pages/coordinator/AssignmentModal'
 import CerrarSemanaModal from '@/pages/coordinator/CloseWeekModal'
 import AsignarBackofficeModal from '@/pages/coordinator/AssignBackofficeModal'
@@ -1422,7 +1422,7 @@ export default function ProgramadorPage() {
         const consConAsig = new Set(asignaciones.map((a) => a.room_id))
         const consSinAsig = consActivos.filter((c) => !consConAsig.has(c.id))
         const pacientesProg = asignaciones.reduce((acc, a) => acc + (a.patient_capacity ?? 0), 0)
-        const ociososList = recursos.filter((r) => ((r.assigned_hours ?? 0) / (r.max_hours_per_week ?? 42)) < 0.6)
+        const ociososList = recursos.filter((r) => utilizacionSemanal(r).ociosa)
         const resumen = {
           label_semana: semanaLabel(semanaBase),
           ocupacion_proyectada: ocupacion,

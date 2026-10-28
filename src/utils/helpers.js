@@ -479,12 +479,16 @@ export const formatFamiliaLabel = (v) => FAMILIA_LABELS[v] ?? titleCase(v ?? 'si
  */
 export function utilizacionSemanal(r = {}) {
   const horas = r.assigned_hours ?? 0
+  // Oct-2026 · Ausencias confirmadas de la semana (el backend las descuenta del
+  // tope en `available_hours`). Quien está ausente toda la semana no se mide: un
+  // técnico de vacaciones salía "ociosa · Costo fijo sin utilizar".
+  const ausencia = { ausente: !!r.absent_all_week, diasAusente: r.absent_days ?? 0, motivoAusencia: r.absence_reason ?? null }
   const sinTope = r.pay_scheme === 'por_paciente' || r.max_hours_per_week == null
-  if (sinTope) {
-    return { horas, tope: null, pct: null, aplica: false, ociosa: false, cerca: false, festivos: r.festivos_en_semana ?? 0 }
+  if (sinTope || ausencia.ausente) {
+    return { horas, tope: null, pct: null, aplica: false, ociosa: false, cerca: false, festivos: r.festivos_en_semana ?? 0, ...ausencia }
   }
   const topeNominal = r.max_hours_per_week
-  const tope = r.max_effective_hours ?? topeNominal
+  const tope = r.available_hours ?? r.max_effective_hours ?? topeNominal
   const pct = tope > 0 ? Math.min(100, Math.round((horas / tope) * 100)) : 0
   return {
     horas,
@@ -495,6 +499,7 @@ export function utilizacionSemanal(r = {}) {
     ociosa: pct < 60,
     cerca: pct >= 90 && !r.is_overtime,
     festivos: r.festivos_en_semana ?? 0,
+    ...ausencia,
   }
 }
 

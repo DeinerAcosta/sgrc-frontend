@@ -4,7 +4,7 @@ import { useAuthStore } from '@/store/authStore'
 import { ausenciaService, recursoService } from '@/services/api'
 import { AlertRow, BarProgress, KpiCard, Spinner, SectionHeader } from '@/components/ui'
 import { Badge } from '@/components/ui'
-import { formatHoras, pacientesDelCaso } from '@/utils/helpers'
+import { formatHoras, pacientesDelCaso, utilizacionSemanal } from '@/utils/helpers'
 import { useNavigate } from 'react-router-dom'
 import { useSedeActiva } from '@/hooks/useActiveSite'
 
@@ -46,7 +46,10 @@ export default function DashboardCoordPage() {
   }, [auxiliares, tecnicos])
   const loadRec = loadAux || loadTec
 
-  const ociosas = recursos.filter((r) => (r.assigned_hours ?? 0) < (r.max_hours_per_week ?? 44) * 0.6)
+  // Oct-2026 · Mismo cálculo que la pantalla de Recursos y el resumen diario por
+  // correo: el tope descuenta festivos y ausencias confirmadas, y quien está
+  // ausente toda la semana no cuenta como ocioso.
+  const ociosas = recursos.filter((r) => utilizacionSemanal(r).ociosa)
   const conExtras = recursos.filter((r) => r.is_overtime)
   // RN-24 (estado_badge='liberada') aplica solo a auxiliares de oftalmología,
   // así que el conteo natural sigue dando 0 para coords de técnicos. OK.
@@ -97,7 +100,7 @@ export default function DashboardCoordPage() {
                 <AlertRow
                   key={r.id}
                   tipo="amarillo"
-                  titulo={`${r.name} · ${formatHoras(r.assigned_hours ?? 0)} / ${formatHoras((r.max_hours_per_week ?? 42))}`}
+                  titulo={`${r.name} · ${formatHoras(r.assigned_hours ?? 0)} / ${formatHoras(utilizacionSemanal(r).tope)}`}
                   subtitulo="Costo fijo sin utilizar"
                   actionLabel="Asignar"
                   onAction={() => navigate('/app/programador')}
@@ -128,31 +131,39 @@ export default function DashboardCoordPage() {
           ) : (
             <div className="space-y-2.5">
               {recursos.slice(0, 8).map((r) => {
-                const horasEfec = r.assigned_hours ?? 0
+                const u = utilizacionSemanal(r)
+                const horasEfec = u.horas
                 // horas_presencia_semana viene del backend (jul-2026): son las
                 // horas brutas SIN descontar almuerzo. Sirve para explicar por
                 // qué 6 turnos de 6h se ven como 30h (efectivas) y no 36h.
                 const horasPres = r.weekly_presence_hours ?? horasEfec
-                const tope = r.max_hours_per_week ?? 42
-                const pct = Math.min(100, Math.round((horasEfec / tope) * 100))
-                const isOciosa = pct < 60
+                const tope = u.tope
+                const pct = u.pct
+                const isOciosa = u.ociosa
                 const isExtra = r.is_overtime
                 const isLib = r.status_badge === 'liberada'
-                const hoverExplicacion = horasPres > horasEfec
+                const hoverExplicacion = !u.aplica
+                  ? `${formatHoras(horasEfec)} programadas`
+                  : horasPres > horasEfec
                   ? `${formatHoras(horasEfec)} efectivas · ${formatHoras(horasPres)} de presencia · tope ${formatHoras(tope)} (Ley 2101). El sistema compara EFECTIVAS vs. tope — la diferencia con presencia es el almuerzo descontado en turnos ≥ 6h que empiezan antes de las 12.`
                   : `${formatHoras(horasEfec)} de ${formatHoras(tope)} (tope semanal Ley 2101)`
                 return (
                   <div key={r.id} title={hoverExplicacion}>
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xs text-gray-700 flex-1 truncate">{r.name}</span>
+                      {u.diasAusente > 0 && (
+                        <Badge variant="blue" className="text-xs py-0">{u.motivoAusencia ?? 'Ausente'}{u.ausente ? '' : ` · ${u.diasAusente} d`}</Badge>
+                      )}
                       {isLib && <Badge variant="yellow" className="text-xs py-0">backoffice</Badge>}
                       {isOciosa && <Badge variant="amber" className="text-xs py-0">ociosa</Badge>}
                       {isExtra && <Badge variant="red" className="text-xs py-0">extras</Badge>}
-                      <span className={`text-xs ${isExtra ? 'text-red-600' : isOciosa ? 'text-amber-600' : 'text-green-700'}`}>
-                        {formatHoras(horasEfec)} / {formatHoras(tope)} · <strong>{pct}%</strong>
+                      <span className={`text-xs ${!u.aplica ? 'text-gray-500' : isExtra ? 'text-red-600' : isOciosa ? 'text-amber-600' : 'text-green-700'}`}>
+                        {u.aplica
+                          ? <>{formatHoras(horasEfec)} / {formatHoras(tope)} · <strong>{pct}%</strong></>
+                          : u.ausente ? 'Ausente toda la semana' : `${formatHoras(horasEfec)} · sin tope`}
                       </span>
                     </div>
-                    <BarProgress value={horasEfec} max={tope} />
+                    {u.aplica && <BarProgress value={horasEfec} max={tope} />}
                     {horasPres > horasEfec && (
                       <div className="text-[10px] text-gray-400 mt-0.5">
                         {formatHoras(horasPres)} presencia (−{formatHoras(horasPres - horasEfec)} almuerzo)

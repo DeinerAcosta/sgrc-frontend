@@ -61,7 +61,7 @@ export default function RecursosCoordPage() {
   const limite = util.filter(({ u }) => u.aplica && u.pct >= 90).length
   const liberadas = recursos.filter((r) => r.status_badge === 'liberada').length
   const extras = recursos.filter((r) => r.is_overtime).length
-  const sinTope = util.filter(({ u }) => !u.aplica).length
+  const sinTope = util.filter(({ u }) => !u.aplica && !u.ausente).length
 
   // Lista larga → se pagina, igual que la grilla de Gestión de ausencias.
   const pag = usePaginacion(util, 15)
@@ -177,7 +177,7 @@ export default function RecursosCoordPage() {
                           {formatHoras(u.horas)}
                           {u.aplica ? (
                             <span className="text-gray-400"> / {formatHoras(u.tope)}</span>
-                          ) : (
+                          ) : !u.ausente && (
                             <span className="text-gray-400"> · sin tope</span>
                           )}
                           {u.festivos > 0 && u.aplica && (
@@ -201,6 +201,8 @@ export default function RecursosCoordPage() {
                               </div>
                               <span className="text-gray-500 tabular-nums w-9 text-right">{u.pct}%</span>
                             </div>
+                          ) : u.ausente ? (
+                            <span className="text-gray-400">Ausente toda la semana</span>
                           ) : (
                             /* Quien cobra por paciente no tiene tope semanal, así
                                que un porcentaje aquí sería un número inventado. */
@@ -209,11 +211,14 @@ export default function RecursosCoordPage() {
                         </td>
                         <td className="px-3 py-2 border-b border-gray-100">
                           <div className="flex flex-wrap gap-1">
+                            {u.diasAusente > 0 && (
+                              <Badge variant="blue">{u.motivoAusencia ?? 'Ausente'}{u.ausente ? '' : ` · ${u.diasAusente} d`}</Badge>
+                            )}
                             {u.ociosa && <Badge variant="amber">ociosa</Badge>}
                             {u.cerca && <Badge variant="red">cerca del límite</Badge>}
                             {r.is_overtime && <Badge variant="red">horas extras</Badge>}
                             {r.status_badge === 'liberada' && <Badge variant="yellow">liberada</Badge>}
-                            {!u.ociosa && !u.cerca && !r.is_overtime && r.status_badge !== 'liberada' && (
+                            {!u.ociosa && !u.cerca && !r.is_overtime && r.status_badge !== 'liberada' && !u.diasAusente && (
                               <span className="text-gray-300">—</span>
                             )}
                           </div>

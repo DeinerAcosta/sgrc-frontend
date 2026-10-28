@@ -118,7 +118,10 @@ export default function AusenciaFormModal({ recursoId, onClose, horarioSemana = 
   const fechasValidas = form.makeup_dates.filter((f) => !(form.start_date && f >= form.start_date && f <= (form.end_date || form.start_date)))
   const esRetraso = form.motivoCodigo === MOTIVO_RETRASO
   const horasRetraso = !(esRetraso || form.is_partial) || (form.absence_start_time && form.absence_end_time)
-  const valid = form.type && form.start_date && horasRetraso && autorizaDatos && !!autorizacion && !faltaMotivoNoReponer
+  // Oct-2026 · La fecha final no puede quedar antes de la inicial (en producción
+  // quedó una vacación del 27-nov al 11-nov). El servidor también lo rechaza.
+  const rangoInvalido = !!(form.end_date && form.start_date && form.end_date < form.start_date)
+  const valid = form.type && form.start_date && horasRetraso && autorizaDatos && !!autorizacion && !faltaMotivoNoReponer && !rangoInvalido
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && tryClose()}>
@@ -191,11 +194,11 @@ export default function AusenciaFormModal({ recursoId, onClose, horarioSemana = 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="label">Fecha inicio <span className="text-red-600">*</span></label>
-              <input className="input" type="date" value={form.start_date} onChange={(e) => set('start_date', e.target.value)} />
+              <input className="input" type="date" value={form.start_date} onChange={(e) => { const d = e.target.value; setForm((f) => ({ ...f, start_date: d, end_date: f.end_date && d && f.end_date < d ? d : f.end_date })) }} />
             </div>
             <div>
               <label className="label">Fecha fin</label>
-              <input className="input" type="date" value={form.end_date} min={form.start_date} onChange={(e) => set('end_date', e.target.value)} />
+              <input className={`input ${rangoInvalido ? 'border-red-500 bg-red-50' : ''}`} type="date" value={form.end_date} min={form.start_date} onChange={(e) => set('end_date', e.target.value)} />
             </div>
           </div>
 
