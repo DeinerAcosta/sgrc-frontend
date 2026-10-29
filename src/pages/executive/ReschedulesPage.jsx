@@ -531,7 +531,7 @@ function TabResumen({ data, porMesAnio, mesActivo, setMesActivo }) {
       <Panel
         eyebrow="Visión general"
         title="Pulso de la reprogramación de agendas"
-        description="Reprogramaciones gestionadas en el rango seleccionado y su impacto en pacientes, cobertura y comportamiento operativo. Usa la segmentación superior para aislar un mes."
+        description="Reprogramaciones gestionadas en el rango seleccionado y su impacto en pacientes, cobertura y comportamiento operativo. Use la segmentación superior para aislar un mes."
       >
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
           <KpiFoca label="Reprogramaciones" value={fmtNum(totalEventos)} color={COLOR_SERIE.eventos} sub="En la selección" />

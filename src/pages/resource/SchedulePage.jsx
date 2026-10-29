@@ -94,7 +94,7 @@ export default function HorarioPage() {
       {isLoading ? (
         <div className="flex justify-center py-12"><Spinner size="lg" /></div>
       ) : !horario || horario.length === 0 ? (
-        <EmptyState icon="📅" title="Sin programación para esta semana" description="El coordinador aún no ha publicado tu horario para esta semana." />
+        <EmptyState icon="📅" title="Sin programación para esta semana" description="El coordinador aún no ha publicado su horario para esta semana." />
       ) : (
         <div className="space-y-2">
           {DIAS_FULL.map((diaLabel, i) => {

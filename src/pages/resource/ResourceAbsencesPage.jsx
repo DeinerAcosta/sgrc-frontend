@@ -80,7 +80,7 @@ export default function AusenciasRecursoPage() {
         {isLoading ? (
           <div className="flex justify-center py-8"><Spinner /></div>
         ) : filtradas.length === 0 ? (
-          <EmptyState icon="📋" title="Sin ausencias registradas" description="No has reportado ausencias en este período." />
+          <EmptyState icon="📋" title="Sin ausencias registradas" description="No ha reportado ausencias en este período." />
         ) : (
           <div className="space-y-2">
             {filtradas.map((a) => {

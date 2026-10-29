@@ -15,7 +15,7 @@ export default function DemoBadge() {
   return (
     <div
       role="status"
-      title="La aplicación no está conectada al backend: los datos que ves son de demostración."
+      title="La aplicación no está conectada al backend: los datos que ve son de demostración."
       style={{
         position: 'fixed', bottom: 12, left: 12, zIndex: 9999,
         background: '#7f1d1d', color: '#fff',

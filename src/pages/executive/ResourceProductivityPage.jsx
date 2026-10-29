@@ -60,7 +60,7 @@ export default function ProductividadRecursoPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-4 print:hidden">
         <div>
           <h1 className="text-base font-semibold text-gray-900">Ficha del recurso</h1>
-          <p className="text-xs text-gray-500">Elige un recurso (filtra por tipo o busca por nombre) para ver su productividad y sus ausencias</p>
+          <p className="text-xs text-gray-500">Elija un recurso (filtre por tipo o busque por nombre) para ver su productividad y sus ausencias</p>
         </div>
         {recursoSel && (
           <div className="flex gap-2 flex-wrap">
@@ -90,7 +90,7 @@ export default function ProductividadRecursoPage() {
             <div className="relative">
               <input
                 className="input"
-                placeholder="Escribe un nombre…"
+                placeholder="Escriba un nombre…"
                 value={busqueda}
                 onChange={(e) => { setBusqueda(e.target.value); setAbierto(true) }}
                 onFocus={() => setAbierto(true)}
@@ -126,7 +126,7 @@ export default function ProductividadRecursoPage() {
       </div>
 
       {!recursoId ? (
-        <EmptyState icon="📈" title="Selecciona un recurso" description="Usa el filtro o el buscador y elige un recurso para ver su productividad." />
+        <EmptyState icon="📈" title="Seleccione un recurso" description="Use el filtro o el buscador y elija un recurso para ver su productividad." />
       ) : isLoading || !data ? (
         <div className="p-6 flex justify-center"><Spinner size="lg" /></div>
       ) : (

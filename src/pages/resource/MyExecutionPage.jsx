@@ -149,21 +149,21 @@ export default function MiEjecucionPage() {
       <div className="card">
         <SectionHeader
           title="Mis asignaciones de hoy"
-          action={<span className="text-xs text-gray-400">Registra los pacientes que realmente atendiste. El coordinador puede verificar y ajustar después.</span>}
+          action={<span className="text-xs text-gray-400">Registre los pacientes que realmente atendió. El coordinador puede verificar y ajustar después.</span>}
         />
 
         {sinRecursoVinculado ? (
           <EmptyState
             icon="⚠️"
-            title="Tu usuario no está vinculado a un recurso"
-            description="Contacta al supervisor para que vincule tu usuario al recurso correspondiente."
+            title="Su usuario no está vinculado a un recurso"
+            description="Comuníquese con el supervisor para que vincule su usuario al recurso correspondiente."
           />
         ) : isLoading ? (
           <div className="flex justify-center py-8"><Spinner /></div>
         ) : !semanaActual ? (
-          <EmptyState icon="📅" title="No hay semana abierta para hoy" description="Cuando el coordinador publique la semana, aquí verás tus asignaciones del día." />
+          <EmptyState icon="📅" title="No hay semana abierta para hoy" description="Cuando el coordinador publique la semana, aquí verá sus asignaciones del día." />
         ) : pendientes.length === 0 ? (
-          <EmptyState icon="✅" title="Sin asignaciones para hoy" description="Hoy no tienes asignaciones como auxiliar. Si crees que es un error, contacta a tu coordinador." />
+          <EmptyState icon="✅" title="Sin asignaciones para hoy" description="Hoy no tiene asignaciones como auxiliar. Si cree que es un error, comuníquese con su coordinador." />
         ) : (
           <>
             <div className="overflow-x-auto -mx-4 sm:mx-0">
@@ -217,7 +217,7 @@ export default function MiEjecucionPage() {
                                   actualizarProgramados({ id: a.id, value: v })
                                 }
                               }}
-                              title="Ajusta si los pacientes realmente programados fueron distintos"
+                              title="Ajuste si los pacientes realmente programados fueron distintos"
                             />
                           )}
                         </td>
@@ -261,7 +261,7 @@ export default function MiEjecucionPage() {
                                 {a.execution?.locked ? 'bloqueado' : 'registrado'}
                               </Badge>
                               {registradoPorOtro && (
-                                <div className="text-[10px] text-amber-600 mt-1" title="Otro usuario editó este registro (probablemente el coordinador). Confirma antes de sobrescribir.">
+                                <div className="text-[10px] text-amber-600 mt-1" title="Otro usuario editó este registro (probablemente el coordinador). Confirme antes de sobrescribir.">
                                   ⚠️ editado por otro
                                 </div>
                               )}
@@ -279,7 +279,7 @@ export default function MiEjecucionPage() {
 
             <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-100 gap-3">
               <div className="text-xs text-gray-400">
-                Guarda al terminar tu jornada. El coordinador puede verificar y ajustar si es necesario.
+                Guarde al terminar su jornada. El coordinador puede verificar y ajustar si es necesario.
               </div>
               <button className="btn-primary" onClick={() => guardarTodo()} disabled={isPending}>
                 {isPending ? <Spinner size="sm" /> : '✓ Guardar registros'}

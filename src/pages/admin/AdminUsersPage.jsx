@@ -133,7 +133,7 @@ export default function AdminUsuariosPage() {
             Mostrando <strong>{filtrados.length}</strong> de {usuarios.length}
             {filtroLogin === 'nunca' && ' · 💡 estos pueden necesitar reenvío de credenciales'}
             {filtroLogin === 'sin_reenvio' && ' · 💡 estos NO han recibido reenvío y NO han entrado — empezar por aquí'}
-            {filtroLogin === 'reenviadas' && ' · 📤 ya les enviaste credenciales recientemente'}
+            {filtroLogin === 'reenviadas' && ' · 📤 ya les envió credenciales recientemente'}
           </div>
         )}
       </div>
@@ -248,7 +248,7 @@ function DetalleUsuarioModal({ usuario, onClose, onEdit, onReenviado }) {
       const dest = resp?.email ?? usuario.email
       const smtpMsg = resp?.smtp_activo
         ? `Email enviado a ${dest}`
-        : `Credenciales reseteadas. SMTP no está activo — comunícale manualmente: ${dest} / SGRC2026!`
+        : `Credenciales reseteadas. SMTP no está activo — comuníquele manualmente: ${dest} / SGRC2026!`
       toast.success(smtpMsg, { duration: 6000 })
       onReenviado?.()
     } catch (err) {
@@ -476,7 +476,7 @@ function UsuarioModal({ usuario, onClose, onSaved }) {
    */
   const confirmarEliminar = async () => {
     const ok = await confirm({
-      title: '¿Qué quieres hacer con este usuario?',
+      title: '¿Qué quiere hacer con este usuario?',
       message: (
         <div className="space-y-2 text-sm">
           <p><strong>{usuario.name}</strong> ({usuario.email})</p>
@@ -548,12 +548,12 @@ function UsuarioModal({ usuario, onClose, onSaved }) {
               </select>
               <div className="text-xs text-gray-500 mt-1">
                 {isNew
-                  ? 'Define qué hace esta persona — auxiliar, técnico, optómetra, oftalmólogo, anestesiólogo o asesor.'
-                  : 'Corrige el tipo si la persona se equivocó al registrarse (ej: puso "Auxiliar" pero realmente es "Técnico").'}
+                  ? 'Defina qué hace esta persona — auxiliar, técnico, optómetra, oftalmólogo, anestesiólogo o asesor.'
+                  : 'Corrija el tipo si la persona se equivocó al registrarse (ej: puso "Auxiliar" pero realmente es "Técnico").'}
               </div>
               {!isNew && form.resourceType && form.resourceType !== usuario.type && (
                 <div className="text-xs text-amber-700 mt-1 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                  ⚠️ Vas a cambiar de <strong>{TIPOS_RECURSO.find(t => t.value === usuario.type)?.label ?? usuario.type ?? '(sin tipo)'}</strong> a <strong>{TIPOS_RECURSO.find(t => t.value === form.resourceType)?.label}</strong>. El cambio queda en auditoría.
+                  ⚠️ Va a cambiar de <strong>{TIPOS_RECURSO.find(t => t.value === usuario.type)?.label ?? usuario.type ?? '(sin tipo)'}</strong> a <strong>{TIPOS_RECURSO.find(t => t.value === form.resourceType)?.label}</strong>. El cambio queda en auditoría.
                 </div>
               )}
             </div>
@@ -594,7 +594,7 @@ function UsuarioModal({ usuario, onClose, onSaved }) {
               <div className="text-xs text-gray-500 mt-1">
                 {form.role === 'coordinador'
                   ? 'El coordinador podrá programar y gestionar las sedes marcadas.'
-                  : 'Los recursos rotan entre estas sedes. Selecciónalas todas en las que puede trabajar.'}
+                  : 'Los recursos rotan entre estas sedes. Selecciónelas todas en las que puede trabajar.'}
               </div>
               {form.sites.length === 0 && (
                 <div className="text-xs text-amber-700 mt-1 bg-amber-50 border border-amber-200 rounded px-2 py-1">

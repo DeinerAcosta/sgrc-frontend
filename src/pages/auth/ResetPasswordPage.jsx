@@ -20,10 +20,10 @@ export default function ResetPasswordPage() {
   const { mutate, isPending } = useMutation({
     mutationFn: () => authService.resetPassword(token, nueva),
     onSuccess: () => {
-      toast.success('Contraseña actualizada. Ya puedes iniciar sesión.')
+      toast.success('Contraseña actualizada. Ya puede iniciar sesión.')
       navigate('/login', { replace: true })
     },
-    onError: (err) => toast.error(err?.message ?? 'El enlace expiró o no es válido. Solicita uno nuevo.'),
+    onError: (err) => toast.error(err?.message ?? 'El enlace expiró o no es válido. Solicite uno nuevo.'),
   })
 
   const longitudOk = nueva.length >= 8
@@ -38,8 +38,8 @@ export default function ResetPasswordPage() {
             <div className="text-4xl mb-3">🔗</div>
             <h1 className="text-base font-semibold text-gray-900">Enlace no válido</h1>
             <p className="text-xs text-gray-500 mt-2 mb-4">
-              Este enlace no tiene token. Si llegaste aquí por error, vuelve al login
-              y solicita un nuevo enlace de recuperación.
+              Este enlace no tiene token. Si llegó aquí por error, vuelva al login
+              y solicite un nuevo enlace de recuperación.
             </p>
             <button className="btn-primary w-full justify-center" onClick={() => navigate('/login')}>
               Volver al login
@@ -60,7 +60,7 @@ export default function ResetPasswordPage() {
             </div>
             <h1 className="text-base font-semibold text-gray-900">Restablecer contraseña</h1>
             <p className="text-xs text-gray-500 mt-1">
-              Escribe tu nueva contraseña. Tiene que tener al menos 8 caracteres.
+              Escriba su nueva contraseña. Tiene que tener al menos 8 caracteres.
             </p>
           </div>
 
@@ -104,7 +104,7 @@ export default function ResetPasswordPage() {
           </div>
 
           <p className="text-xs text-center text-gray-400 mt-5">
-            El enlace es válido por 1 hora desde que lo solicitaste.
+            El enlace es válido por 1 hora desde que lo solicitó.
           </p>
         </div>
       </div>

@@ -17,7 +17,7 @@ export default function PerfilPage() {
   const { mutate: guardar, isPending } = useMutation({
     mutationFn: () => usuarioService.actualizarPerfil({ email, phone: celular }),
     onSuccess: () => {
-      toast.success('Datos actualizados. Si cambiaste el correo, te llegará un email de verificación.')
+      toast.success('Datos actualizados. Si cambió el correo, le llegará un email de verificación.')
       setEditando(false)
     },
     onError: (err) => toast.error(err?.message ?? 'Error al actualizar'),
@@ -29,7 +29,7 @@ export default function PerfilPage() {
     <div className="p-3 sm:p-4 max-w-2xl mx-auto">
       <div className="mb-4">
         <h1 className="text-base font-semibold text-gray-900">Mi perfil</h1>
-        <p className="text-xs text-gray-500">Actualiza tus datos de contacto para recibir notificaciones</p>
+        <p className="text-xs text-gray-500">Actualice sus datos de contacto para recibir notificaciones</p>
       </div>
 
       <div className="card">
@@ -69,7 +69,7 @@ export default function PerfilPage() {
             )}
             {editando && (
               <div className="text-xs text-gray-500 mt-1">
-                Este número recibirá las alertas de cambios en tu horario y confirmaciones.
+                Este número recibirá las alertas de cambios en su horario y confirmaciones.
               </div>
             )}
           </div>
@@ -113,7 +113,7 @@ export default function PerfilPage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <div className="text-sm text-gray-700">Contraseña</div>
-              <div className="text-xs text-gray-400 mt-0.5">Cámbiala periódicamente para mantener tu cuenta segura.</div>
+              <div className="text-xs text-gray-400 mt-0.5">Cámbiela periódicamente para mantener su cuenta segura.</div>
             </div>
             <button
               className="btn"
@@ -126,7 +126,7 @@ export default function PerfilPage() {
 
         <div className="mt-6 pt-4 border-t border-gray-100">
           <div className="text-xs text-gray-500">
-            Todos los cambios quedan registrados en el log de auditoría con tu usuario y fecha.
+            Todos los cambios quedan registrados en el log de auditoría con su usuario y fecha.
           </div>
         </div>
       </div>

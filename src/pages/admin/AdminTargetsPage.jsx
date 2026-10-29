@@ -88,7 +88,7 @@ export default function AdminMetasPage() {
           Más alto = avisa de más gente. Más bajo = solo los casos graves.
           {form.alerta_utilizacion_min_pct >= 90 && (
             <span className="block mt-1 text-amber-700">
-              ⚠️ Con {form.alerta_utilizacion_min_pct}% vas a marcar a casi todo el equipo y el correo deja de ser útil.
+              ⚠️ Con {form.alerta_utilizacion_min_pct}% va a marcar a casi todo el equipo y el correo deja de ser útil.
             </span>
           )}
         </div>

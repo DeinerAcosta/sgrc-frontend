@@ -183,7 +183,7 @@ export default function DashboardDirectivoPage() {
         <div className="card">
           <div className="text-xs font-medium text-gray-700 mb-3">Ocupación por sede</div>
           {sedesOcupacion.length === 0 ? (
-            <EmptyState icon="🏢" title="Sin datos de ocupación" description="Crea asignaciones para ver la ocupación." />
+            <EmptyState icon="🏢" title="Sin datos de ocupación" description="Cree asignaciones para ver la ocupación." />
           ) : (
             <>
               <ResponsiveContainer width="100%" height={Math.max(180, sedesOcupacion.length * 32)}>
@@ -200,7 +200,7 @@ export default function DashboardDirectivoPage() {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
-              <div className="text-xs text-gray-400 mt-2">💡 Para ver una sede específica usa el filtro en Ocupación o Productividad</div>
+              <div className="text-xs text-gray-400 mt-2">💡 Para ver una sede específica use el filtro en Ocupación o Productividad</div>
             </>
           )}
           <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">

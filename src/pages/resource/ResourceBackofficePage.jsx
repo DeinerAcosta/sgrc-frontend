@@ -22,7 +22,7 @@ export default function BackofficeRecursoPage() {
       <div className="mb-4">
         <h1 className="text-base font-semibold text-gray-900">Mi turno de backoffice</h1>
         <p className="text-xs text-gray-500">
-          Tareas administrativas asignadas cuando tu médico tiene ausencia
+          Tareas administrativas asignadas cuando su médico tiene ausencia
         </p>
       </div>
 
@@ -32,7 +32,7 @@ export default function BackofficeRecursoPage() {
         <EmptyState
           icon="✅"
           title="Sin turno de backoffice hoy"
-          description="Cuando un médico al que apoyas tenga una ausencia confirmada, el coordinador podrá asignarte a tareas administrativas. Aquí verás las tareas pendientes de registrar al final del turno."
+          description="Cuando un médico al que apoya tenga una ausencia confirmada, el coordinador podrá asignarle tareas administrativas. Aquí verá las tareas pendientes de registrar al final del turno."
         />
       ) : (
         asignaciones.map((a) => (

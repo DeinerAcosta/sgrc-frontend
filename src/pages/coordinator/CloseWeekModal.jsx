@@ -20,8 +20,8 @@ export default function CerrarSemanaModal({ semana, resumen, sedeId, sedeNombre,
     mutationFn: () => semanaService.cerrar(semana.id, sedeId),
     onSuccess: (res) => {
       const msg = res?.consolidated
-        ? `Cerraste ${sedeNombre}. Era la última sede pendiente — semana consolidada.`
-        : `Cerraste ${sedeNombre}. Otras sedes pueden seguir trabajando hasta que cierren la suya.`
+        ? `Cerró ${sedeNombre}. Era la última sede pendiente — semana consolidada.`
+        : `Cerró ${sedeNombre}. Otras sedes pueden seguir trabajando hasta que cierren la suya.`
       toast.success(msg, { duration: 6000 })
       qc.invalidateQueries({ queryKey: ['semanas'] })
       onClose()
@@ -125,12 +125,12 @@ export default function CerrarSemanaModal({ semana, resumen, sedeId, sedeNombre,
           {bajoMeta && (
             <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-800">
               <strong>La ocupación proyectada ({resumen.ocupacion_proyectada}%) está por debajo de la meta del 80%.</strong>
-              {' '}Puedes cerrar igualmente, pero recomendamos revisar primero.
+              {' '}Puede cerrar igualmente, pero recomendamos revisar primero.
             </div>
           )}
 
           <div className="bg-gray-50 rounded-lg px-3 py-2 text-xs text-gray-600">
-            ℹ️ Solo cierras <strong>{sedeNombre ?? 'tu sede'}</strong>. Otras sedes seguirán abiertas hasta que sus coordinadores cierren la suya. Una vez cerrada, solo el supervisor podrá modificar tus asignaciones.
+            ℹ️ Solo cierra <strong>{sedeNombre ?? 'su sede'}</strong>. Otras sedes seguirán abiertas hasta que sus coordinadores cierren la suya. Una vez cerrada, solo el supervisor podrá modificar sus asignaciones.
           </div>
         </div>
 

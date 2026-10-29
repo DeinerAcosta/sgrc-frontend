@@ -605,7 +605,7 @@ export default function InformePage() {
         {isLoading ? (
           <div className="flex justify-center py-12"><Spinner size="lg" /></div>
         ) : dataOrdenada.length === 0 ? (
-          <EmptyState icon="📊" title="Sin datos para los filtros seleccionados" description="Ajusta el rango de fechas o los filtros para ver resultados." />
+          <EmptyState icon="📊" title="Sin datos para los filtros seleccionados" description="Ajuste el rango de fechas o los filtros para ver resultados." />
         ) : (
           /* Sep-2026 · el sticky del <th> NO funcionaba acá: sin max-h el div no
              genera scroll propio, así que el `sticky top-0` no tiene contra qué

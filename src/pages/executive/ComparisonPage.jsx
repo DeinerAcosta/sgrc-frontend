@@ -70,7 +70,7 @@ export default function ComparativoPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <div>
           <h1 className="text-base font-semibold text-gray-900">Históricos de semanas</h1>
-          <p className="text-xs text-gray-500">Compara dos semanas cualesquiera de las últimas 52</p>
+          <p className="text-xs text-gray-500">Compare dos semanas cualesquiera de las últimas 52</p>
         </div>
         <div className="flex gap-2 items-center">
           {isFetching && <Spinner size="sm" />}

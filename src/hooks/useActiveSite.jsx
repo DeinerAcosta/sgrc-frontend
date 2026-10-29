@@ -74,7 +74,7 @@ export function useSedeActiva() {
           value={sedeManual}
           onChange={(e) => setSedeManual(e.target.value)}
         >
-          {!tieneVariasSedes && <option value="">Selecciona una sede…</option>}
+          {!tieneVariasSedes && <option value="">Seleccione una sede…</option>}
           {sedesDisponibles.map((s) => (
             <option key={s.id} value={s.id}>{s.name}</option>
           ))}

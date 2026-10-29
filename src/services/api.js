@@ -422,7 +422,7 @@ const validarAsignacion = (data, currentUserRol) => {
 
   // RN-08 / Validación 1: Semana abierta (o supervisor)
   if (semana?.status === 'cerrada' && currentUserRol !== 'supervisor') {
-    return { status: 403, message: 'No tienes permiso para modificar esta semana — está cerrada' }
+    return { status: 403, message: 'No tiene permiso para modificar esta semana — está cerrada' }
   }
 
   const recurso = _recursos.find((r) => r.id === data.resource_id)

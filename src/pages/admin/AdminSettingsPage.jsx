@@ -89,7 +89,7 @@ export default function AdminParametrosPage() {
                   </div>
                 </>
               ) : (
-                <EmptyState title="Sin parámetros configurados" description={`Agrega la primera vigencia para ${label}.`} />
+                <EmptyState title="Sin parámetros configurados" description={`Agregue la primera vigencia para ${label}.`} />
               )}
 
               {historial.length > 0 && (
@@ -161,7 +161,7 @@ function ParametroModal({ tipoFijo, esNuevoTipo, onClose, onSaved }) {
             <h2 className="text-sm font-semibold text-gray-900">
               {esNuevoTipo ? 'Nuevo tipo de consulta' : 'Nueva vigencia de costo'}
             </h2>
-            <p className="text-xs text-gray-500 mt-0.5">{tipoFijo ? tipoLabel : esNuevoTipo ? 'Define un tipo nuevo y su primera vigencia' : ''}</p>
+            <p className="text-xs text-gray-500 mt-0.5">{tipoFijo ? tipoLabel : esNuevoTipo ? 'Defina un tipo nuevo y su primera vigencia' : ''}</p>
           </div>
           <button onClick={tryClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
         </div>

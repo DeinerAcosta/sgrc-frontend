@@ -57,7 +57,7 @@ export default function ReemplazoPage() {
         <EmptyState
           icon="⚠️"
           title="No se pudo cargar la ausencia"
-          description={error?.message ?? 'La ausencia no existe o no tienes acceso a ella.'}
+          description={error?.message ?? 'La ausencia no existe o no tiene acceso a ella.'}
         />
       </div>
     )
@@ -591,7 +591,7 @@ function ConfirmarAusencia({ ausencia }) {
   const pedir = async () => {
     const si = await confirm({
       title: 'Confirmar la ausencia',
-      message: `Confirmas que ${ausencia.resource?.name ?? 'el recurso'} no atendió esos días. Sus turnos quedan como no ejecutados y se le notifica.`,
+      message: `Confirma que ${ausencia.resource?.name ?? 'el recurso'} no atendió esos días. Sus turnos quedan como no ejecutados y se le notifica.`,
       confirmLabel: 'Sí, confirmar',
       cancelLabel: 'Cancelar',
     })
@@ -604,7 +604,7 @@ function ConfirmarAusencia({ ausencia }) {
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-amber-900">Esta ausencia no está confirmada</h2>
           <p className="text-xs text-amber-800 mt-0.5">
-            Confírmala para empezar a cubrir la agenda y repartir el caso.
+            Confírmela para empezar a cubrir la agenda y repartir el caso.
           </p>
         </div>
         {puede && (
@@ -734,7 +734,7 @@ function TarjetaFranja({ franja, ausencia, cuenta, soloVe = false }) {
   const pedirQuitar = async (t) => {
     const si = await confirm({
       title: 'Quitar a quien cubre',
-      message: `${t.resource?.name ?? 'Esta persona'} deja de cubrir ${t.start_time}–${t.end_time}. Luego puedes elegir a otra.`,
+      message: `${t.resource?.name ?? 'Esta persona'} deja de cubrir ${t.start_time}–${t.end_time}. Luego puede elegir a otra.`,
       confirmLabel: 'Sí, quitar',
       cancelLabel: 'Cancelar',
     })
@@ -839,7 +839,7 @@ function TarjetaFranja({ franja, ausencia, cuenta, soloVe = false }) {
           ) : sinConfirmar ? (
             <div className="text-xs text-amber-800 sm:text-right max-w-[14rem]">
               {ausencia?.status === 'pendiente'
-                ? 'Confirma la ausencia para cubrir esta jornada.'
+                ? 'Confirme la ausencia para cubrir esta jornada.'
                 : 'Ausencia rechazada: no hay que cubrirla.'}
             </div>
           ) : (
@@ -912,7 +912,7 @@ function TarjetaFranja({ franja, ausencia, cuenta, soloVe = false }) {
             >
               <div className="text-xs font-semibold text-gray-800">Otro profesional</div>
               <div className="text-[11px] text-gray-500 mt-0.5">
-                Se hace cargo de esos pacientes. Lo eliges en el Programador.
+                Se hace cargo de esos pacientes. Lo elige en el Programador.
               </div>
             </button>
           </div>

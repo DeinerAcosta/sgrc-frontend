@@ -49,12 +49,12 @@ export default function CambiarPasswordPage() {
               <span className="text-white font-bold text-sm">SC</span>
             </div>
             <h1 className="text-base font-semibold text-gray-900">
-              {obligatorio ? 'Crea tu contraseña' : 'Cambiar contraseña'}
+              {obligatorio ? 'Cree su contraseña' : 'Cambiar contraseña'}
             </h1>
             <p className="text-xs text-gray-500 mt-1">
               {obligatorio
-                ? 'Antes de ingresar al sistema necesitas reemplazar la contraseña provisional por una propia.'
-                : 'Tu nueva contraseña debe tener al menos 8 caracteres.'}
+                ? 'Antes de ingresar al sistema necesita reemplazar la contraseña provisional por una propia.'
+                : 'Su nueva contraseña debe tener al menos 8 caracteres.'}
             </p>
           </div>
 

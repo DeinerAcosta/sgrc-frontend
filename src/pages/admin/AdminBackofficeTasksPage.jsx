@@ -220,7 +220,7 @@ function AprobarModal({ tarea, onClose, onSaved }) {
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div>
             <h2 className="text-sm font-semibold text-gray-900">Aprobar solicitud</h2>
-            <p className="text-xs text-gray-500 mt-0.5">Puedes ajustar los datos antes de aprobar</p>
+            <p className="text-xs text-gray-500 mt-0.5">Puede ajustar los datos antes de aprobar</p>
           </div>
           <button onClick={tryClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
         </div>

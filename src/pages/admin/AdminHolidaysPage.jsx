@@ -22,7 +22,7 @@ export default function AdminFestivosPage() {
   const confirmarEliminar = async (f) => {
     const ok = await confirm({
       title: '¿Eliminar este festivo?',
-      message: `Vas a eliminar "${f.description}" del calendario. Esta acción no se puede deshacer.`,
+      message: `Va a eliminar "${f.description}" del calendario. Esta acción no se puede deshacer.`,
       confirmLabel: 'Eliminar',
       cancelLabel: 'Cancelar',
       variant: 'danger',
@@ -76,7 +76,7 @@ export default function AdminFestivosPage() {
       </div>
 
       <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-800 mb-4">
-        ℹ️ Los días festivos aparecen resaltados en la grilla del programador y en el resumen diario. El sistema sincroniza automáticamente el calendario oficial de Colombia el 1 de enero de cada año (18 fechas, Ley Emiliani + Pascua). Puedes agregar festivos locales o cierres adicionales con "+ Agregar festivo".
+        ℹ️ Los días festivos aparecen resaltados en la grilla del programador y en el resumen diario. El sistema sincroniza automáticamente el calendario oficial de Colombia el 1 de enero de cada año (18 fechas, Ley Emiliani + Pascua). Puede agregar festivos locales o cierres adicionales con "+ Agregar festivo".
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">

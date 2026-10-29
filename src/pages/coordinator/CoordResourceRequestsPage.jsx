@@ -42,7 +42,7 @@ export default function SolicitudesRecursoCoordPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <div>
           <h1 className="text-base font-semibold text-gray-900">Solicitudes de recurso</h1>
-          <p className="text-xs text-gray-500">Pide al supervisor un recurso para una sede que no coordinas</p>
+          <p className="text-xs text-gray-500">Pida al supervisor un recurso para una sede que no coordina</p>
         </div>
         <button className="btn-primary" onClick={() => setShowModal(true)}>+ Nueva solicitud</button>
       </div>
@@ -52,7 +52,7 @@ export default function SolicitudesRecursoCoordPage() {
         {isLoading ? (
           <div className="flex justify-center py-8"><Spinner /></div>
         ) : solicitudes.length === 0 ? (
-          <EmptyState icon="📨" title="Sin solicitudes" description="Cuando necesites un recurso fuera de tu sede, crea una solicitud." />
+          <EmptyState icon="📨" title="Sin solicitudes" description="Cuando necesite un recurso fuera de su sede, cree una solicitud." />
         ) : (
           <div className="space-y-2">
             {solicitudes.map((s) => {
@@ -172,7 +172,7 @@ function NuevaSolicitudModal({ onClose, onSaved }) {
           <div>
             <label className="label">Sede destino <span className="text-red-600">*</span></label>
             <select className="input" value={form.targetSiteId} onChange={(e) => setForm({ ...form, targetSiteId: e.target.value })}>
-              <option value="">— Elige la sede donde necesitas el recurso —</option>
+              <option value="">— Elija la sede donde necesita el recurso —</option>
               {sedes.filter((s) => s.active).sort((a, b) => a.name.localeCompare(b.name)).map((s) => (
                 <option key={s.id} value={s.id}>{s.name} · {s.city}</option>
               ))}
@@ -183,20 +183,20 @@ function NuevaSolicitudModal({ onClose, onSaved }) {
             <div>
               <label className="label">Recurso a prestar <span className="text-red-600">*</span></label>
               <select className="input" value={form.resourceId} onChange={(e) => setForm({ ...form, resourceId: e.target.value })}>
-                <option value="">— Elige el recurso —</option>
+                <option value="">— Elija el recurso —</option>
                 {recursos.sort((a, b) => a.name.localeCompare(b.name)).map((r) => {
                   const t = TIPOS_RECURSO.find((x) => x.value === r.type)
                   return <option key={r.id} value={r.id}>{r.name} ({t?.label ?? r.type})</option>
                 })}
               </select>
-              <div className="text-xs text-gray-400 mt-1">Verás todos los recursos del sistema. El supervisor decide si autoriza.</div>
+              <div className="text-xs text-gray-400 mt-1">Verá todos los recursos del sistema. El supervisor decide si autoriza.</div>
             </div>
           ) : (
             <>
               <div>
                 <label className="label">Tipo de recurso nuevo <span className="text-red-600">*</span></label>
                 <select className="input" value={form.newResourceType} onChange={(e) => setForm({ ...form, newResourceType: e.target.value })}>
-                  <option value="">— Elige el tipo —</option>
+                  <option value="">— Elija el tipo —</option>
                   {TIPOS_RECURSO.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
               </div>
@@ -229,7 +229,7 @@ function NuevaSolicitudModal({ onClose, onSaved }) {
             <textarea
               className="input resize-none"
               rows={4}
-              placeholder="Explica brevemente por qué necesitas este recurso en esa sede"
+              placeholder="Explique brevemente por qué necesita este recurso en esa sede"
               value={form.justification}
               onChange={(e) => setForm({ ...form, justification: e.target.value })}
             />
@@ -237,7 +237,7 @@ function NuevaSolicitudModal({ onClose, onSaved }) {
           </div>
 
           <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-800">
-            💡 Tu solicitud llega al supervisor por notificación. Cuando la apruebe o rechace, te avisaremos.
+            💡 Su solicitud llega al supervisor por notificación. Cuando la apruebe o rechace, le avisaremos.
           </div>
         </div>
         <div className="px-5 py-4 border-t border-gray-100 flex gap-2 flex-shrink-0">

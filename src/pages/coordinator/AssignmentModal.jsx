@@ -284,9 +284,9 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
           `La hora de inicio "${form.start_time}" está antes del horario típico de operación.\n\n` +
           (sugerida
             ? `El sistema usa formato de 24 horas: "${form.start_time}" = ${parseInt(form.start_time.slice(0,2),10)} AM (madrugada).\n` +
-              `Si querías registrar por la tarde, debería ser "${sugerida}".\n\n` +
-              `¿Confirmás que la asignación empieza a las ${form.start_time} de la madrugada?`
-            : `¿Confirmás que la asignación empieza a las ${form.start_time}?`),
+              `Si quería registrar por la tarde, debería ser "${sugerida}".\n\n` +
+              `¿Confirma que la asignación empieza a las ${form.start_time} de la madrugada?`
+            : `¿Confirma que la asignación empieza a las ${form.start_time}?`),
         confirmLabel: 'Sí, es correcta',
         cancelLabel: 'Corregir',
         variant: 'warning',
@@ -640,7 +640,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                   value={form.authorized_by_id}
                   onChange={(e) => set('authorized_by_id', e.target.value)}
                 >
-                  <option value="">— Selecciona un directivo —</option>
+                  <option value="">— Seleccione un directivo —</option>
                   {directivos.map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.name} · {d.role === 'gerencia' ? 'Gerencia' : 'Directivo'}
@@ -677,7 +677,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                 placeholder="Ej: Corrección solicitada por gerencia tras revisión del cierre · ticket #..."
               />
               <div className="text-[11px] text-red-700 mt-1">
-                ⚠️ Esta sede ya cerró su semana. Como supervisor/gerencia puedes editar, pero el cambio queda registrado en auditoría con tu identificación y el motivo.
+                ⚠️ Esta sede ya cerró su semana. Como supervisor/gerencia puede editar, pero el cambio queda registrado en auditoría con su identificación y el motivo.
               </div>
             </div>
           )}
@@ -694,7 +694,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
               <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden">
                 <div className="px-5 py-4 border-b border-gray-100">
                   <h3 className="text-sm font-semibold text-gray-900">
-                    {cubreAusenciaId ? 'Confirma la reprogramación' : 'Confirma la asignación'}
+                    {cubreAusenciaId ? 'Confirme la reprogramación' : 'Confirme la asignación'}
                   </h3>
                 </div>
 

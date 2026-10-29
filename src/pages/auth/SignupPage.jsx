@@ -58,7 +58,7 @@ export default function RegistroPage() {
       // supervisor los completa al aprobar la solicitud desde /admin/usuarios.
     }),
     onSuccess: (res) => {
-      toast.success(res?.message ?? 'Solicitud enviada. Recibirás un email cuando sea aprobada.')
+      toast.success(res?.message ?? 'Solicitud enviada. Recibirá un email cuando sea aprobada.')
       navigate('/login', { replace: true })
     },
     onError: (err) => toast.error(err?.message ?? 'Error al enviar la solicitud'),
@@ -89,7 +89,7 @@ export default function RegistroPage() {
             </div>
             <h1 className="text-base font-semibold text-gray-900">Registrarme en SGRC</h1>
             <p className="text-xs text-gray-500 mt-1">
-              Tu solicitud quedará pendiente de aprobación por el supervisor
+              Su solicitud quedará pendiente de aprobación por el supervisor
             </p>
           </div>
 
@@ -112,7 +112,7 @@ export default function RegistroPage() {
                   type="email"
                   value={form.email}
                   onChange={(e) => set('email', e.target.value)}
-                  placeholder="tu@cofca.com"
+                  placeholder="nombre@cofca.com"
                 />
               </div>
               <div>
@@ -143,7 +143,7 @@ export default function RegistroPage() {
                     value={form.resource_type}
                     onChange={(e) => set('resource_type', e.target.value)}
                   >
-                    <option value="">Selecciona...</option>
+                    <option value="">Seleccione...</option>
                     {TIPOS_RECURSO.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
                 </div>
@@ -161,7 +161,7 @@ export default function RegistroPage() {
 
             {sedes.length > 0 && (
               <div>
-                <label className="label">Sede(s) donde te interesa trabajar (opcional)</label>
+                <label className="label">Sede(s) donde le interesa trabajar (opcional)</label>
                 <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-1">
                   {sedes.map((s) => (
                     <label key={s.id} className="flex items-center gap-2 text-xs cursor-pointer">
@@ -205,7 +205,7 @@ export default function RegistroPage() {
             </button>
 
             <div className="text-xs text-gray-400 text-center mt-3">
-              Cuando el supervisor apruebe tu solicitud, te enviaremos por email una contraseña provisional que deberás cambiar al primer ingreso. Los datos técnicos (horas, esquema de pago, sede definitiva) los define el supervisor según tu contrato.
+              Cuando el supervisor apruebe su solicitud, le enviaremos por email una contraseña provisional que deberá cambiar al primer ingreso. Los datos técnicos (horas, esquema de pago, sede definitiva) los define el supervisor según su contrato.
             </div>
           </div>
         </div>

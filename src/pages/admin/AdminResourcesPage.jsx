@@ -209,7 +209,7 @@ function RecursoModal({ recurso, onClose, onSaved }) {
     onSuccess: () => {
       toast.success(isNew ? 'Recurso creado' : 'Recurso actualizado')
       if (cambiaEstado && !form.active) {
-        toast('⚠️ RN-14: revisa las asignaciones futuras de este recurso — el coordinador debe resolverlas manualmente', { duration: 6000 })
+        toast('⚠️ RN-14: revise las asignaciones futuras de este recurso — el coordinador debe resolverlas manualmente', { duration: 6000 })
       }
       onSaved()
     },
@@ -234,7 +234,7 @@ function RecursoModal({ recurso, onClose, onSaved }) {
                 ))}
               </ul>
               <p className="text-xs text-amber-700">
-                Si es la <strong>misma persona</strong>, cancela y edita el recurso que ya existe.
+                Si es la <strong>misma persona</strong>, cancele y edite el recurso que ya existe.
                 Crear una copia parte su historial en dos.
               </p>
             </div>
@@ -276,7 +276,7 @@ function RecursoModal({ recurso, onClose, onSaved }) {
                 {dep.solicitudes > 0 && <li>{dep.solicitudes} solicitud(es) de recurso</li>}
               </ul>
               <p className="text-xs text-gray-600">
-                Borrarlo dejaría huecos en los informes de semanas ya cerradas. Desactívalo:
+                Borrarlo dejaría huecos en los informes de semanas ya cerradas. Desactívelo:
                 deja de aparecer para programar y el historial se conserva.
               </p>
             </div>
@@ -291,7 +291,7 @@ function RecursoModal({ recurso, onClose, onSaved }) {
         title: '¿Eliminar definitivamente?',
         message: (
           <div className="space-y-2 text-sm">
-            <p>Vas a borrar a <strong>{recurso.name}</strong> del catálogo.</p>
+            <p>Va a borrar a <strong>{recurso.name}</strong> del catálogo.</p>
             <p className="text-xs text-gray-600">
               No tiene ninguna asignación, ausencia ni tarea asociada, así que no se pierde
               nada de los informes.
@@ -449,7 +449,7 @@ function RecursoModal({ recurso, onClose, onSaved }) {
                 onChange={(e) => setForm({ ...form, max_hours_per_day: parseInt(e.target.value) || 10 })}
               />
               <div className="text-[11px] text-gray-500 mt-1">
-                Default 10h. Sube a 12-14h si trabaja horas extras habituales.
+                Default 10h. Suba a 12-14h si trabaja horas extras habituales.
               </div>
             </div>
           </div>

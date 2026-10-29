@@ -58,7 +58,7 @@ export default function HorarioDiarioPage() {
               value={sedeId}
               onChange={(e) => setSedeId(e.target.value)}
             >
-              {opcionesSede.length > 1 && <option value="">Selecciona sede…</option>}
+              {opcionesSede.length > 1 && <option value="">Seleccione sede…</option>}
               {opcionesSede.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}{s.city ? ` · ${s.city}` : ''}</option>
               ))}
@@ -79,7 +79,7 @@ export default function HorarioDiarioPage() {
       {/* Banner de festivo si aplica */}
       {data?.es_festivo && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-900 mb-3 flex items-center gap-2">
-          📆 <span><strong>Día festivo:</strong> {data.festivo_descripcion}. Verifica con el coordinador si hay atención programada.</span>
+          📆 <span><strong>Día festivo:</strong> {data.festivo_descripcion}. Verifique con el coordinador si hay atención programada.</span>
         </div>
       )}
 

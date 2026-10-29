@@ -287,7 +287,7 @@ export default function EjecucionPage() {
       <div className="card">
         <SectionHeader
           title="Pacientes atendidos por consultorio"
-          action={<span className="text-xs text-gray-400">El campo viene pre-llenado con la capacidad programada — solo ajusta si fue diferente</span>}
+          action={<span className="text-xs text-gray-400">El campo viene pre-llenado con la capacidad programada — solo ajuste si fue diferente</span>}
         />
 
         {isLoading ? (
@@ -300,7 +300,7 @@ export default function EjecucionPage() {
           <EmptyState
             icon="🔍"
             title="Sin asignaciones en las áreas filtradas"
-            description={`Hay ${pendientes.length} asignación${pendientes.length === 1 ? '' : 'es'} para este día, pero ninguna en las áreas seleccionadas. Ajusta o limpia el filtro.`}
+            description={`Hay ${pendientes.length} asignación${pendientes.length === 1 ? '' : 'es'} para este día, pero ninguna en las áreas seleccionadas. Ajuste o limpie el filtro.`}
           />
         ) : (
           <>
@@ -370,7 +370,7 @@ export default function EjecucionPage() {
                                   actualizarProgramados({ id: a.id, value: v })
                                 }
                               }}
-                              title="Edita los pacientes realmente programados (de la agenda externa)"
+                              title="Edite los pacientes realmente programados (de la agenda externa)"
                             />
                           )}
                         </td>

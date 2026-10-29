@@ -41,7 +41,7 @@ export default function SelectSubespecialidad({ tipo, value, onChange, error = f
         <option value="">Seleccionar subespecialidad…</option>
         {opciones.map((o) => <option key={o} value={o}>{o}</option>)}
       </select>
-      {error && <div className="text-[11px] text-red-600 mt-1">Elige la subespecialidad para poder guardar.</div>}
+      {error && <div className="text-[11px] text-red-600 mt-1">Elija la subespecialidad para poder guardar.</div>}
     </div>
   )
 }

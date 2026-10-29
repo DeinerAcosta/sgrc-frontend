@@ -130,7 +130,7 @@ export default function ProgramadorPage() {
         row?.scrollIntoView({ behavior: 'smooth', block: 'center' })
         setHighlightCons(cons.id)
         setTimeout(() => setHighlightCons(null), 3500)
-        toast(`${recurso.name} tiene horas disponibles — asígnalo en ${cons.name}`, { icon: '👉' })
+        toast(`${recurso.name} tiene horas disponibles — asígnelo en ${cons.name}`, { icon: '👉' })
       } else {
         toast(`No hay consultorios activos de ${recurso.type} en esta sede`, { icon: 'ℹ️' })
       }
@@ -366,7 +366,7 @@ export default function ProgramadorPage() {
       // realmente no hay ninguna sede que usar.
       const sedeFallback = sedeId || sedePropia || (esAdminSched ? null : user?.sites?.[0]) || null
       if (!sedeFallback) {
-        throw new Error('No se pudo determinar la sede. Recarga la página y vuelve a intentar.')
+        throw new Error('No se pudo determinar la sede. Recargue la página y vuelva a intentar.')
       }
       // SCOPE POR SEDE (fix incidente jun-2026): solo afectamos la sede activa.
       return semanaService.copiar(anterior.id, format(semanaBase, 'yyyy-MM-dd'), { siteId: sedeFallback })
@@ -378,7 +378,7 @@ export default function ProgramadorPage() {
       const omitidas = res?.skipped ?? 0
       const errores = res?.errors ?? []
       const reemplazo = res?.replaced > 0
-        ? ` (reemplazaron ${res.replaced} anteriores en tu sede)`
+        ? ` (reemplazaron ${res.replaced} anteriores en su sede)`
         : ''
 
       // Copiar semana ahora valida igual que copiar día: lo que choca con el
@@ -415,7 +415,7 @@ export default function ProgramadorPage() {
   // Admin: su sede vinculada no dice nada de la sede que está programando —
   // el nombre sale del catálogo completo (antes decía "tu sede").
   const sedeActivaNombre = todasSedes.find((s) => s.id === sedeId)?.name
-    ?? user?.sites_info?.find((s) => s.id === sedeId)?.name ?? 'tu sede'
+    ?? user?.sites_info?.find((s) => s.id === sedeId)?.name ?? 'su sede'
   const onClickCopiarSemana = async () => {
     // Validación temprana: si aún no hay sede seleccionada (dropdown vacío en
     // supervisor/gerencia, o hidratación pendiente del auth para coord), avisar
@@ -423,13 +423,13 @@ export default function ProgramadorPage() {
     // la(s) sede(s)..." nunca aparece al usuario final.
     const sedeFallback = sedeId || sedePropia || (esAdminSched ? null : user?.sites?.[0]) || null
     if (!sedeFallback) {
-      toast.error('Selecciona una sede antes de copiar (arriba en el selector).', { duration: 4000 })
+      toast.error('Seleccione una sede antes de copiar (arriba en el selector).', { duration: 4000 })
       return
     }
     if (asignaciones.length > 0) {
       const paso1 = await confirm({
         title: '⚠️ Atención: esta semana ya tiene programación',
-        message: `${sedeActivaNombre} tiene ${asignaciones.length} asignaciones esta semana. Al copiar la semana anterior, esas ${asignaciones.length} serán REEMPLAZADAS por las de la semana anterior. SOLO afecta a tu sede — las demás sedes NO se tocan.`,
+        message: `${sedeActivaNombre} tiene ${asignaciones.length} asignaciones esta semana. Al copiar la semana anterior, esas ${asignaciones.length} serán REEMPLAZADAS por las de la semana anterior. SOLO afecta a su sede — las demás sedes NO se tocan.`,
         confirmLabel: 'Entiendo, continuar',
         cancelLabel: 'Cancelar',
         variant: 'warning',
@@ -437,7 +437,7 @@ export default function ProgramadorPage() {
       if (!paso1) return
       const paso2 = await confirm({
         title: '🛑 ÚLTIMA CONFIRMACIÓN',
-        message: `Vas a borrar ${asignaciones.length} asignaciones de ${sedeActivaNombre} (solo tu sede). Otras sedes NO se tocan. Esta acción es recuperable de backup pero requiere intervención técnica. ¿100% seguro?`,
+        message: `Va a borrar ${asignaciones.length} asignaciones de ${sedeActivaNombre} (solo su sede). Otras sedes NO se tocan. Esta acción es recuperable de backup pero requiere intervención técnica. ¿100% seguro?`,
         confirmLabel: `Sí, reemplazar ${asignaciones.length} asignaciones de mi sede`,
         cancelLabel: 'No, cancelar',
         variant: 'danger',
@@ -551,7 +551,7 @@ export default function ProgramadorPage() {
   const programarReposicion = (a, t) => {
     const cons = consultorios.find((c) => c.id === t.room_id)
     if (!cons || !semanaActual) {
-      toast.error(`El consultorio ${t.room_name ?? ''} no está en la sede que estás viendo.`)
+      toast.error(`El consultorio ${t.room_name ?? ''} no está en la sede que está viendo.`)
       return
     }
     const propuesta = a.fecha_reposicion_propuesta ? String(a.fecha_reposicion_propuesta).slice(0, 10) : null
@@ -655,7 +655,7 @@ export default function ProgramadorPage() {
       {caso?.ausencia && (
         <div className="bg-amber-50 border border-amber-300 rounded-lg px-3 py-2.5 mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="text-xs text-amber-900 min-w-0">
-            🔀 Estás moviendo la agenda de <strong>{caso.ausencia.resource?.name}</strong>
+            🔀 Está moviendo la agenda de <strong>{caso.ausencia.resource?.name}</strong>
             {caso.ausencia.fechas?.length ? (
               <> · ausente el <strong>{caso.ausencia.fechas
                 .map((f) => format(parseFechaLocal(f), "EEEE d 'de' MMMM", { locale: es }))
@@ -692,7 +692,7 @@ export default function ProgramadorPage() {
             {/* Para "otro profesional" Hector pidió quitar la indicación. */}
             {quienAtiende === 'mismo' && (
               <div className="text-amber-700 mt-0.5">
-                Va precargado al asignar. Cambia de sede arriba para ver dónde hay espacio.
+                Va precargado al asignar. Cambie de sede arriba para ver dónde hay espacio.
               </div>
             )}
           </div>
@@ -705,7 +705,7 @@ export default function ProgramadorPage() {
               if (caso.cuenta && !caso.cuenta.resuelto && caso.cuenta.pacientes_pendientes > 0) {
                 const salir = await confirm({
                   title: `Quedan ${caso.cuenta.pacientes_pendientes} pacientes sin reprogramar`,
-                  message: 'Todavía no tienen médico ni día nuevo. Puedes volver al caso y seguir después, pero el caso sigue abierto.',
+                  message: 'Todavía no tienen médico ni día nuevo. Puede volver al caso y seguir después, pero el caso sigue abierto.',
                   confirmLabel: 'Continuar Reprogramación',
                   cancelLabel: 'Permanecer Aquí',
                 })
@@ -745,7 +745,7 @@ export default function ProgramadorPage() {
                 value={sedeManual}
                 onChange={(e) => setSedeManual(e.target.value)}
               >
-                {!tieneVariasSedes && <option value="">Selecciona una sede…</option>}
+                {!tieneVariasSedes && <option value="">Seleccione una sede…</option>}
                 {sedesDisponibles.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
@@ -770,7 +770,7 @@ export default function ProgramadorPage() {
               className="btn"
               onClick={() => onClickCopiarSemana()}
               title={asignaciones.length > 0
-                ? `Reemplaza las ${asignaciones.length} asignaciones actuales con las de la semana anterior. Te pedirá confirmación.`
+                ? `Reemplaza las ${asignaciones.length} asignaciones actuales con las de la semana anterior. Le pedirá confirmación.`
                 : 'Copia las asignaciones de la semana anterior a esta'}
             >
               📋 Copiar semana anterior
@@ -795,7 +795,7 @@ export default function ProgramadorPage() {
           {semanaActual && !isCerrada && (
             <button className="btn" style={{ borderColor: '#d1fae5', color: '#065f46' }} onClick={() => {
               if (!sedeId) {
-                toast.error('Selecciona una sede antes de cerrar (arriba en el selector).', { duration: 4000 })
+                toast.error('Seleccione una sede antes de cerrar (arriba en el selector).', { duration: 4000 })
                 return
               }
               setShowCierre(true)
@@ -805,11 +805,11 @@ export default function ProgramadorPage() {
           )}
           {isCerrada && (
             <Badge variant="gray">
-              Semana cerrada{isSupervisor ? ' — puedes editar' : libre ? ' — edición habilitada temporalmente' : ''}
+              Semana cerrada{isSupervisor ? ' — puede editar' : libre ? ' — edición habilitada temporalmente' : ''}
             </Badge>
           )}
           {libre && (
-            <span title="Modo temporal: puedes programar semanas vencidas y sedes ya cerradas. Los solapes y topes de horas se siguen validando.">
+            <span title="Modo temporal: puede programar semanas vencidas y sedes ya cerradas. Los solapes y topes de horas se siguen validando.">
               <Badge variant="amber">Programación libre activa</Badge>
             </span>
           )}
@@ -966,11 +966,11 @@ export default function ProgramadorPage() {
 
       {/* Grid */}
       {!sedeId ? (
-        <EmptyState icon="🏢" title="Selecciona una sede" description="Elige una sede arriba para ver y programar sus consultorios." />
+        <EmptyState icon="🏢" title="Seleccione una sede" description="Elija una sede arriba para ver y programar sus consultorios." />
       ) : loadCons || loadAsig ? (
         <div className="flex justify-center py-12"><Spinner size="lg" /></div>
       ) : !semanaActual ? (
-        <EmptyState icon="📅" title="No hay semana creada para este período" description="Crea la semana para comenzar a programar recursos." />
+        <EmptyState icon="📅" title="No hay semana creada para este período" description="Cree la semana para comenzar a programar recursos." />
       ) : (
         // Sep-2026 · sticky vertical: sin max-h el div no tiene scroll propio y
         // el sticky top-0 queda "encerrado" arriba del div sin efecto visible.
@@ -1006,7 +1006,7 @@ export default function ProgramadorPage() {
                             className="text-gray-400 hover:text-brand-600 text-xs"
                             onClick={() => setCopiarDia({ type: 'dia', dayFrom: diaKey, etiqueta: `${d} ${format(diasFecha[i], 'd')}` })}
                             title={isCerrada
-                              ? 'Semana cerrada: copia este día a otra semana'
+                              ? 'Semana cerrada: copie este día a otra semana'
                               : 'Copiar este día a otro(s) día(s)'}
                           >📋</button>
                         )}
@@ -1169,7 +1169,7 @@ export default function ProgramadorPage() {
                               if (caso?.ausencia) {
                                 const encima = await confirm({
                                   title: `Esta casilla ya tiene a ${a.resource?.name}`,
-                                  message: `¿Asignás a ${caso.ausencia.resource?.name} SOBRE esta casilla, o editás la que ya está?`,
+                                  message: `¿Asigna a ${caso.ausencia.resource?.name} SOBRE esta casilla, o edita la que ya está?`,
                                   confirmLabel: 'Asignar Reprogramación',
                                   cancelLabel: 'Editar Existente',
                                 })
@@ -1264,7 +1264,7 @@ export default function ProgramadorPage() {
                                   })
                                 }}
                                 title={isCerrada
-                                  ? 'Semana cerrada: copia este turno a otra semana'
+                                  ? 'Semana cerrada: copie este turno a otra semana'
                                   : 'Copiar este turno a otro día'}
                               >📋</button>
                             )}
@@ -1291,7 +1291,7 @@ export default function ProgramadorPage() {
                               etiqueta: DIAS_LABEL[DIAS.indexOf(dia)] ?? dia,
                             })}
                             title={isCerrada
-                              ? `Semana cerrada: copia las ${asigs.length} asignaciones a otra semana`
+                              ? `Semana cerrada: copie las ${asigs.length} asignaciones a otra semana`
                               : `Copiar las ${asigs.length} asignaciones de ${cons.name} a otro(s) día(s)`}
                           >
                             📋 copiar todas
@@ -1350,7 +1350,7 @@ export default function ProgramadorPage() {
           ))}
         </div>
         <div className="text-[11px] text-gray-400">
-          Pasa el mouse por una casilla para ver el detalle completo.
+          Pase el mouse por una casilla para ver el detalle completo.
         </div>
       </div>
 
@@ -1501,9 +1501,9 @@ export default function ProgramadorPage() {
                   {esBusquedaGlobal && cargandoGlobal
                     ? 'Cargando asignaciones de todas las sedes…'
                     : busquedaRecurso.trim().length === 0
-                      ? 'Escribe al menos 2 letras.'
+                      ? 'Escriba al menos 2 letras.'
                       : normalizarTexto(busquedaRecurso).length < 2
-                        ? 'Escribe al menos 2 letras.'
+                        ? 'Escriba al menos 2 letras.'
                         : resultadosBusqueda.length === 0
                           ? 'Sin resultados en esta semana.'
                           : `${resultadosBusqueda.length} aparicion${resultadosBusqueda.length === 1 ? '' : 'es'} · ${resultadosAgrupados.length} ${resultadosAgrupados.length === 1 ? 'persona' : 'personas'}`}
@@ -1609,7 +1609,7 @@ function PickerServicioModal({ consultorio, onClose, onPick }) {
       <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div>
-            <h2 className="text-sm font-semibold text-gray-900">¿Qué servicio vas a programar?</h2>
+            <h2 className="text-sm font-semibold text-gray-900">¿Qué servicio va a programar?</h2>
             <p className="text-xs text-gray-500 mt-0.5">{consultorio.name}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
@@ -1711,10 +1711,10 @@ function CopiarDiaModal({ info, semanaId, sedeId, semanaSiguienteId, origenCerra
     ? `📋 Copiar ${info.consultorioNombre}`
     : '📋 Copiar día completo'
   const descripcion = tipo === 'asignacion'
-    ? <>Vas a copiar el turno de <strong>{info.etiqueta}</strong> a los días seleccionados.</>
+    ? <>Va a copiar el turno de <strong>{info.etiqueta}</strong> a los días seleccionados.</>
     : tipo === 'consultorio'
-    ? <>Vas a copiar todas las asignaciones de <strong>{info.consultorioNombre}</strong> del <strong>{info.etiqueta}</strong> a los días seleccionados.</>
-    : <>Vas a copiar <strong>todas las asignaciones</strong> de <strong>{info.etiqueta}</strong> a los días seleccionados.</>
+    ? <>Va a copiar todas las asignaciones de <strong>{info.consultorioNombre}</strong> del <strong>{info.etiqueta}</strong> a los días seleccionados.</>
+    : <>Va a copiar <strong>todas las asignaciones</strong> de <strong>{info.etiqueta}</strong> a los días seleccionados.</>
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -1734,7 +1734,7 @@ function CopiarDiaModal({ info, semanaId, sedeId, semanaSiguienteId, origenCerra
                 type="button"
                 onClick={() => { if (!origenCerrada) { setDestinoEsSiguiente(false); setDestinos([]) } }}
                 disabled={origenCerrada}
-                title={origenCerrada ? 'Esta semana está cerrada — solo puedes copiar a otra semana' : ''}
+                title={origenCerrada ? 'Esta semana está cerrada — solo puede copiar a otra semana' : ''}
                 className={`text-xs py-2 rounded-lg border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${!destinoEsSiguiente ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'}`}
               >
                 Esta semana {origenCerrada && '(cerrada)'}
@@ -1743,7 +1743,7 @@ function CopiarDiaModal({ info, semanaId, sedeId, semanaSiguienteId, origenCerra
                 type="button"
                 onClick={() => { if (semanaSiguienteId) { setDestinoEsSiguiente(true); setDestinos([]) } }}
                 disabled={!semanaSiguienteId}
-                title={!semanaSiguienteId ? 'No existe semana próxima creada — créala primero' : ''}
+                title={!semanaSiguienteId ? 'No existe semana próxima creada — créela primero' : ''}
                 className={`text-xs py-2 rounded-lg border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${destinoEsSiguiente ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'}`}
               >
                 Próxima semana {!semanaSiguienteId && '(no creada)'}

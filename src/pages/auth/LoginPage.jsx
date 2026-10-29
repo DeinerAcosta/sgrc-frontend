@@ -101,7 +101,7 @@ export default function LoginPage() {
 
   const { mutate: doForgot, isPending: sendingForgot } = useMutation({
     mutationFn: () => authService.forgotPassword(email),
-    onSuccess: () => { toast.success('Te enviamos un enlace de recuperación'); setForgot(false) },
+    onSuccess: () => { toast.success('Le enviamos un enlace de recuperación'); setForgot(false) },
     onError: () => toast.error('No encontramos ese correo'),
   })
 
@@ -109,9 +109,9 @@ export default function LoginPage() {
     return (
       <AuthLayout>
         <p className="text-[11px] tracking-[0.18em] text-brand-600 font-medium">RECUPERAR ACCESO</p>
-        <h1 className="text-2xl font-semibold text-gray-900 mt-1">¿Olvidaste tu contraseña?</h1>
+        <h1 className="text-2xl font-semibold text-gray-900 mt-1">¿Olvidó su contraseña?</h1>
         <p className="text-sm text-gray-500 mt-1 mb-6">
-          Ingresa tu correo y te enviaremos un enlace para restablecerla.
+          Ingrese su correo y le enviaremos un enlace para restablecerla.
         </p>
         <div className="space-y-4">
           <div>
@@ -121,7 +121,7 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="tu@correo.com"
+              placeholder="nombre@correo.com"
               onKeyDown={(e) => e.key === 'Enter' && doForgot()}
             />
           </div>
@@ -137,9 +137,9 @@ export default function LoginPage() {
   return (
     <AuthLayout>
       <p className="text-[11px] tracking-[0.18em] text-brand-600 font-medium">BIENVENIDO</p>
-      <h1 className="text-2xl font-semibold text-gray-900 mt-1">Inicia sesión</h1>
+      <h1 className="text-2xl font-semibold text-gray-900 mt-1">Inicie sesión</h1>
       <p className="text-sm text-gray-500 mt-1 mb-6">
-        Accede al panel de gestión de recursos clínicos.
+        Acceda al panel de gestión de recursos clínicos.
       </p>
 
       <div className="space-y-4">
@@ -150,7 +150,7 @@ export default function LoginPage() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="tu@correo.com"
+            placeholder="nombre@correo.com"
             onKeyDown={(e) => e.key === 'Enter' && doLogin()}
           />
         </div>
@@ -158,7 +158,7 @@ export default function LoginPage() {
           <div className="flex items-center justify-between mb-1">
             <label className="label mb-0">Contraseña <span className="text-red-600">*</span></label>
             <button onClick={() => setForgot(true)} className="text-xs text-brand-600 hover:underline">
-              ¿Olvidaste tu contraseña?
+              ¿Olvidó su contraseña?
             </button>
           </div>
           <PasswordInput
@@ -180,13 +180,13 @@ export default function LoginPage() {
         {/* Sep-2026: enlace visible al autoregistro. Antes vivia solo como
             ruta directa /registro sin puerta de entrada desde el login. */}
         <div className="text-center text-xs text-gray-500 pt-1">
-          ¿No tienes cuenta?{' '}
+          ¿No tiene cuenta?{' '}
           <button
             type="button"
             onClick={() => navigate('/registro')}
             className="text-brand-600 hover:underline font-medium"
           >
-            Solicita tu registro
+            Solicite su registro
           </button>
         </div>
       </div>
@@ -195,7 +195,7 @@ export default function LoginPage() {
         <>
           <div className="flex items-center gap-2 my-5">
             <div className="flex-1 h-px bg-gray-200" />
-            <span className="text-xs text-gray-400 uppercase tracking-wider">o entra como</span>
+            <span className="text-xs text-gray-400 uppercase tracking-wider">o entre como</span>
             <div className="flex-1 h-px bg-gray-200" />
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -212,14 +212,14 @@ export default function LoginPage() {
             ))}
           </div>
           <p className="text-xs text-center text-gray-400 mt-4">
-            Modo demo — sin backend. Cualquier botón te lleva al dashboard del rol.
+            Modo demo — sin backend. Cualquier botón lo lleva al dashboard del rol.
           </p>
         </>
       )}
 
       {!DEMO_MODE && (
         <p className="text-xs text-center text-gray-400 mt-6">
-          ¿Problemas para acceder? Contacta al supervisor del sistema.
+          ¿Problemas para acceder? Comuníquese con el supervisor del sistema.
         </p>
       )}
     </AuthLayout>

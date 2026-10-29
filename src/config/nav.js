@@ -105,7 +105,7 @@ const CONFIGURACION = {
 
 const SOLICITUDES = {
   clave: 'solicitudes', icon: '📨', label: 'Solicitudes',
-  descripcion: 'Peticiones que esperan tu aprobación.',
+  descripcion: 'Peticiones que esperan su aprobación.',
   children: [
     { to: '/app/admin/solicitudes',         label: 'De registro', descripcion: 'Personas que pidieron una cuenta' },
     { to: '/app/admin/solicitudes-recurso', label: 'De recurso',  descripcion: 'Coordinadores que piden personal de otra sede' },
@@ -123,7 +123,7 @@ const GESTION_AUSENCIAS = {
     // y asesores de su sede; las de profesionales son de la líder. Antes no
     // tenía ninguna puerta a eso: podía abrir un caso desde el listado, pero
     // nada le decía cuáles le tocaban.
-    { to: '/app/mis-reprogramaciones', label: 'Mis reprogramaciones', descripcion: 'Las agendas caídas que te toca reprogramar' },
+    { to: '/app/mis-reprogramaciones', label: 'Mis reprogramaciones', descripcion: 'Las agendas caídas que le toca reprogramar' },
   ],
 }
 
@@ -161,7 +161,7 @@ export const NAV_ITEMS = {
     { to: '/app/dashboard-coord', icon: '🏠', label: 'Dashboard' },
     {
       clave: 'programacion', icon: '📅', label: 'Programación',
-      descripcion: 'El día a día de tu sede: programar, ejecutar y revisar.',
+      descripcion: 'El día a día de su sede: programar, ejecutar y revisar.',
       children: [
         { to: '/app/programador',    label: 'Programador',    descripcion: 'Armar la semana del equipo' },
         { to: '/app/ejecucion',      label: 'Ejecución',      descripcion: 'Registrar lo que realmente pasó' },
@@ -173,9 +173,9 @@ export const NAV_ITEMS = {
       // "Solicitudes de recurso" entra aquí: pedir un recurso es gestionar tu
       // equipo, no una sección propia con un solo elemento.
       clave: 'equipo', icon: '👥', label: 'Mi equipo',
-      descripcion: 'Las personas a tu cargo y lo que necesitan.',
+      descripcion: 'Las personas a su cargo y lo que necesitan.',
       children: [
-        { to: '/app/recursos-coord',      label: 'Recursos',               descripcion: 'Tu equipo y su carga' },
+        { to: '/app/recursos-coord',      label: 'Recursos',               descripcion: 'Su equipo y su carga' },
         { to: '/app/backoffice-coord',    label: 'Backoffice',             descripcion: 'Tareas administrativas asignadas' },
         { to: '/app/solicitudes-recurso', label: 'Solicitudes de recurso', descripcion: 'Pedir personal de otra sede' },
       ],

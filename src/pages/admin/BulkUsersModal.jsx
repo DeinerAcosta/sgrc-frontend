@@ -173,7 +173,7 @@ export default function BulkUsuariosModal({ onClose, onSaved }) {
 
   const procesarPaste = () => {
     const nuevas = parseCSV(csvTexto, sedesNombres)
-    if (nuevas.length === 0) { toast.error('No detecté filas — revisa el formato'); return }
+    if (nuevas.length === 0) { toast.error('No detecté filas — revise el formato'); return }
     setFilas(nuevas)
     setPasteOpen(false)
     setCsvTexto('')
@@ -205,7 +205,7 @@ export default function BulkUsuariosModal({ onClose, onSaved }) {
               <div className="kpi-card"><div className="text-2xl font-semibold text-red-600">{resultado.totals.failed}</div><div className="text-xs text-gray-500">Fallidos</div></div>
             </div>
             <div className="text-xs text-gray-500 mb-2">
-              {resultado.totals.ok > 0 && 'Los emails con la contraseña provisional ya fueron enviados (revisa la consola del backend si SMTP no está configurado).'}
+              {resultado.totals.ok > 0 && 'Los emails con la contraseña provisional ya fueron enviados (revise la consola del backend si SMTP no está configurado).'}
             </div>
             <div className="overflow-x-auto">
             <table className="w-full text-xs border border-gray-100 rounded-lg overflow-hidden">
@@ -264,7 +264,7 @@ export default function BulkUsuariosModal({ onClose, onSaved }) {
             {pasteOpen && (
               <div className="px-5 py-3 border-b border-gray-100 bg-blue-50 flex-shrink-0">
                 <div className="text-xs text-blue-900 mb-1.5">
-                  Pega el contenido de tu Excel (con o sin encabezado). Columnas esperadas: <strong>nombre · email · celular · rol · tipo · especialidad · sedes</strong>. Las sedes pueden ir separadas por <code>|</code>.
+                  Pegue el contenido de su Excel (con o sin encabezado). Columnas esperadas: <strong>nombre · email · celular · rol · tipo · especialidad · sedes</strong>. Las sedes pueden ir separadas por <code>|</code>.
                 </div>
                 <textarea
                   className="input resize-none text-xs font-mono"

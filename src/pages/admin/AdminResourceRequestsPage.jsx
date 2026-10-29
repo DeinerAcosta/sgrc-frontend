@@ -58,7 +58,7 @@ export default function AdminSolicitudesRecursoPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <div>
           <h1 className="text-base font-semibold text-gray-900">Solicitudes de recurso</h1>
-          <p className="text-xs text-gray-500">Aprueba o rechaza las solicitudes que crean los coordinadores</p>
+          <p className="text-xs text-gray-500">Apruebe o rechace las solicitudes que crean los coordinadores</p>
         </div>
         <select className="input max-w-xs" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
           <option value="pendiente">Solo pendientes</option>
@@ -167,9 +167,9 @@ function DecisionModal({ solicitud, accion, onClose, onConfirm, isPending }) {
           <div className="text-sm text-gray-700">
             {accion === 'aprobar'
               ? (solicitud?.request_type === 'prestamo'
-                ? <>Vas a aprobar el préstamo de <strong>{solicitud?.resource?.name}</strong> a la sede <strong>{solicitud?.target_site?.name}</strong>. El recurso quedará vinculado a esa sede y el coord solicitante podrá asignarlo.</>
-                : <>Vas a aprobar el alta de un nuevo recurso. Después de aprobar, debes ir a <em>Recursos (catálogo)</em> y crear el recurso. Luego vuelve aquí para asociarlo.</>)
-              : <>Vas a rechazar la solicitud de <strong>{solicitud?.requester?.name}</strong>. Debes dar un motivo claro.</>}
+                ? <>Va a aprobar el préstamo de <strong>{solicitud?.resource?.name}</strong> a la sede <strong>{solicitud?.target_site?.name}</strong>. El recurso quedará vinculado a esa sede y el coord solicitante podrá asignarlo.</>
+                : <>Va a aprobar el alta de un nuevo recurso. Después de aprobar, debe ir a <em>Recursos (catálogo)</em> y crear el recurso. Luego vuelva aquí para asociarlo.</>)
+              : <>Va a rechazar la solicitud de <strong>{solicitud?.requester?.name}</strong>. Debe dar un motivo claro.</>}
           </div>
           <div>
             <label className="label">{requiereMotivo ? <>Motivo del rechazo <span className="text-red-600">*</span></> : 'Comentario / nota (opcional)'}</label>

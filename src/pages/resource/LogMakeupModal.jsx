@@ -101,7 +101,7 @@ export default function RegistrarReposicionModal({ ausencia, onClose }) {
 
         <div className="px-5 py-4 space-y-4 overflow-y-auto">
           <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 text-xs text-blue-900">
-            💡 Propone una fecha y horario para reponer esta ausencia. El coordinador revisará y aprobará o rechazará tu propuesta.
+            💡 Proponga una fecha y horario para reponer esta ausencia. El coordinador revisará y aprobará o rechazará su propuesta.
           </div>
 
           <div>

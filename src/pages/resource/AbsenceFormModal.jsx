@@ -256,7 +256,7 @@ export default function AusenciaFormModal({ recursoId, onClose, horarioSemana = 
             <div>
               {form.wants_makeup === 'si' && (
                 <div className="mt-3 space-y-2">
-                  <label className="label">Fechas en que repondrás</label>
+                  <label className="label">Fechas en que repondrá</label>
                   <CalendarioMultiple
                     value={form.makeup_dates}
                     onChange={(v) => set('makeup_dates', v)}
@@ -289,7 +289,7 @@ export default function AusenciaFormModal({ recursoId, onClose, horarioSemana = 
 
           {alertaAnticip && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
-              ⚠️ Este tipo de ausencia requiere mínimo 30 días de anticipación. Estás reportando con {anticip} días. El coordinador será notificado de este incumplimiento.
+              ⚠️ Este tipo de ausencia requiere mínimo 30 días de anticipación. Está reportando con {anticip} días. El coordinador será notificado de este incumplimiento.
             </div>
           )}
 

@@ -502,7 +502,7 @@ export default function AusenciasCoordPage() {
         <div>
           {!sel ? (
             <div className="card h-full flex items-center justify-center text-xs text-gray-400">
-              Selecciona una ausencia para ver el detalle
+              Seleccione una ausencia para ver el detalle
             </div>
           ) : (
             <div className="card space-y-4">
@@ -682,7 +682,7 @@ function HubAusencias({ ausencias, cargando, Selector, onElegir, onRegistrar, ch
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5">
         <div>
           <h1 className="text-base font-semibold text-gray-900">Gestión de ausencias</h1>
-          <p className="text-xs text-gray-500 mt-0.5">Elige el grupo de personal que vas a gestionar</p>
+          <p className="text-xs text-gray-500 mt-0.5">Elija el grupo de personal que va a gestionar</p>
           <Selector className="mt-2" />
         </div>
         <button className="btn-danger" onClick={onRegistrar}>+ Registrar ausencia</button>
@@ -845,7 +845,7 @@ function ReposicionesTab({ reposiciones, qc }) {
               rows={2}
               value={nota}
               onChange={(e) => setNota(e.target.value)}
-              placeholder="Nota opcional (ej: OK. Recuerda avisar en recepción.)"
+              placeholder="Nota opcional (ej: OK. Recuerde avisar en recepción.)"
             />
             <button
               type="button"
@@ -1010,7 +1010,7 @@ function AccionDelCaso({ ausencia, onIr }) {
       </button>
 
       <div className="text-xs text-gray-400 text-center">
-        {siguiente ?? 'Abre el caso para revisar cómo quedó'}
+        {siguiente ?? 'Abra el caso para revisar cómo quedó'}
       </div>
     </div>
   )

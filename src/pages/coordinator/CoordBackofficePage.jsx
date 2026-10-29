@@ -53,7 +53,7 @@ export default function BackofficeCoordPage() {
         <div>
           <h1 className="text-base font-semibold text-gray-900">Backoffice</h1>
           <p className="text-xs text-gray-500">
-            Tareas administrativas asignadas a auxiliares liberadas por ausencia · seguimiento de tu sede
+            Tareas administrativas asignadas a auxiliares liberadas por ausencia · seguimiento de su sede
           </p>
           <Selector className="mt-2" />
         </div>
@@ -119,7 +119,7 @@ export default function BackofficeCoordPage() {
           <EmptyState
             icon="🗂️"
             title="Sin asignaciones de backoffice"
-            description="Cuando un médico tenga una ausencia confirmada, sus auxiliares quedan liberadas y podrás asignarlas a tareas administrativas desde aquí."
+            description="Cuando un médico tenga una ausencia confirmada, sus auxiliares quedan liberadas y podrá asignarlas a tareas administrativas desde aquí."
           />
         ) : (
           <div className="space-y-2">

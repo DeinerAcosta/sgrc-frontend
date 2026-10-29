@@ -177,7 +177,7 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, tipos }) 
               disabled={!categoria}
             >
               <option value="">
-                {!categoria ? 'Primero elige la categoría...' : recursosFiltrados.length === 0 ? 'Sin personal de esta categoría en la sede' : 'Seleccionar recurso...'}
+                {!categoria ? 'Primero elija la categoría...' : recursosFiltrados.length === 0 ? 'Sin personal de esta categoría en la sede' : 'Seleccionar recurso...'}
               </option>
               {recursosFiltrados.map((r) => (
                 <option key={r.id} value={r.id}>
@@ -245,7 +245,7 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, tipos }) 
                 maxLength={60}
               />
               <div className="text-xs text-gray-400 mt-1">
-                Indicá la ciudad a la que se traslada el profesional para cobertura.
+                Indique la ciudad a la que se traslada el profesional para cobertura.
               </div>
             </div>
           )}
@@ -308,7 +308,7 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, tipos }) 
 
           {alertaAnticip && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
-              ⚠️ Este tipo requiere 30 días de anticipación. Estás registrando con {anticip} días.
+              ⚠️ Este tipo requiere 30 días de anticipación. Está registrando con {anticip} días.
             </div>
           )}
 
@@ -322,13 +322,13 @@ export default function RegistrarAusenciaCoordModal({ sedeId, onClose, tipos }) 
 
           {fechaInvalida && (
             <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-800">
-              ⛔ Solo puedes registrar ausencias para el día actual o hasta 7 días atrás.
+              ⛔ Solo puede registrar ausencias para el día actual o hasta 7 días atrás.
             </div>
           )}
           {/* Sep-14-2026: aviso a supervisor/gerencia cuando registra retroactivo mas alla del limite del coord. */}
           {puedeSaltarRestriccionFecha && diasAtras > 7 && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
-              ⚠️ Estás registrando una ausencia iniciada hace <strong>{diasAtras} días</strong>. Los coordinadores no pueden registrar con más de 7 días de atraso, pero como <strong>{user?.role}</strong> sí puedes. Quedará registrado en la auditoría.
+              ⚠️ Está registrando una ausencia iniciada hace <strong>{diasAtras} días</strong>. Los coordinadores no pueden registrar con más de 7 días de atraso, pero como <strong>{user?.role}</strong> sí puede. Quedará registrado en la auditoría.
             </div>
           )}
 

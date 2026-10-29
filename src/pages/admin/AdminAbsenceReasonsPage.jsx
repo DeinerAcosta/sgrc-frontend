@@ -356,7 +356,7 @@ function MotivoModal({ motivo, onClose, onSaved }) {
 
           {esSistema && (
             <div className="bg-blue-50 border border-blue-100 rounded p-2 text-xs text-blue-800">
-              🛡️ Este motivo es del sistema — no se puede desactivar ni borrar. Sí puedes editar nombre, descripción, factor y orden.
+              🛡️ Este motivo es del sistema — no se puede desactivar ni borrar. Sí puede editar nombre, descripción, factor y orden.
             </div>
           )}
         </div>

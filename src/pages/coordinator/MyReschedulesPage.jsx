@@ -73,7 +73,7 @@ function AgendaCaida({ caso }) {
   if (caso.sin_semana) {
     return (
       <p className="text-xs text-gray-500">
-        Esa semana no quedó programada, así que no hay turnos registrados. Confírmalo con la líder antes de llamar.
+        Esa semana no quedó programada, así que no hay turnos registrados. Confírmelo con la líder antes de llamar.
       </p>
     )
   }
@@ -81,7 +81,7 @@ function AgendaCaida({ caso }) {
     return (
       <p className="text-xs text-gray-500">
         No hay turnos cargados para esos días: puede que la agenda no se alcanzara a programar.
-        Confírmalo con la líder antes de llamar.
+        Confírmelo con la líder antes de llamar.
       </p>
     )
   }
@@ -121,8 +121,8 @@ function QuePaso({ caso }) {
         </p>
         <p className="text-gray-600 mt-1">
           {caso.reschedule_notes
-            ? 'Al paciente hay que moverlo: sigue la indicación que te dejaron arriba.'
-            : 'Consulta con la líder qué hacer con estos pacientes antes de llamar.'}
+            ? 'Al paciente hay que moverlo: siga la indicación que le dejaron arriba.'
+            : 'Consulte con la líder qué hacer con estos pacientes antes de llamar.'}
         </p>
       </div>
     )
@@ -201,12 +201,12 @@ function Llamadas({ caso, onGuardar, guardando }) {
   return (
     <div className="border-t border-gray-100 pt-3">
       <h4 className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">
-        Tus llamadas
+        Sus llamadas
       </h4>
       <p className="text-xs text-gray-500 mb-2">
         {sinEmpezar
-          ? `Anota cuántos de los ${total || 'los'} pacientes lograste contactar. Puedes guardar varias veces; escribe siempre el total que llevas.`
-          : 'Actualiza los números cada vez que avances; se guarda el último valor, no se suma al anterior.'}
+          ? `Anote cuántos de los ${total || 'los'} pacientes logró contactar. Puede guardar varias veces; escriba siempre el total que lleva.`
+          : 'Actualice los números cada vez que avance; se guarda el último valor, no se suma al anterior.'}
       </p>
       <div className="flex flex-wrap items-end gap-3">
         <label className="text-xs text-gray-600">
@@ -267,7 +267,7 @@ function Llamadas({ caso, onGuardar, guardando }) {
 
       {sePasa && (
         <p className="text-xs text-red-700 mt-2">
-          Son {llamados} llamadas sobre una agenda de {total} pacientes. Revisa los números.
+          Son {llamados} llamadas sobre una agenda de {total} pacientes. Revise los números.
         </p>
       )}
       {ya.registradas_en && !cambio && (
@@ -655,9 +655,9 @@ export default function MyReschedulesPage() {
   const ll = resumen.llamadas ?? {}
 
   const alcance = llamador
-    ? 'Las agendas que te asignaron.'
+    ? 'Las agendas que le asignaron.'
     : user?.role === 'coordinador'
-      ? 'Técnicos, auxiliares y asesores de tu sede. Las agendas de profesionales las reparte la líder.'
+      ? 'Técnicos, auxiliares y asesores de su sede. Las agendas de profesionales las reparte la líder.'
       : 'Todo el reparto: lo asignado a los reprogramadores y lo que llevan los coordinadores.'
 
   return (
@@ -732,13 +732,13 @@ export default function MyReschedulesPage() {
           {casos.length === 0 ? (
             <EmptyState
               icon="✅"
-              title={llamador ? 'No tienes agendas asignadas' : 'No tienes agendas por reprogramar'}
+              title={llamador ? 'No tiene agendas asignadas' : 'No tiene agendas por reprogramar'}
               description={
                 verCerradas
-                  ? 'No hay casos a tu nombre, ni abiertos ni terminados.'
+                  ? 'No hay casos a su nombre, ni abiertos ni terminados.'
                   : llamador
-                    ? 'Cuando la líder te asigne una agenda caída, el caso aparece acá con sus indicaciones.'
-                    : 'Cuando alguien de tu reparto falte y deje pacientes sin atender, el caso aparece acá.'
+                    ? 'Cuando la líder le asigne una agenda caída, el caso aparece acá con sus indicaciones.'
+                    : 'Cuando alguien de su reparto falte y deje pacientes sin atender, el caso aparece acá.'
               }
             />
           ) : cronograma ? (

@@ -106,7 +106,7 @@ export default function AsignarBackofficeModal({ auxiliar, onClose }) {
           const primer = data.skipped[0]
           toast(`${c} ${c === 1 ? 'día creado' : 'días creados'}, ${o} ${o === 1 ? 'omitido' : 'omitidos'} (ej: ${primer.date} — ${primer.reason})`, { icon: '⚠️', duration: 8000 })
         } else {
-          toast.error(`Todos los días fueron omitidos por conflicto. Revisa la programación de ${auxiliar.name}.`, { duration: 8000 })
+          toast.error(`Todos los días fueron omitidos por conflicto. Revise la programación de ${auxiliar.name}.`, { duration: 8000 })
         }
       } else {
         toast.success(`${auxiliar.name} asignada a backoffice`)

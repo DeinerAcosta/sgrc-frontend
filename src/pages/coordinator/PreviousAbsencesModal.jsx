@@ -90,7 +90,7 @@ export default function AvisoAusentesSemanaAnterior({ datos, cargando, onClose, 
               </h3>
               <p className="text-[11px] text-gray-500 mb-2">
                 La copia les puso turnos. Sus casillas quedan resaltadas en la grilla para
-                que decidas si ahí reponen la agenda que se cayó.
+                que decida si ahí reponen la agenda que se cayó.
               </p>
               <div className="space-y-2">
                 {yaProgramados.map((a) => <FilaAusente key={a.absence_id} a={a} onProgramar={onProgramar} />)}
