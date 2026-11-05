@@ -8,6 +8,7 @@ import { calcularCapacidadPacientes, DIAS_FULL, DIAS, TIPOS_RECURSO, ESPECIALIDA
 import { useDirtyClose } from '@/hooks/useDirtyClose'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useAuthStore } from '@/store/authStore'
+import AssistantWeekLoad from '@/pages/coordinator/AssistantWeekLoad'
 
 /**
  * Modal de asignación (crear o editar).
@@ -136,14 +137,18 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
 
   // Pool de recursos de apoyo. En diagnóstico cargamos técnicos; en oftalmo/anest, auxiliares.
   // Filtramos al técnico principal del pool para que no se pueda elegir a sí mismo.
+  // Nov-2026 · Con week_id las horas de cada auxiliar son de la semana que se
+  // programa (antes eran las de la semana de hoy).
   const { data: poolApoyo = [] } = useQuery({
-    queryKey: ['pool-apoyo', tipoApoyo],
-    queryFn: () => recursoService.list({ type: tipoApoyo, active: true }),
+    queryKey: ['pool-apoyo', tipoApoyo, semanaId],
+    queryFn: () => recursoService.list({ type: tipoApoyo, active: true, week_id: semanaId }),
     enabled: permiteApoyoOpcional,
   })
   const auxiliares = esDiagnostico
     ? poolApoyo.filter((r) => r.id !== form.resource_id)
     : poolApoyo
+  const auxSel = auxiliares.find((a) => a.id === form.assistant_id)
+  const aux2Sel = auxiliares.find((a) => a.id === form.assistant2_id)
 
   // Sep-2026 · Ley 2101 · Autorización directivo para aux sáb+dom.
   const esFinde = dia === 'sabado' || dia === 'domingo'
@@ -487,7 +492,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                     .filter((a) => a.id !== form.assistant2_id)  // no mostrar la que ya está en aux #2
                     .map((a) => {
                       const horas = a.current_week_hours ?? a.currentWeekHours ?? 0
-                      const max = a.max_hours_per_week ?? a.maxHoursPerWeek ?? 42
+                      const max = a.max_effective_hours ?? a.max_hours_per_week ?? a.maxHoursPerWeek ?? 42
                       const liberada = a.status_badge === 'liberada'
                       return {
                         id: a.id,
@@ -512,6 +517,16 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                       />
                       Horario distinto al recurso principal {esDiagnostico ? '(este técnico se va antes para otro servicio)' : '(esta aux cubre solo parte del turno)'}
                     </label>
+                    {auxSel && (
+                      <AssistantWeekLoad
+                        persona={auxSel}
+                        semanaId={semanaId}
+                        dia={dia}
+                        ini={auxHorarioDistinto ? form.assistant_start_time : form.start_time}
+                        fin={auxHorarioDistinto ? form.assistant_end_time : form.end_time}
+                        asignacionId={asignacion?.id}
+                      />
+                    )}
                     {auxHorarioDistinto && (
                       <div className="grid grid-cols-2 gap-2 mt-2">
                         <div>
@@ -556,7 +571,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                       .filter((a) => a.id !== form.assistant_id)  // no mostrar la que ya está en aux #1
                       .map((a) => {
                         const horas = a.current_week_hours ?? a.currentWeekHours ?? 0
-                        const max = a.max_hours_per_week ?? a.maxHoursPerWeek ?? 42
+                        const max = a.max_effective_hours ?? a.max_hours_per_week ?? a.maxHoursPerWeek ?? 42
                         const liberada = a.status_badge === 'liberada'
                         return {
                           id: a.id,
@@ -581,6 +596,16 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                         />
                         Horario distinto al recurso principal
                       </label>
+                      {aux2Sel && (
+                        <AssistantWeekLoad
+                          persona={aux2Sel}
+                          semanaId={semanaId}
+                          dia={dia}
+                          ini={aux2HorarioDistinto ? form.assistant2_start_time : form.start_time}
+                          fin={aux2HorarioDistinto ? form.assistant2_end_time : form.end_time}
+                          asignacionId={asignacion?.id}
+                        />
+                      )}
                       {aux2HorarioDistinto && (
                         <div className="grid grid-cols-2 gap-2 mt-2">
                           <div>

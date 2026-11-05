@@ -78,6 +78,9 @@ export default function ProgramadorPage() {
   const [showFilter, setShowFilter] = useState(false)
   const [showDescargar, setShowDescargar] = useState(false)
   const [descargando, setDescargando] = useState(false)
+  // '' = semana completa; si no, el día (lunes…domingo) que se descarga solo.
+  const [diaDescarga, setDiaDescarga] = useState('')
+  const [showCopiarSemana, setShowCopiarSemana] = useState(false)
   // Abre siempre en la semana ACTUAL (lunes de hoy). El coordinador usa este
   // módulo principalmente para revisar el cronograma vigente. Si necesita
   // CREAR una semana futura, usa "Siguiente →" y la regla RN-01 (anticipación
@@ -351,13 +354,28 @@ export default function ProgramadorPage() {
     onError: (err) => toast.error(err?.message ?? 'No se puede crear la semana'),
   })
 
+  // Nov-2026 · Hector: copiar no solo de la semana anterior sino de cualquiera
+  // de las anteriores. `semanas` llega de la más reciente a la más vieja.
+  // parseFechaLocal: las fechas vienen como YYYY-MM-DD; con parseISO se
+  // interpretarían como UTC y en Colombia (UTC-5) podrían quedar en el día
+  // anterior, devolviendo la semana incorrecta.
+  const semanasAnteriores = semanas.filter((s) => parseFechaLocal(s.end_date) < semanaBase)
+  const [origenCopia, setOrigenCopia] = useState('')
+  // Al navegar de semana, una elección vieja puede quedar en el futuro: se vuelve a la anterior.
+  const origenCopiaId = semanasAnteriores.some((s) => s.id === origenCopia)
+    ? origenCopia
+    : semanasAnteriores[0]?.id ?? ''
+  const { data: asigsOrigenCopia, isFetching: contandoOrigen } = useQuery({
+    queryKey: ['asignaciones-origen-copia', origenCopiaId, sedeId],
+    queryFn: () => asignacionService.list({ week_id: origenCopiaId, site_id: sedeId }),
+    enabled: showCopiarSemana && !!origenCopiaId && !!sedeId,
+  })
+  const etiquetaSemana = (s) => semanaLabel(parseFechaLocal(s.start_date))
+
   const { mutate: copiarSemana } = useMutation({
-    mutationFn: () => {
-      // parseFechaLocal: las fechas vienen como YYYY-MM-DD; con parseISO se
-      // interpretarían como UTC y en Colombia (UTC-5) podrían quedar en el día
-      // anterior, devolviendo la semana incorrecta.
-      const anterior = semanas.find((s) => parseFechaLocal(s.end_date) < semanaBase)
-      if (!anterior) throw new Error('No hay semana anterior para copiar')
+    mutationFn: (origenId) => {
+      const anterior = semanas.find((s) => s.id === origenId)
+      if (!anterior) throw new Error('Elija la semana que quiere copiar')
       // FIX Bug B (jul-2026): antes fallaba en producción con "Debes especificar
       // la(s) sede(s)..." cuando `sedeId` llegaba vacío al backend. Causa raíz:
       // race entre montaje del componente y el useEffect que setea sedeManual.
@@ -416,7 +434,13 @@ export default function ProgramadorPage() {
   // el nombre sale del catálogo completo (antes decía "tu sede").
   const sedeActivaNombre = todasSedes.find((s) => s.id === sedeId)?.name
     ?? user?.sites_info?.find((s) => s.id === sedeId)?.name ?? 'su sede'
-  const onClickCopiarSemana = async () => {
+  const onClickCopiarSemana = async (origenId) => {
+    const origen = semanas.find((s) => s.id === origenId)
+    if (!origen) {
+      toast.error('No hay semanas anteriores para copiar')
+      return
+    }
+    const nombreOrigen = `la semana del ${etiquetaSemana(origen)}`
     // Validación temprana: si aún no hay sede seleccionada (dropdown vacío en
     // supervisor/gerencia, o hidratación pendiente del auth para coord), avisar
     // ANTES de mostrar el confirm — así el mensaje del backend "Debes especificar
@@ -429,7 +453,7 @@ export default function ProgramadorPage() {
     if (asignaciones.length > 0) {
       const paso1 = await confirm({
         title: '⚠️ Atención: esta semana ya tiene programación',
-        message: `${sedeActivaNombre} tiene ${asignaciones.length} asignaciones esta semana. Al copiar la semana anterior, esas ${asignaciones.length} serán REEMPLAZADAS por las de la semana anterior. SOLO afecta a su sede — las demás sedes NO se tocan.`,
+        message: `${sedeActivaNombre} tiene ${asignaciones.length} asignaciones esta semana. Al copiar ${nombreOrigen}, esas ${asignaciones.length} serán REEMPLAZADAS por las de esa semana. SOLO afecta a su sede — las demás sedes NO se tocan.`,
         confirmLabel: 'Entiendo, continuar',
         cancelLabel: 'Cancelar',
         variant: 'warning',
@@ -444,7 +468,8 @@ export default function ProgramadorPage() {
       })
       if (!paso2) return
     }
-    copiarSemana()
+    setShowCopiarSemana(false)
+    copiarSemana(origen.id)
   }
 
   const { mutate: eliminarAsig } = useMutation({
@@ -765,16 +790,55 @@ export default function ProgramadorPage() {
           {/* 22-oct · Con programación libre el servidor deja copiar hacia una
               semana cerrada (weekController.copiar), pero el botón se escondía
               igual: Hector no podía copiar la semana anterior. */}
+          {/* Nov-2026 · Se elige de qué semana copiar: por defecto la anterior,
+              pero se puede tomar cualquiera de las previas. */}
           {semanaActual && (!isCerrada || libre) && (
-            <button
-              className="btn"
-              onClick={() => onClickCopiarSemana()}
-              title={asignaciones.length > 0
-                ? `Reemplaza las ${asignaciones.length} asignaciones actuales con las de la semana anterior. Le pedirá confirmación.`
-                : 'Copia las asignaciones de la semana anterior a esta'}
-            >
-              📋 Copiar semana anterior
-            </button>
+            <div className="relative">
+              <button
+                className="btn"
+                onClick={() => setShowCopiarSemana((v) => !v)}
+                title={asignaciones.length > 0
+                  ? `Reemplaza las ${asignaciones.length} asignaciones actuales con las de la semana que elija. Le pedirá confirmación.`
+                  : 'Copia a esta semana las asignaciones de una semana anterior'}
+              >
+                📋 Copiar semana anterior
+              </button>
+              {showCopiarSemana && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setShowCopiarSemana(false)} />
+                  <div className="absolute top-full left-0 mt-1 w-72 bg-white rounded-lg border border-gray-200 shadow-lg z-40 p-3 space-y-2">
+                    {semanasAnteriores.length === 0 ? (
+                      <div className="text-sm text-gray-500">No hay semanas anteriores para copiar.</div>
+                    ) : (
+                      <>
+                        <div>
+                          <label className="label">Semana a copiar</label>
+                          <select className="input" value={origenCopiaId} onChange={(e) => setOrigenCopia(e.target.value)}>
+                            {semanasAnteriores.map((s, i) => (
+                              <option key={s.id} value={s.id}>
+                                {etiquetaSemana(s)}{i === 0 ? ' (anterior)' : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {contandoOrigen || !asigsOrigenCopia
+                            ? 'Contando asignaciones…'
+                            : `${asigsOrigenCopia.length} ${asigsOrigenCopia.length === 1 ? 'asignación' : 'asignaciones'} en ${sedeActivaNombre}`}
+                        </div>
+                        <button
+                          className="btn-primary w-full"
+                          disabled={contandoOrigen || asigsOrigenCopia?.length === 0}
+                          onClick={() => onClickCopiarSemana(origenCopiaId)}
+                        >
+                          Copiar a esta semana
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           )}
 
           {/* §7 · Queda a mano para cuando el coordinador entra a una semana ya
@@ -913,14 +977,25 @@ export default function ProgramadorPage() {
                 className="btn"
                 onClick={() => setShowDescargar((v) => !v)}
                 disabled={descargando}
-                title="Descargar horario semanal en PDF o Excel"
+                title="Descargar el horario de la semana o de un día en PDF o Excel"
               >
-                {descargando ? '⏳ Generando…' : '📥 Descargar semana'}
+                {descargando ? '⏳ Generando…' : '📥 Descargar'}
               </button>
               {showDescargar && (
                 <>
                   <div className="fixed inset-0 z-30" onClick={() => setShowDescargar(false)} />
-                  <div className="absolute top-full left-0 mt-1 w-52 bg-white rounded-lg border border-gray-200 shadow-lg z-40 p-1">
+                  <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-lg border border-gray-200 shadow-lg z-40 p-1">
+                    <div className="px-2 pt-1 pb-2">
+                      <label className="label">Qué descargar</label>
+                      <select className="input" value={diaDescarga} onChange={(e) => setDiaDescarga(e.target.value)}>
+                        <option value="">Semana completa</option>
+                        {DIAS.map((d, i) => (
+                          <option key={d} value={d}>
+                            {format(diasFecha[i], "EEEE d 'de' MMMM", { locale: es }).replace(/^./, (c) => c.toUpperCase())}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                     {[
                       { fmt: 'pdf',  label: '📄 PDF (para imprimir)', ext: 'pdf'  },
                       { fmt: 'xlsx', label: '📊 Excel (editable)',     ext: 'xlsx' },
@@ -932,8 +1007,13 @@ export default function ProgramadorPage() {
                           setShowDescargar(false)
                           setDescargando(true)
                           const nombreSede = sedesDisponibles.find((s) => s.id === sedeId)?.name ?? 'sede'
+                          const iDia = DIAS.indexOf(diaDescarga)
                           try {
-                            await asignacionService.descargarSemana({ semanaId: semanaActual.id, sedeId, formato: opt.fmt, nombreSede })
+                            await asignacionService.descargarSemana({
+                              semanaId: semanaActual.id, sedeId, formato: opt.fmt, nombreSede,
+                              dia: diaDescarga || null,
+                              sufijo: iDia >= 0 ? format(diasFecha[iDia], 'yyyy-MM-dd') : format(semanaBase, 'yyyy-MM-dd'),
+                            })
                             toast.success(`Horario descargado (${opt.ext.toUpperCase()})`)
                           } catch (err) {
                             toast.error('No se pudo generar la descarga')
