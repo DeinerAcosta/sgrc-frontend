@@ -33,13 +33,15 @@ function horasDelDia(franjas, tipo) {
 const redondear = (h) => Math.round(h * 10) / 10
 
 /**
- * Nov-2026 · Hector: al elegir la auxiliar, ver en qué está programada esa
- * semana y cuántas horas le quedan, contando ya el turno que se está armando.
+ * Nov-2026 · Hector: al elegir a alguien en el modal de asignación (profesional
+ * o auxiliar), ver en qué está programado esa semana y cuántas horas le quedan,
+ * contando ya el turno que se está armando.
  *
- * Props: persona (recurso del pool de apoyo), semanaId, dia, ini/fin (su horario
- * en este turno), asignacionId (al editar, para no contar el turno dos veces).
+ * Props: persona (el recurso elegido), rol (texto sobre el nombre), semanaId,
+ * dia, ini/fin (su horario en este turno), asignacionId (al editar, para no
+ * contar el turno dos veces).
  */
-export default function AssistantWeekLoad({ persona, semanaId, dia, ini, fin, asignacionId }) {
+export default function ResourceWeekLoad({ persona, rol, semanaId, dia, ini, fin, asignacionId }) {
   const { data: turnos = [], isLoading } = useQuery({
     queryKey: ['asigs-persona-semana', semanaId, persona.id],
     queryFn: () => asignacionService.list({ week_id: semanaId, resource_id: persona.id }),
@@ -60,14 +62,18 @@ export default function AssistantWeekLoad({ persona, semanaId, dia, ini, fin, as
   const dias = DIAS.filter((d) => d !== 'domingo' || todas.some((f) => f.dia === 'domingo'))
   const horasPorDia = Object.fromEntries(dias.map((d) => [d, horasDelDia(todas.filter((f) => f.dia === d), persona.type)]))
   const total = redondear(Object.values(horasPorDia).reduce((a, b) => a + b, 0))
-  const tope = persona.max_effective_hours ?? persona.max_hours_per_week ?? 42
-  const quedan = redondear(tope - total)
-  const pct = Math.min(100, tope > 0 ? (total / tope) * 100 : 0)
-
-  if (isLoading) return <div className="text-xs text-gray-400 mt-2">Cargando su semana…</div>
+  // null = sin tope semanal (oftalmólogos y otorrinos): se muestran las horas y ya.
+  const tope = persona.max_effective_hours ?? persona.max_hours_per_week ?? null
+  const quedan = tope == null ? null : redondear(tope - total)
+  const pct = tope ? Math.min(100, (total / tope) * 100) : 0
 
   return (
-    <div className="mt-2 rounded-lg border border-gray-200 p-2">
+    <div className="rounded-lg border border-gray-200 p-2 bg-white">
+      <div className="mb-2 min-w-0">
+        <div className="text-[10px] uppercase tracking-wide text-gray-400">{rol}</div>
+        <div className="text-xs font-semibold text-gray-900 truncate">{persona.name}</div>
+      </div>
+      {isLoading ? <div className="text-xs text-gray-400">Cargando su semana…</div> : (<>
       <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${dias.length}, minmax(0, 1fr))` }}>
         {dias.map((d) => (
           <div key={d} className="min-w-0">
@@ -98,14 +104,19 @@ export default function AssistantWeekLoad({ persona, semanaId, dia, ini, fin, as
           </div>
         ))}
       </div>
-      <div className="mt-2">
-        <div className="h-1.5 rounded bg-gray-100 overflow-hidden">
-          <div className={clsx('h-full', quedan < 0 ? 'bg-red-500' : pct >= 90 ? 'bg-amber-500' : 'bg-green-500')} style={{ width: `${pct}%` }} />
+      {tope == null ? (
+        <div className="text-xs mt-2 text-gray-600">{total}h esta semana · sin tope semanal</div>
+      ) : (
+        <div className="mt-2">
+          <div className="h-1.5 rounded bg-gray-100 overflow-hidden">
+            <div className={clsx('h-full', quedan < 0 ? 'bg-red-500' : pct >= 90 ? 'bg-amber-500' : 'bg-green-500')} style={{ width: `${pct}%` }} />
+          </div>
+          <div className={clsx('text-xs mt-1', quedan < 0 ? 'text-red-600 font-semibold' : 'text-gray-600')}>
+            {total}h de {tope}h · {quedan < 0 ? `se pasa por ${-quedan}h` : `le quedan ${quedan}h`}
+          </div>
         </div>
-        <div className={clsx('text-xs mt-1', quedan < 0 ? 'text-red-600 font-semibold' : 'text-gray-600')}>
-          {total}h de {tope}h · {quedan < 0 ? `se pasa por ${-quedan}h` : `le quedan ${quedan}h`}
-        </div>
-      </div>
+      )}
+      </>)}
     </div>
   )
 }

@@ -8,7 +8,7 @@ import { calcularCapacidadPacientes, DIAS_FULL, DIAS, TIPOS_RECURSO, ESPECIALIDA
 import { useDirtyClose } from '@/hooks/useDirtyClose'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useAuthStore } from '@/store/authStore'
-import AssistantWeekLoad from '@/pages/coordinator/AssistantWeekLoad'
+import ResourceWeekLoad from '@/pages/coordinator/ResourceWeekLoad'
 
 /**
  * Modal de asignación (crear o editar).
@@ -130,9 +130,10 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
   // Cargamos el "recurso principal" según la especialidad activa, no según
   // si es principal o alternativo. Si es oftalmología → oftalmólogos. Si es
   // diagnostico → técnicos. Etc.
+  // Nov-2026 · Con week_id las horas son las de la semana que se programa.
   const { data: recursos = [] } = useQuery({
-    queryKey: ['recursos-disponibles', especialidadActiva],
-    queryFn: () => recursoService.list({ especialidad_consultorio: especialidadActiva, active: true }),
+    queryKey: ['recursos-disponibles', especialidadActiva, semanaId],
+    queryFn: () => recursoService.list({ especialidad_consultorio: especialidadActiva, active: true, week_id: semanaId }),
   })
 
   // Pool de recursos de apoyo. En diagnóstico cargamos técnicos; en oftalmo/anest, auxiliares.
@@ -312,12 +313,16 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
   const autorizacionOk =
     !requiereAutorizacionFinde ||
     (form.authorized_by_id && form.authorization_reason && form.authorization_reason.trim().length >= 5)
+  // Nov-2026 · Hector: al elegir a alguien, el modal se parte en dos — el
+  // formulario a un lado y su semana al otro (profesional y auxiliares).
+  const verApoyo = permiteApoyoOpcional && !sinAuxiliar && !esReprogramacion
+  const conPanel = !!recursoSel || (verApoyo && !!auxSel)
   const valid = form.resource_id && form.start_time && form.end_time && (!requiereAuxAdicional || form.assistant_id) && motivoOk && autorizacionOk
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && tryClose()}>
-      <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+      <div className={`bg-white rounded-2xl w-full ${conPanel ? 'max-w-5xl' : 'max-w-md'} max-h-[90vh] flex flex-col`}>
+        <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-sm font-semibold text-gray-900">
@@ -346,6 +351,8 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
           <button onClick={tryClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
         </div>
 
+        <div className="flex-1 min-h-0 overflow-y-auto md:flex md:overflow-hidden">
+        <div className={conPanel ? 'md:w-1/2 md:overflow-y-auto' : 'w-full'}>
         <div className="px-5 py-4 space-y-4">
           {/* Oct-2026 · Viniendo de "Mover la agenda". Sin este aviso, el medico
               aparece puesto sin explicacion y el turno queda atado a una ausencia
@@ -517,16 +524,6 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                       />
                       Horario distinto al recurso principal {esDiagnostico ? '(este técnico se va antes para otro servicio)' : '(esta aux cubre solo parte del turno)'}
                     </label>
-                    {auxSel && (
-                      <AssistantWeekLoad
-                        persona={auxSel}
-                        semanaId={semanaId}
-                        dia={dia}
-                        ini={auxHorarioDistinto ? form.assistant_start_time : form.start_time}
-                        fin={auxHorarioDistinto ? form.assistant_end_time : form.end_time}
-                        asignacionId={asignacion?.id}
-                      />
-                    )}
                     {auxHorarioDistinto && (
                       <div className="grid grid-cols-2 gap-2 mt-2">
                         <div>
@@ -596,16 +593,6 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                         />
                         Horario distinto al recurso principal
                       </label>
-                      {aux2Sel && (
-                        <AssistantWeekLoad
-                          persona={aux2Sel}
-                          semanaId={semanaId}
-                          dia={dia}
-                          ini={aux2HorarioDistinto ? form.assistant2_start_time : form.start_time}
-                          fin={aux2HorarioDistinto ? form.assistant2_end_time : form.end_time}
-                          asignacionId={asignacion?.id}
-                        />
-                      )}
                       {aux2HorarioDistinto && (
                         <div className="grid grid-cols-2 gap-2 mt-2">
                           <div>
@@ -791,8 +778,48 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
         </div>
 
         {editando && <Contingencia asignacion={asignacion} onSaved={onSaved} />}
+        </div>
 
-        <div className="px-5 py-4 border-t border-gray-100 flex flex-col-reverse sm:flex-row gap-2">
+        {conPanel && (
+          <div className="md:w-1/2 md:overflow-y-auto border-t md:border-t-0 md:border-l border-gray-100 bg-gray-50 px-4 py-4 space-y-3">
+            {recursoSel && (
+              <ResourceWeekLoad
+                persona={recursoSel}
+                rol={TIPOS_RECURSO.find((t) => t.value === recursoSel.type)?.label ?? 'Recurso principal'}
+                semanaId={semanaId}
+                dia={dia}
+                ini={form.start_time}
+                fin={form.end_time}
+                asignacionId={asignacion?.id}
+              />
+            )}
+            {verApoyo && auxSel && (
+              <ResourceWeekLoad
+                persona={auxSel}
+                rol={labelApoyo}
+                semanaId={semanaId}
+                dia={dia}
+                ini={auxHorarioDistinto ? form.assistant_start_time : form.start_time}
+                fin={auxHorarioDistinto ? form.assistant_end_time : form.end_time}
+                asignacionId={asignacion?.id}
+              />
+            )}
+            {verApoyo && aux2Sel && (
+              <ResourceWeekLoad
+                persona={aux2Sel}
+                rol={labelApoyo2}
+                semanaId={semanaId}
+                dia={dia}
+                ini={aux2HorarioDistinto ? form.assistant2_start_time : form.start_time}
+                fin={aux2HorarioDistinto ? form.assistant2_end_time : form.end_time}
+                asignacionId={asignacion?.id}
+              />
+            )}
+          </div>
+        )}
+        </div>
+
+        <div className="shrink-0 px-5 py-4 border-t border-gray-100 flex flex-col-reverse sm:flex-row gap-2">
           {editando && (
             <button
               className="btn-danger sm:mr-auto justify-center"
