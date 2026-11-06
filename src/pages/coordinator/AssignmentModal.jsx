@@ -18,6 +18,8 @@ import ResourceWeekLoad from '@/pages/coordinator/ResourceWeekLoad'
  *  - asignacion?: object  ← si viene, modo EDICIÓN (prefill + PUT)
  *  - sedeId, onClose, onSaved
  */
+const conHorarioAux = (nombre, distinto, ini, fin) => (distinto && ini && fin ? `${nombre} (${ini}–${fin})` : nombre)
+
 export default function AsignacionModal({ data, asignacion, sedeId, onClose, onSaved }) {
   const {
     roomId: consultorioId, room: consultorio, day: dia, weekId: semanaId, especialidadOverride,
@@ -317,6 +319,18 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
   // formulario a un lado y su semana al otro (profesional y auxiliares).
   const verApoyo = permiteApoyoOpcional && !sinAuxiliar && !esReprogramacion
   const conPanel = !!recursoSel || (verApoyo && !!auxSel)
+  const turnoActual = {
+    consultorio: consultorio?.name,
+    sede: consultorio?.site?.name ?? consultorio?.site_name,
+    ini: form.start_time,
+    fin: form.end_time,
+    profesional: recursoSel?.name,
+    auxiliares: verApoyo ? [
+      auxSel && conHorarioAux(auxSel.name, auxHorarioDistinto, form.assistant_start_time, form.assistant_end_time),
+      aux2Sel && conHorarioAux(aux2Sel.name, aux2HorarioDistinto, form.assistant2_start_time, form.assistant2_end_time),
+    ].filter(Boolean) : [],
+    pacientes: form.expected_patients === '' ? capacidad : form.expected_patients,
+  }
   const valid = form.resource_id && form.start_time && form.end_time && (!requiereAuxAdicional || form.assistant_id) && motivoOk && autorizacionOk
 
   return (
@@ -791,6 +805,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                 ini={form.start_time}
                 fin={form.end_time}
                 asignacionId={asignacion?.id}
+                turnoActual={turnoActual}
               />
             )}
             {verApoyo && auxSel && (
@@ -802,6 +817,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                 ini={auxHorarioDistinto ? form.assistant_start_time : form.start_time}
                 fin={auxHorarioDistinto ? form.assistant_end_time : form.end_time}
                 asignacionId={asignacion?.id}
+                turnoActual={turnoActual}
               />
             )}
             {verApoyo && aux2Sel && (
@@ -813,6 +829,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                 ini={aux2HorarioDistinto ? form.assistant2_start_time : form.start_time}
                 fin={aux2HorarioDistinto ? form.assistant2_end_time : form.end_time}
                 asignacionId={asignacion?.id}
+                turnoActual={turnoActual}
               />
             )}
           </div>
