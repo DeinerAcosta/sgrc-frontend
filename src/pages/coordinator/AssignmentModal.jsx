@@ -335,7 +335,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && tryClose()}>
-      <div className={`bg-white rounded-2xl w-full ${conPanel ? 'max-w-5xl' : 'max-w-md'} max-h-[90vh] flex flex-col`}>
+      <div className={`bg-white rounded-2xl w-full ${conPanel ? 'max-w-6xl' : 'max-w-xl'} max-h-[94vh] flex flex-col`}>
         <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -448,8 +448,8 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
               normalmente la EXIGEN (oftalmo/anestesio). El coord lo marca cuando
               el doctor realiza el servicio solo (consulta simple, control, etc.). */}
           {_exigeApoyoPorEspecialidad && !esReprogramacion && (
-            <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
-              <label className="flex items-start gap-2 cursor-pointer">
+            <div>
+              <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={sinAuxiliar}
@@ -472,16 +472,8 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                       setAux2HorarioDistinto(false)
                     }
                   }}
-                  className="mt-0.5"
                 />
-                <div>
-                  <div className="text-xs font-medium text-amber-900">
-                    Este servicio NO requiere auxiliar de enfermería
-                  </div>
-                  <div className="text-xs text-amber-700 mt-0.5">
-                    Marca esta casilla si el doctor realiza este servicio solo (consulta simple, control, lectura, etc.). El sistema dejará de exigir auxiliar.
-                  </div>
-                </div>
+                <span className="text-xs font-medium text-gray-700">Este servicio NO requiere auxiliar de enfermería</span>
               </label>
             </div>
           )}
