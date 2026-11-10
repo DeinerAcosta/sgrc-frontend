@@ -104,7 +104,7 @@ const CONFIG = {
   },
   productividad: {
     title: 'Productividad por recurso',
-    desc: 'Horas y pacientes programados vs ejecutados por recurso. Incluye TODOS los recursos activos (los sin actividad aparecen con 0h al final). Promedios calculados sobre horas ejecutadas dividido por semanas o meses del rango.',
+    desc: 'Horas y pacientes programados vs ejecutados por recurso. Incluye TODOS los recursos activos (los sin actividad aparecen con 0h al final). Promedios calculados sobre horas ejecutadas dividido por las semanas o meses con ejecución.',
     cols: ['Recurso', 'Tipo', 'Sede', 'H. programadas', 'H. ejecutadas', 'Prom. semanal (h)', 'Prom. mensual (h)', 'Pac. programados', 'Pac. atendidos', '% Cumplimiento'],
     keys: ['resource', 'type', 'site', 'h_prog', 'h_ejec', 'prom_h_semanal', 'prom_h_mensual', 'pac_prog', 'pac_at', 'pct_cumplimiento'],
     meta: 85,
@@ -292,6 +292,9 @@ function PorFamiliaPanel({ filas }) {
   )
 }
 
+// Tipos de recurso que no tienen pacientes propios en Productividad.
+const TIPOS_SIN_PACIENTES = new Set(['asesor_servicios', 'auxiliar'])
+
 export default function InformePage() {
   const { tipo = 'ocupacion' } = useParams()
   const cfg = CONFIG[tipo] ?? CONFIG.ocupacion
@@ -369,14 +372,15 @@ export default function InformePage() {
   // Columnas visibles según rol: si el CONFIG define colsRestringidasACoord
   // y el usuario es coordinador, ocultamos esos índices (ago-2026: en el
   // informe de ausentismo, coord no ve Programadas/Imprevistas/Quejas).
-  // PROYECTOS-3255 #2.1: en Productividad, si el filtro es SOLO asesor_servicios,
-  // ocultamos las columnas de pacientes/cumplimiento — los asesores no atienden
-  // con cita, esas cifras no aplican y sale todo en '—'.
-  const SOLO_ASESORES = tipo === 'productividad' && tiposSel.length === 1 && tiposSel[0] === 'asesor_servicios'
+  // PROYECTOS-3255 #2.1: en Productividad, si el filtro es SOLO de tipos que no
+  // atienden pacientes, ocultamos las columnas de pacientes/cumplimiento — esas
+  // cifras no aplican y salía todo en 0 o '—'. Nov-2026 · Hector: también las
+  // auxiliares (los pacientes del turno son del médico).
+  const SIN_PACIENTES = tipo === 'productividad' && tiposSel.length > 0 && tiposSel.every((t) => TIPOS_SIN_PACIENTES.has(t))
   const COLS_PACIENTES_PRODUCTIVIDAD = new Set(['Pac. programados', 'Pac. atendidos', '% Cumplimiento'])
   const indicesVisibles = cfg.cols.map((_, i) => i).filter((i) => {
     if (user?.role === 'coordinador' && cfg.colsRestringidasACoord?.has(i)) return false
-    if (SOLO_ASESORES && COLS_PACIENTES_PRODUCTIVIDAD.has(cfg.cols[i])) return false
+    if (SIN_PACIENTES && COLS_PACIENTES_PRODUCTIVIDAD.has(cfg.cols[i])) return false
     return true
   })
   const colsVisibles = indicesVisibles.map((i) => cfg.cols[i])
@@ -676,7 +680,7 @@ export default function InformePage() {
                         // PROYECTOS-3255 #2.1: en productividad, los asesores no reportan pacientes
                         // ni % cumplimiento (hacen recepcion / gestion, no atienden con cita).
                         const esColPacientes = tipo === 'productividad' && (col === 'Pac. programados' || col === 'Pac. atendidos' || col === '% Cumplimiento')
-                        const rowEsAsesor = row.type === 'asesor_servicios'
+                        const rowEsAsesor = TIPOS_SIN_PACIENTES.has(row.type)
                         if (esColPacientes && rowEsAsesor) val = null
                         const isSemaforo = j === indicesVisibles.length - 1 && semaforo && !(esColPacientes && rowEsAsesor)
                         // Ícono de warning al lado del nombre si la fila tiene anomalía
@@ -733,7 +737,7 @@ export default function InformePage() {
         {dataOrdenada.length > 0 && <Paginacion estado={pag} etiqueta="registros" />}
       </div>
 
-      {cfg.meta && (
+      {cfg.meta && !SIN_PACIENTES && (
         <div className="flex gap-4 mt-3 text-xs text-gray-400">
           <span className="flex items-center gap-1"><span className="semaforo-g" />≥{cfg.meta}% (meta)</span>
           <span className="flex items-center gap-1"><span className="semaforo-a" />{cfg.meta - 10}–{cfg.meta - 1}%</span>
