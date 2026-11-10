@@ -24,6 +24,7 @@ export default function CerrarSemanaModal({ semana, resumen, sedeId, sedeNombre,
         : `Cerró ${sedeNombre}. Otras sedes pueden seguir trabajando hasta que cierren la suya.`
       toast.success(msg, { duration: 6000 })
       qc.invalidateQueries({ queryKey: ['semanas'] })
+      qc.invalidateQueries({ queryKey: ['semana-estado-sedes'] })
       onClose()
     },
     onError: (err) => toast.error(err?.message ?? 'Error al cerrar'),

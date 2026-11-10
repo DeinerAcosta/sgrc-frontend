@@ -539,6 +539,16 @@ export default function ProgramadorPage() {
   }, [caso, navegar])
 
   const isCerrada = semanaActual?.status === 'cerrada'
+  // Nov-2026 · Hector: que se vea quién cerró la semana oficialmente (el cierre
+  // es por sede; si no lo hizo nadie, lo cerró el sistema a medianoche).
+  const { data: estadoSedes } = useQuery({
+    queryKey: ['semana-estado-sedes', semanaActual?.id],
+    queryFn: () => semanaService.estadoPorSede(semanaActual.id),
+    enabled: !!semanaActual?.id,
+  })
+  const cierresHechos = (estadoSedes?.sites ?? []).filter((s) => s.cerrada)
+  const cierreSede = sedeId ? cierresHechos.find((s) => s.site_id === sedeId) : null
+  const textoCierre = (c) => `${c.closed_by === 'Sistema' ? 'cierre automático del sistema' : c.closed_by}${c.closed_at ? ' · ' + format(new Date(c.closed_at), "EEE d MMM, HH:mm", { locale: es }) : ''}`
   const isSupervisor = user?.role === 'supervisor' || user?.role === 'gerencia'
   // Modo temporal de programación libre (lo decide el backend y viaja en la
   // sesión). Mientras esté activo, una semana cerrada no bloquea la edición:
@@ -856,7 +866,7 @@ export default function ProgramadorPage() {
           {semanaActual && (
             <button className="btn" onClick={() => setVerCambios(true)}>🕘 Cambios</button>
           )}
-          {semanaActual && !isCerrada && (
+          {semanaActual && !isCerrada && !cierreSede && (
             <button className="btn" style={{ borderColor: '#d1fae5', color: '#065f46' }} onClick={() => {
               if (!sedeId) {
                 toast.error('Seleccione una sede antes de cerrar (arriba en el selector).', { duration: 4000 })
@@ -871,6 +881,13 @@ export default function ProgramadorPage() {
             <Badge variant="gray">
               Semana cerrada{isSupervisor ? ' — puede editar' : libre ? ' — edición habilitada temporalmente' : ''}
             </Badge>
+          )}
+          {cierreSede ? (
+            <Badge variant="gray">🔒 {cierreSede.sede_nombre} cerrada por {textoCierre(cierreSede)}</Badge>
+          ) : !sedeId && cierresHechos.length > 0 && (
+            <span title={cierresHechos.map((c) => `${c.sede_nombre}: ${textoCierre(c)}`).join('\n')}>
+              <Badge variant="gray">🔒 {cierresHechos.length} {cierresHechos.length === 1 ? 'sede cerrada' : 'sedes cerradas'}</Badge>
+            </span>
           )}
           {libre && (
             <span title="Modo temporal: puede programar semanas vencidas y sedes ya cerradas. Los solapes y topes de horas se siguen validando.">
