@@ -390,49 +390,6 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                 : 'del profesional ausente'}
             </div>
           )}
-          {/* Nov-2026 · Hector: el horario va PRIMERO, con hora inicio, hora fin
-              y pacientes en la misma fila. Los pacientes no aplican a asesores
-              (PROYECTOS-3255 #2.1). */}
-          {(() => {
-            const conPacientes = recursoSel?.type !== 'asesor_servicios'
-            return (
-              <div className={`grid grid-cols-1 gap-3 items-end ${conPacientes ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
-                <div>
-                  <label className="label">Hora inicio <span className="text-red-600">*</span></label>
-                  <input className="input" type="time" min="07:00" max="19:00" value={form.start_time} onChange={(e) => set('start_time', e.target.value)} />
-                </div>
-                <div>
-                  <label className="label">Hora fin <span className="text-red-600">*</span></label>
-                  <input className="input" type="time" min="07:00" max="19:00" value={form.end_time} onChange={(e) => set('end_time', e.target.value)} />
-                </div>
-                {conPacientes && (
-                  <div>
-                    <label className="label whitespace-nowrap" title="Pacientes programados reales">
-                      Pacientes reales
-                      {topePacientes != null && <span className="text-gray-400 font-normal"> (máx. {topePacientes})</span>}
-                    </label>
-                    <input
-                      className="input"
-                      type="number"
-                      min="0"
-                      max={topePacientes ?? 200}
-                      disabled={!form.resource_id}
-                      placeholder={form.resource_id ? `Vacío = ${topePacientes != null ? Math.min(capacidad, topePacientes) : capacidad}` : ''}
-                      value={form.expected_patients}
-                      onChange={(e) => {
-                        // En una reprogramación no se aceptan más pacientes de los que
-                        // faltan por reprogramar: si son 20, el 21 no entra.
-                        const v = e.target.value
-                        if (topePacientes != null && v !== '' && Number(v) > topePacientes) return
-                        set('expected_patients', v)
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
-            )
-          })()}
-
           {/* Recurso principal — buscable */}
           <div>
             <label className="label">Recurso principal <span className="text-red-600">*</span> <span className="text-gray-400 font-normal">({recursos.length} disponibles)</span></label>
@@ -497,6 +454,49 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
               </div>
             </div>
           )}
+
+          {/* Nov-2026 · Hector: orden recurso → ¿requiere auxiliar? → horario →
+              auxiliares. Hora inicio, hora fin y pacientes en la misma fila.
+              Los pacientes no aplican a asesores (PROYECTOS-3255 #2.1). */}
+          {(() => {
+            const conPacientes = recursoSel?.type !== 'asesor_servicios'
+            return (
+              <div className={`grid grid-cols-1 gap-3 items-end ${conPacientes ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+                <div>
+                  <label className="label">Hora inicio <span className="text-red-600">*</span></label>
+                  <input className="input" type="time" min="07:00" max="19:00" value={form.start_time} onChange={(e) => set('start_time', e.target.value)} />
+                </div>
+                <div>
+                  <label className="label">Hora fin <span className="text-red-600">*</span></label>
+                  <input className="input" type="time" min="07:00" max="19:00" value={form.end_time} onChange={(e) => set('end_time', e.target.value)} />
+                </div>
+                {conPacientes && (
+                  <div>
+                    <label className="label whitespace-nowrap" title="Pacientes programados reales">
+                      Pacientes reales
+                      {topePacientes != null && <span className="text-gray-400 font-normal"> (máx. {topePacientes})</span>}
+                    </label>
+                    <input
+                      className="input"
+                      type="number"
+                      min="0"
+                      max={topePacientes ?? 200}
+                      disabled={!form.resource_id}
+                      placeholder={form.resource_id ? `Vacío = ${topePacientes != null ? Math.min(capacidad, topePacientes) : capacidad}` : ''}
+                      value={form.expected_patients}
+                      onChange={(e) => {
+                        // En una reprogramación no se aceptan más pacientes de los que
+                        // faltan por reprogramar: si son 20, el 21 no entra.
+                        const v = e.target.value
+                        if (topePacientes != null && v !== '' && Number(v) > topePacientes) return
+                        set('expected_patients', v)
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           {/* Recurso de apoyo (si aplica) — buscable.
               En oftalmo/anestesio es OBLIGATORIO (asterisco).
