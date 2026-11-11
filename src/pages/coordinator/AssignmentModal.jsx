@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { asignacionService, recursoService, semanaService, usuarioService } from '@/services/api'
+import { asignacionService, recursoService, semanaService, usuarioService, matrizService } from '@/services/api'
 import { Spinner } from '@/components/ui'
 import SearchableSelect from '@/components/ui/SearchableSelect'
 import { calcularCapacidadPacientes, DIAS_FULL, DIAS, TIPOS_RECURSO, ESPECIALIDADES_EXIGEN_APOYO, ESPECIALIDADES_PERMITEN_APOYO } from '@/utils/helpers'
@@ -9,6 +9,8 @@ import { useDirtyClose } from '@/hooks/useDirtyClose'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useAuthStore } from '@/store/authStore'
 import ResourceWeekLoad from '@/pages/coordinator/ResourceWeekLoad'
+import AuxiliarGridSelect from '@/pages/coordinator/AuxiliarGridSelect'
+import { elegible } from '@/utils/matriz'
 
 /**
  * Modal de asignación (crear o editar).
@@ -324,6 +326,70 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
   // Nov-2026 · Hector: al elegir a alguien, el modal se parte en dos — el
   // formulario a un lado y su semana al otro (profesional y auxiliares).
   const verApoyo = permiteApoyoOpcional && !sinAuxiliar && !esReprogramacion
+
+  // Nov-2026 · Hector: la auxiliar viene PRESELECCIONADA según la Matriz y se
+  // elige en una cuadrícula con su estado en el día y la hora de este turno.
+  // Cuelga de 'asignaciones' para que guardar/borrar en el Programador la
+  // refresque.
+  const horarioValido = !!form.start_time && !!form.end_time && form.end_time > form.start_time
+  const { data: estadoTurno = [], isFetching: cargandoTurno } = useQuery({
+    queryKey: ['asignaciones', 'aux-turno', semanaId, dia, form.start_time, form.end_time, form.resource_id, asignacion?.id ?? null, tipoApoyo],
+    queryFn: () => matrizService.turno({
+      week_id: semanaId,
+      weekday: dia,
+      start_time: form.start_time,
+      end_time: form.end_time,
+      professional_id: form.resource_id || undefined,
+      exclude_assignment_id: asignacion?.id,
+      type: tipoApoyo,
+    }),
+    enabled: verApoyo && !!semanaId && horarioValido,
+    staleTime: 0,
+    placeholderData: (prev) => prev,
+  })
+  const filasAux = (() => {
+    const porId = new Map(estadoTurno.map((e) => [e.id, e]))
+    return auxiliares.map((a) => {
+      const e = porId.get(a.id)
+      const horasSemana = a.current_week_hours ?? 0
+      const tope = a.max_effective_hours ?? a.max_hours_per_week ?? null
+      const capacidad = a.available_hours ?? tope
+      return {
+        id: a.id,
+        name: a.name,
+        estado: e?.estado ?? 'sin_asignar',
+        motivoAusencia: e?.motivo_ausencia ?? null,
+        recursosPar: e?.recursos_par ?? [],
+        preseleccionada: !!e?.preseleccionada,
+        horasDia: e?.horas_dia ?? 0,
+        horasSemana,
+        tope,
+        disponibles: capacidad == null ? null : Math.max(0, Math.round((capacidad - horasSemana) * 10) / 10),
+        horario: e?.horario ?? [],
+        sedes: e?.sedes ?? [],
+      }
+    })
+  })()
+
+  // Preselección: solo al crear (al editar se respeta la que tiene el turno) y
+  // nunca encima de una que el coordinador eligió a mano. Si cambia el
+  // profesional, la preseleccionada se recalcula; si la nueva no tiene pareja
+  // en la Matriz, se quita la que había puesto el sistema.
+  const auxAuto = useRef(null)
+  useEffect(() => {
+    if (editando || !verApoyo || cargandoTurno || !estadoTurno.length) return
+    const actual = form.assistant_id
+    if (actual && actual !== auxAuto.current) return
+    const candidata = filasAux
+      .filter((f) => f.preseleccionada && elegible(f.estado) && f.id !== form.assistant2_id)
+      .sort((a, b) => (b.disponibles ?? 0) - (a.disponibles ?? 0))[0]
+    const nueva = candidata?.id ?? ''
+    if (nueva !== actual) {
+      auxAuto.current = nueva || null
+      setForm((f) => ({ ...f, assistant_id: nueva }))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estadoTurno, cargandoTurno, verApoyo, editando])
   const conPanel = !!recursoSel || (verApoyo && !!auxSel)
   const turnoActual = {
     consultorio: consultorio?.name,
@@ -517,23 +583,13 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                   {labelApoyo} {requiereAuxAdicional ? <span className="text-red-600">*</span> : <span className="text-gray-400 font-normal">(opcional)</span>}
                   <span className="text-gray-400 font-normal"> ({auxiliares.length} disponibles)</span>
                 </label>
-                <SearchableSelect
+                <AuxiliarGridSelect
                   value={form.assistant_id}
-                  onChange={(id) => set('assistant_id', id)}
+                  onChange={(id) => { auxAuto.current = null; set('assistant_id', id) }}
+                  filas={filasAux}
+                  excluir={form.assistant2_id}
+                  cargando={cargandoTurno && !estadoTurno.length}
                   placeholder={labelApoyoBuscar}
-                  visibles={3}
-                  options={auxiliares
-                    .filter((a) => a.id !== form.assistant2_id)  // no mostrar la que ya está en aux #2
-                    .map((a) => {
-                      const horas = a.current_week_hours ?? a.currentWeekHours ?? 0
-                      const max = a.max_effective_hours ?? a.max_hours_per_week ?? a.maxHoursPerWeek ?? 42
-                      const liberada = a.status_badge === 'liberada'
-                      return {
-                        id: a.id,
-                        label: `${a.name}${liberada ? ' 🟡 liberada' : ''}`,
-                        sublabel: `${horas}h / ${max}h`,
-                      }
-                    })}
                 />
                 {form.assistant_id && (
                   <>
@@ -587,23 +643,13 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                   <label className="label">
                     {labelApoyo2} <span className="text-gray-400 font-normal">(opcional{esDiagnostico ? '' : ' · doc complejos / cirugías'})</span>
                   </label>
-                  <SearchableSelect
+                  <AuxiliarGridSelect
                     value={form.assistant2_id}
                     onChange={(id) => set('assistant2_id', id)}
+                    filas={filasAux}
+                    excluir={form.assistant_id}
+                    cargando={cargandoTurno && !estadoTurno.length}
                     placeholder={esDiagnostico ? '🔍 Buscar segundo técnico de apoyo…' : '🔍 Buscar segunda auxiliar (si aplica)…'}
-                    visibles={3}
-                    options={auxiliares
-                      .filter((a) => a.id !== form.assistant_id)  // no mostrar la que ya está en aux #1
-                      .map((a) => {
-                        const horas = a.current_week_hours ?? a.currentWeekHours ?? 0
-                        const max = a.max_effective_hours ?? a.max_hours_per_week ?? a.maxHoursPerWeek ?? 42
-                        const liberada = a.status_badge === 'liberada'
-                        return {
-                          id: a.id,
-                          label: `${a.name}${liberada ? ' 🟡 liberada' : ''}`,
-                          sublabel: `${horas}h / ${max}h`,
-                        }
-                      })}
                   />
                   {form.assistant2_id && (
                     <>

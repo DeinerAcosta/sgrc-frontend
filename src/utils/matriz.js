@@ -38,3 +38,16 @@ export function horasPorFranja(franjas = []) {
 
 /** 8.5 → "8,5" · 8 → "8" (como se escribe en la clínica). */
 export const fmtHoras = (h) => (Math.round(h * 10) / 10).toString().replace('.', ',')
+
+/**
+ * Estado de una auxiliar en el día y la hora de un turno (lo calcula el
+ * backend, lib/matrizAuxiliares.js estadoAuxiliarEnTurno). Ausente y Asignado
+ * no se pueden elegir.
+ */
+export const ESTADOS_AUX = {
+  asignado:    { label: 'Asignado',    cls: 'bg-gray-100 text-gray-600 border-gray-200' },
+  disponible:  { label: 'Disponible',  cls: 'bg-green-50 text-green-800 border-green-200' },
+  ausente:     { label: 'Ausente',     cls: 'bg-red-50 text-red-700 border-red-200' },
+  sin_asignar: { label: 'Sin asignar', cls: 'bg-blue-50 text-blue-800 border-blue-200' },
+}
+export const elegible = (estado) => estado === 'disponible' || estado === 'sin_asignar'

@@ -1200,6 +1200,8 @@ export const consultorioService = {
 export const matrizService = {
   get: () => api.get('/assistant-matrix'),
   guardarDia: (auxiliarId, dia, data) => api.put(`/assistant-matrix/${auxiliarId}/${dia}`, data),
+  // Estado de cada auxiliar en el día y la hora de un turno + preselección.
+  turno: (params) => api.get('/assistant-matrix/shift', { params }),
 }
 
 // ============ FESTIVOS (RN-06) ============
