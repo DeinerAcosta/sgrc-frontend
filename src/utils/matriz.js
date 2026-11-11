@@ -45,9 +45,9 @@ export const fmtHoras = (h) => (Math.round(h * 10) / 10).toString().replace('.',
  * no se pueden elegir.
  */
 export const ESTADOS_AUX = {
-  asignado:    { label: 'Asignado',    cls: 'bg-gray-100 text-gray-600 border-gray-200' },
-  disponible:  { label: 'Disponible',  cls: 'bg-green-50 text-green-800 border-green-200' },
-  ausente:     { label: 'Ausente',     cls: 'bg-red-50 text-red-700 border-red-200' },
-  sin_asignar: { label: 'Sin asignar', cls: 'bg-blue-50 text-blue-800 border-blue-200' },
+  disponible:  { label: 'Disponible',  cls: 'bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' },
+  sin_asignar: { label: 'Sin asignar', cls: 'bg-sky-50 text-sky-700',         dot: 'bg-sky-500' },
+  asignado:    { label: 'Asignado',    cls: 'bg-amber-50 text-amber-700',     dot: 'bg-amber-500' },
+  ausente:     { label: 'Ausente',     cls: 'bg-rose-50 text-rose-700',       dot: 'bg-rose-500' },
 }
 export const elegible = (estado) => estado === 'disponible' || estado === 'sin_asignar'

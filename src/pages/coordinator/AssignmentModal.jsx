@@ -9,7 +9,7 @@ import { useDirtyClose } from '@/hooks/useDirtyClose'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useAuthStore } from '@/store/authStore'
 import ResourceWeekLoad from '@/pages/coordinator/ResourceWeekLoad'
-import AuxiliarGridSelect from '@/pages/coordinator/AuxiliarGridSelect'
+import { AuxiliarBar, AuxiliarPicker } from '@/pages/coordinator/AuxiliarGridSelect'
 import { elegible } from '@/utils/matriz'
 
 /**
@@ -69,7 +69,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
   const esDiagnostico = especialidadActiva === 'diagnostico'
   const tipoApoyo = esDiagnostico ? 'tecnico' : 'auxiliar'
   const labelApoyo = esDiagnostico ? 'Técnico de apoyo' : 'Auxiliar de enfermería'
-  const labelApoyoBuscar = esDiagnostico ? '🔍 Buscar segundo técnico…' : '🔍 Buscar y seleccionar auxiliar…'
+  const labelApoyoBuscar = esDiagnostico ? 'Elegir técnico de apoyo' : 'Elegir auxiliar'
   const labelApoyo2 = esDiagnostico ? 'Técnico de apoyo #2' : 'Auxiliar de enfermería #2'
 
   const [form, setForm] = useState({
@@ -376,6 +376,12 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
   // profesional, la preseleccionada se recalcula; si la nueva no tiene pareja
   // en la Matriz, se quita la que había puesto el sistema.
   const auxAuto = useRef(null)
+  // Qué auxiliar se está eligiendo en el panel de la derecha (1, 2 o ninguna).
+  const [eligiendoAux, setEligiendoAux] = useState(null)
+  const pickerRef = useRef(null)
+  useEffect(() => { if (!verApoyo) setEligiendoAux(null) }, [verApoyo])
+  // En pantallas angostas el panel queda debajo del formulario: se lleva a la vista.
+  useEffect(() => { if (eligiendoAux) pickerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) }, [eligiendoAux])
   useEffect(() => {
     if (editando || !verApoyo || cargandoTurno || !estadoTurno.length) return
     const actual = form.assistant_id
@@ -390,7 +396,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [estadoTurno, cargandoTurno, verApoyo, editando])
-  const conPanel = !!recursoSel || (verApoyo && !!auxSel)
+  const conPanel = !!recursoSel || (verApoyo && !!auxSel) || !!eligiendoAux
   const turnoActual = {
     consultorio: consultorio?.name,
     sede: consultorio?.site?.name ?? consultorio?.site_name,
@@ -583,11 +589,10 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                   {labelApoyo} {requiereAuxAdicional ? <span className="text-red-600">*</span> : <span className="text-gray-400 font-normal">(opcional)</span>}
                   <span className="text-gray-400 font-normal"> ({auxiliares.length} disponibles)</span>
                 </label>
-                <AuxiliarGridSelect
-                  value={form.assistant_id}
-                  onChange={(id) => { auxAuto.current = null; set('assistant_id', id) }}
-                  filas={filasAux}
-                  excluir={form.assistant2_id}
+                <AuxiliarBar
+                  fila={filasAux.find((f) => f.id === form.assistant_id)}
+                  abierto={eligiendoAux === 1}
+                  onClick={() => setEligiendoAux((v) => (v === 1 ? null : 1))}
                   cargando={cargandoTurno && !estadoTurno.length}
                   placeholder={labelApoyoBuscar}
                 />
@@ -643,13 +648,12 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                   <label className="label">
                     {labelApoyo2} <span className="text-gray-400 font-normal">(opcional{esDiagnostico ? '' : ' · doc complejos / cirugías'})</span>
                   </label>
-                  <AuxiliarGridSelect
-                    value={form.assistant2_id}
-                    onChange={(id) => set('assistant2_id', id)}
-                    filas={filasAux}
-                    excluir={form.assistant_id}
+                  <AuxiliarBar
+                    fila={filasAux.find((f) => f.id === form.assistant2_id)}
+                    abierto={eligiendoAux === 2}
+                    onClick={() => setEligiendoAux((v) => (v === 2 ? null : 2))}
                     cargando={cargandoTurno && !estadoTurno.length}
-                    placeholder={esDiagnostico ? '🔍 Buscar segundo técnico de apoyo…' : '🔍 Buscar segunda auxiliar (si aplica)…'}
+                    placeholder={esDiagnostico ? 'Elegir segundo técnico de apoyo (si aplica)' : 'Elegir segunda auxiliar (si aplica)'}
                   />
                   {form.assistant2_id && (
                     <>
@@ -854,7 +858,22 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
         {editando && <Contingencia asignacion={asignacion} onSaved={onSaved} />}
         </div>
 
-        {conPanel && (
+        {eligiendoAux ? (
+          <div ref={pickerRef} className="lg:flex-1 lg:min-w-0 bg-gray-50 p-4 sm:p-6 flex flex-col h-[78vh] lg:h-auto">
+            <AuxiliarPicker
+              titulo={`Elegir ${(eligiendoAux === 1 ? labelApoyo : labelApoyo2).toLowerCase()}`}
+              subtitulo={`${diaLabel} · ${form.start_time}–${form.end_time}`}
+              value={eligiendoAux === 1 ? form.assistant_id : form.assistant2_id}
+              excluir={eligiendoAux === 1 ? form.assistant2_id : form.assistant_id}
+              filas={filasAux}
+              onChange={(id) => {
+                if (eligiendoAux === 1) { auxAuto.current = null; set('assistant_id', id) } else set('assistant2_id', id)
+                setEligiendoAux(null)
+              }}
+              onClose={() => setEligiendoAux(null)}
+            />
+          </div>
+        ) : conPanel && (
           // El profesional a lo ancho y las auxiliares lado a lado en pantallas
           // anchas (una sola auxiliar también va a lo ancho); en angostas, apiladas.
           <div className="lg:flex-1 lg:min-w-0 lg:overflow-y-auto border-t lg:border-t-0 border-gray-100 bg-gray-50 px-4 sm:px-6 py-5 grid grid-cols-1 xl:grid-cols-2 gap-3 content-start">
