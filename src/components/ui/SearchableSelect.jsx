@@ -125,7 +125,21 @@ export default function SearchableSelect({ value, onChange, options, placeholder
         disabled={disabled}
         readOnly={!open}
       />
-      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">{open ? '▲' : '▼'}</span>
+      {/* Nov-2026 · Hector: la flecha abre y CIERRA la lista; antes era un
+          dibujo y para cerrar había que pulsar en otra parte. */}
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label={open ? 'Cerrar lista' : 'Abrir lista'}
+        disabled={disabled}
+        className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 rounded-md flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 text-xs disabled:opacity-50"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => {
+          if (open) { cerrar(); inputRef.current?.blur() } else { abrir(); inputRef.current?.focus() }
+        }}
+      >
+        {open ? '▲' : '▼'}
+      </button>
 
       {open && pos && createPortal(
         <div
