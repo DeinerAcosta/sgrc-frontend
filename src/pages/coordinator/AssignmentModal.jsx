@@ -165,7 +165,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
   // Consultar si CUALQUIERA de los aux seleccionados ya tiene asignación
   // en el otro día del finde de esta misma semana. Query condicional.
   const { data: asigsAuxOtroDia = [] } = useQuery({
-    queryKey: ['asigs-aux-finde', semanaId, otroDiaFinde, auxsTipoAuxiliar.map((a) => a.id).sort().join(',')],
+    queryKey: ['asignaciones', 'aux-finde', semanaId, otroDiaFinde, auxsTipoAuxiliar.map((a) => a.id).sort().join(',')],
     queryFn: async () => {
       const results = await Promise.all(
         auxsTipoAuxiliar.map((aux) =>

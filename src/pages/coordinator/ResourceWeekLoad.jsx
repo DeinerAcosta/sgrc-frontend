@@ -85,9 +85,14 @@ function DetalleTurno({ f, rect, choca, tipo }) {
 export default function ResourceWeekLoad({ persona, rol, semanaId, dia, ini, fin, asignacionId, turnoActual }) {
   const [hover, setHover] = useState(null)
   const { data: turnos = [], isLoading } = useQuery({
-    queryKey: ['asigs-persona-semana', semanaId, persona.id],
+    // Cuelga de 'asignaciones' para que guardar/eliminar/copiar en el programador
+    // la invalide, y staleTime 0 para que cada apertura del modal la pida de
+    // nuevo: con el staleTime global de 5 min mostraba la semana de antes de
+    // programar los otros días.
+    queryKey: ['asignaciones', 'persona-semana', semanaId, persona.id],
     queryFn: () => asignacionService.list({ week_id: semanaId, resource_id: persona.id }),
     enabled: !!semanaId,
+    staleTime: 0,
   })
 
   const franjas = turnos
