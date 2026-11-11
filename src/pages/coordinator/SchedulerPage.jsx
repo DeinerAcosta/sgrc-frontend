@@ -56,23 +56,23 @@ export default function ProgramadorPage() {
   // el hook useSedeActiva. Bug reportado: Wendy (gerencia) veía el Programador
   // como si fuera coord de una sola sede porque tenía 1 site en su usuario.
   const esAdminSched = ['gerencia', 'supervisor', 'directivo'].includes(user?.role)
-  // sedePropia solo si tiene EXACTAMENTE 1 sede (caso típico coordinador 1 sede).
-  // Si tiene 2+ sedes (coordinador multi-sede como Wadys que tiene 5),
-  // mostramos el selector para que elija cuál programar.
-  const sedePropia = (!esAdminSched && user?.sites?.length === 1) ? user.sites[0] : null
-  const tieneVariasSedes = !esAdminSched && (user?.sites?.length ?? 0) > 1
-  const primeraSede = user?.sites?.[0]
+  // Nov-2026 · Hector: el coordinador VE todas las sedes en el Programador, pero
+  // solo programa en las suyas. Las ajenas quedan en solo consulta: la semana,
+  // el detalle de cada turno al pasar el mouse y Descargar; nada más. Por eso
+  // el selector ya no se esconde al coordinador de una sola sede: arranca en
+  // la suya y puede mirar las demás.
+  const misSedes = esAdminSched ? [] : (user?.sites ?? [])
+  const primeraSede = misSedes[0]
 
-  const [sedeManual, setSedeManual] = useState('')
+  const [sedeManual, setSedeManual] = useState(() => primeraSede ?? '')
 
-  // Sincronizar sedeManual cuando user.sedes cambia (por el refresh automático
-  // del AppLayout que trae sedes nuevas tras un login con JWT viejo).
+  // Si la sesión llega después con las sedes (refresh del AppLayout tras un
+  // login con JWT viejo), arranca en la primera suya. Ya NO se le devuelve a
+  // la suya cuando elige otra: mirar sedes ajenas está permitido.
   useEffect(() => {
-    if (tieneVariasSedes && (!sedeManual || !user.sites.includes(sedeManual))) {
-      setSedeManual(user.sites[0])
-    }
+    if (!esAdminSched && !sedeManual && primeraSede) setSedeManual(primeraSede)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tieneVariasSedes, primeraSede, user?.sites?.length])
+  }, [esAdminSched, primeraSede])
   // Filtro multi-select por especialidad — array vacío = todas
   const [especialidadFilter, setEspecialidadFilter] = useState([])
   const [showFilter, setShowFilter] = useState(false)
@@ -164,21 +164,21 @@ export default function ProgramadorPage() {
     ejecutarSalto(asigId, consId)
   }
 
-  // El coordinador trabaja sobre su sede; el supervisor (sin sede propia) la elige.
-  const sedeId = sedePropia || sedeManual
+  const sedeId = sedeManual
+  // Sede ajena para el coordinador = solo consulta. El servidor ya rechaza
+  // cualquier escritura fuera de sus sedes (lib/siteScope.js); esto es para que
+  // la pantalla no ofrezca lo que de todas formas se va a rechazar.
+  const soloLectura = !esAdminSched && !!sedeId && !misSedes.includes(sedeId)
 
-  // Sedes para el selector:
-  //   - Supervisor/gerencia (sin sedes propias): TODAS las sedes
-  //   - Coordinador multi-sede: SOLO sus sedes
-  //   - Coordinador con 1 sede: no se muestra selector
+  // Todas las sedes para todos. El coordinador las ve en dos grupos: las suyas
+  // primero y las demás marcadas como consulta.
   const { data: todasSedes = [] } = useQuery({
     queryKey: ['sedes-programador'],
     queryFn: () => sedeService.list(),
-    enabled: !sedePropia,
   })
-  const sedesDisponibles = tieneVariasSedes
-    ? todasSedes.filter((s) => user.sites.includes(s.id))
-    : todasSedes
+  const sedesDisponibles = todasSedes
+  const sedesMias = todasSedes.filter((s) => misSedes.includes(s.id))
+  const sedesAjenas = todasSedes.filter((s) => !misSedes.includes(s.id))
 
   const diasFecha = diasDeSemana(semanaBase)
   const fechasISO = diasFecha.map((d) => format(d, 'yyyy-MM-dd'))
@@ -234,7 +234,9 @@ export default function ProgramadorPage() {
   const { data: ausentesPrev, isLoading: loadAusentesPrev } = useQuery({
     queryKey: ['ausentes-semana-anterior', semanaActual?.id, sedeId],
     queryFn: () => semanaService.ausentesSemanaAnterior(semanaActual.id, { siteId: sedeId || undefined }),
-    enabled: !!semanaActual,
+    // Las ausencias de una sede ajena no son del coordinador (el servidor las
+    // niega con 403): en solo consulta no se piden.
+    enabled: !!semanaActual && !soloLectura,
     staleTime: 60_000,
   })
   // ===== AUSENCIAS DE ESTA MISMA SEMANA =====
@@ -244,7 +246,7 @@ export default function ProgramadorPage() {
   const { data: ausenciasSemana } = useQuery({
     queryKey: ['ausencias-de-la-semana', semanaActual?.id, sedeId],
     queryFn: () => semanaService.ausenciasDeLaSemana(semanaActual.id, { siteId: sedeId || undefined }),
-    enabled: !!semanaActual,
+    enabled: !!semanaActual && !soloLectura,
     staleTime: 60_000,
   })
 
@@ -382,7 +384,7 @@ export default function ProgramadorPage() {
       // Auto-recover: si sedeId está vacío pero user.sedes tiene contenido,
       // usamos user.sedes[0] como fallback antes de rechazar. Solo abortamos si
       // realmente no hay ninguna sede que usar.
-      const sedeFallback = sedeId || sedePropia || (esAdminSched ? null : user?.sites?.[0]) || null
+      const sedeFallback = sedeId || (esAdminSched ? null : user?.sites?.[0]) || null
       if (!sedeFallback) {
         throw new Error('No se pudo determinar la sede. Recargue la página y vuelva a intentar.')
       }
@@ -445,7 +447,7 @@ export default function ProgramadorPage() {
     // supervisor/gerencia, o hidratación pendiente del auth para coord), avisar
     // ANTES de mostrar el confirm — así el mensaje del backend "Debes especificar
     // la(s) sede(s)..." nunca aparece al usuario final.
-    const sedeFallback = sedeId || sedePropia || (esAdminSched ? null : user?.sites?.[0]) || null
+    const sedeFallback = sedeId || (esAdminSched ? null : user?.sites?.[0]) || null
     if (!sedeFallback) {
       toast.error('Seleccione una sede antes de copiar (arriba en el selector).', { duration: 4000 })
       return
@@ -555,11 +557,11 @@ export default function ProgramadorPage() {
   // sirve para cuadres retroactivos. Los solapes y topes se siguen validando en
   // el servidor, así que abrir el botón no abre la puerta a datos inválidos.
   const libre = user?.free_scheduling === true
-  const canEdit = !isCerrada || isSupervisor || libre
+  const canEdit = !soloLectura && (!isCerrada || isSupervisor || libre)
   // canCopiar = puede USAR esta semana como ORIGEN de copia hacia otra semana,
   // aunque esté cerrada. NO modifica la cerrada — solo lee. El destino siempre
   // debe ser otra semana (el modal CopiarDiaModal lo fuerza si origen cerrada).
-  const canCopiar = canEdit || isCerrada
+  const canCopiar = !soloLectura && (canEdit || isCerrada)
 
   // RN-01 relajada (jul-2026): antes exigía 3 días de anticipación; ahora los
   // coords pueden programar la semana en curso o cualquier futura. Solo se
@@ -768,26 +770,35 @@ export default function ProgramadorPage() {
               </span>
             )}
           </p>
-          {!sedePropia && (
-            <div className="mt-2">
-              {tieneVariasSedes && (
-                <label className="text-xs font-semibold text-gray-700 block mb-1">
-                  📍 Sede a programar ({sedesDisponibles.length} disponibles):
-                </label>
+          <div className="mt-2">
+            <select
+              className="input w-full sm:max-w-[320px]"
+              value={sedeManual}
+              onChange={(e) => setSedeManual(e.target.value)}
+            >
+              {esAdminSched ? (
+                <>
+                  <option value="">Seleccione una sede…</option>
+                  {sedesDisponibles.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </>
+              ) : (
+                <>
+                  <optgroup label="Mis sedes">
+                    {sedesMias.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </optgroup>
+                  {sedesAjenas.length > 0 && (
+                    <optgroup label="Otras sedes · solo consulta">
+                      {sedesAjenas.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </optgroup>
+                  )}
+                </>
               )}
-              <select
-                className="input w-full sm:max-w-[320px]"
-                value={sedeManual}
-                onChange={(e) => setSedeManual(e.target.value)}
-              >
-                {!tieneVariasSedes && <option value="">Seleccione una sede…</option>}
-                {sedesDisponibles.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </div>
-          )}
+            </select>
+          </div>
         </div>
         <div className="flex gap-2 flex-wrap">
-          {!semanaActual && (
+          {soloLectura && <Badge variant="blue">👁 Solo consulta</Badge>}
+          {!semanaActual && !soloLectura && (
             <button
               className="btn-primary"
               onClick={() => crearSemana()}
@@ -802,7 +813,7 @@ export default function ProgramadorPage() {
               igual: Hector no podía copiar la semana anterior. */}
           {/* Nov-2026 · Se elige de qué semana copiar: por defecto la anterior,
               pero se puede tomar cualquiera de las previas. */}
-          {semanaActual && (!isCerrada || libre) && (
+          {semanaActual && (!isCerrada || libre) && !soloLectura && (
             <div className="relative">
               <button
                 className="btn"
@@ -863,10 +874,10 @@ export default function ProgramadorPage() {
               {ausentesSinProgramar > 0 && ` · ${ausentesSinProgramar} sin programar`}
             </button>
           )}
-          {semanaActual && (
+          {semanaActual && !soloLectura && (
             <button className="btn" onClick={() => setVerCambios(true)}>🕘 Cambios</button>
           )}
-          {semanaActual && !isCerrada && !cierreSede && (
+          {semanaActual && !isCerrada && !cierreSede && !soloLectura && (
             <button className="btn" style={{ borderColor: '#d1fae5', color: '#065f46' }} onClick={() => {
               if (!sedeId) {
                 toast.error('Seleccione una sede antes de cerrar (arriba en el selector).', { duration: 4000 })
@@ -879,7 +890,7 @@ export default function ProgramadorPage() {
           )}
           {isCerrada && (
             <Badge variant="gray">
-              Semana cerrada{isSupervisor ? ' — puede editar' : libre ? ' — edición habilitada temporalmente' : ''}
+              Semana cerrada{soloLectura ? '' : isSupervisor ? ' — puede editar' : libre ? ' — edición habilitada temporalmente' : ''}
             </Badge>
           )}
           {cierreSede ? (
