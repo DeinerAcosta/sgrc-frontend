@@ -19,7 +19,14 @@ import { createPortal } from 'react-dom'
 // Sin tildes ni mayúsculas: "maria" encuentra a "María".
 const normalizar = (t) => (t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
-export default function SearchableSelect({ value, onChange, options, placeholder = 'Seleccionar…', disabled }) {
+/**
+ * Nov-2026 · `visibles`: cuántas opciones se ven a la vez; las demás salen con
+ * el scroll de la lista. Hector lo pidió en 3 para el profesional y la auxiliar
+ * del Programador. Sin el prop, la lista usa el alto disponible como antes.
+ */
+const ALTO_OPCION_REM = 2.25 // py-2 + text-sm (1.25rem de línea)
+
+export default function SearchableSelect({ value, onChange, options, placeholder = 'Seleccionar…', disabled, visibles }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [activo, setActivo] = useState(0)
@@ -126,7 +133,10 @@ export default function SearchableSelect({ value, onChange, options, placeholder
           className="fixed z-[80] bg-white border border-gray-200 rounded-lg shadow-xl flex flex-col overflow-hidden"
           style={{ left: pos.left, width: pos.width, top: pos.top, bottom: pos.bottom, maxHeight: pos.maxHeight }}
         >
-          <div className="overflow-y-auto flex-1 py-1">
+          <div
+            className="overflow-y-auto flex-1 py-1"
+            style={visibles ? { maxHeight: `calc(${visibles * ALTO_OPCION_REM}rem + 0.5rem)` } : undefined}
+          >
             {filtered.length === 0 ? (
               <div className="px-3 py-3 text-sm text-gray-400 text-center">
                 Sin coincidencias para "{query}"
@@ -137,7 +147,7 @@ export default function SearchableSelect({ value, onChange, options, placeholder
                   type="button"
                   key={o.id}
                   data-i={i}
-                  className={`w-full text-left px-3 py-2 flex items-baseline justify-between gap-3 ${i === activo ? 'bg-blue-50' : ''}`}
+                  className={`w-full text-left px-3 py-2 flex items-baseline justify-between gap-3 ${visibles ? 'h-9' : ''} ${i === activo ? 'bg-blue-50' : ''}`}
                   onMouseEnter={() => setActivo(i)}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => pick(o.id)}

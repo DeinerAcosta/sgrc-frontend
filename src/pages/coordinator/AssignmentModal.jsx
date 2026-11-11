@@ -109,7 +109,12 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
   // asignación que YA fue guardada sin aux en una especialidad que normalmente
   // la exige (lo más probable: el coord ya marcó este check en su momento).
   const _yaGuardadaSinAux = !!asignacion && !(asignacion?.assistant_id ?? asignacion?.assistantId)
-  const [sinAuxiliar, setSinAuxiliar] = useState(_yaGuardadaSinAux && ESPECIALIDADES_EXIGEN_APOYO.includes(especialidadActiva))
+  // Nov-2026 · Ahora es la pregunta "¿Requiere auxiliar? Sí / No" debajo del
+  // profesional, también donde el apoyo es opcional (diagnóstico): ahí arranca
+  // en No salvo que el turno ya tenga técnico de apoyo.
+  const [sinAuxiliar, setSinAuxiliar] = useState(
+    ESPECIALIDADES_EXIGEN_APOYO.includes(especialidadActiva) ? _yaGuardadaSinAux : !(asignacion?.assistant_id ?? asignacion?.assistantId),
+  )
   // Si el coord marca "sin auxiliar", la exigencia se cae. La sección de apoyo
   // sigue mostrándose como opcional (o ni siquiera, ver más abajo) por si
   // luego cambian de idea durante la edición.
@@ -119,7 +124,8 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
   const esReprogramacion = !!cubreAusenciaId && !editando
   // Solo en una reprogramación hay tope: lo que falta por reprogramar del caso.
   const topePacientes = esReprogramacion && pacientesPorReprogramar > 0 ? pacientesPorReprogramar : null
-  const requiereAuxAdicional = _exigeApoyoPorEspecialidad && !sinAuxiliar && !esReprogramacion
+  // Si respondió Sí, la auxiliar (o el técnico de apoyo) pasa a ser obligatoria.
+  const requiereAuxAdicional = permiteApoyoOpcional && !sinAuxiliar && !esReprogramacion
   const [conflicto, setConflicto] = useState(null)
   // El resumen previo a guardar. null = cerrado. { conflicto } se llena solo
   // si el servidor rechazo por turno solapado, y entonces el mismo resumen
@@ -333,11 +339,15 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
   }
   const valid = form.resource_id && form.start_time && form.end_time && (!requiereAuxAdicional || form.assistant_id) && motivoOk && autorizacionOk
 
+  // Nov-2026 · Hector: asignar ya no es un modal sino una pantalla completa.
+  // Encima del Programador (no es una ruta aparte) para no perder la semana,
+  // la sede ni el caso que se está reprogramando al volver.
   return (
-    <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && tryClose()}>
-      <div className={`bg-white rounded-2xl w-full ${conPanel ? 'max-w-6xl' : 'max-w-xl'} max-h-[94vh] flex flex-col`}>
-        <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <div>
+    <div className="fixed inset-0 z-50 bg-gray-50 flex flex-col">
+      <div className="shrink-0 bg-white border-b border-gray-200">
+        <div className="flex items-center gap-4 px-4 sm:px-6 py-3">
+          <button onClick={tryClose} className="btn whitespace-nowrap">← Volver al programador</button>
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-sm font-semibold text-gray-900">
                 {editando ? 'Editar asignación' : 'Nueva asignación'}
@@ -362,12 +372,12 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
               )}
             </p>
           </div>
-          <button onClick={tryClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
         </div>
+      </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto md:flex md:overflow-hidden">
-        <div className={conPanel ? 'md:w-1/2 md:overflow-y-auto' : 'w-full'}>
-        <div className="px-5 py-4 space-y-4">
+        <div className={`bg-white ${conPanel ? 'md:w-1/2 md:overflow-y-auto md:border-r md:border-gray-200' : 'w-full md:overflow-y-auto'}`}>
+        <div className={`px-4 sm:px-6 py-5 space-y-4 ${conPanel ? '' : 'max-w-2xl mx-auto'}`}>
           {/* Oct-2026 · Viniendo de "Mover la agenda". Sin este aviso, el medico
               aparece puesto sin explicacion y el turno queda atado a una ausencia
               sin que nadie lo haya dicho en voz alta. */}
@@ -385,6 +395,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
               value={form.resource_id}
               onChange={(id) => set('resource_id', id)}
               placeholder="🔍 Buscar y seleccionar recurso…"
+              visibles={3}
               options={recursos.map((r) => {
                 const tipo = TIPOS_RECURSO.find((t) => t.value === r.type)
                 const horas = r.current_week_hours ?? r.currentWeekHours ?? 0
@@ -401,80 +412,44 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
             />
           </div>
 
-          {/* Franja horaria */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Nov-2026 · Hector: debajo del profesional, si requiere o no
+              auxiliar. Reemplaza la casilla "NO requiere auxiliar" que iba más
+              abajo. Con Sí, la auxiliar es obligatoria. */}
+          {permiteApoyoOpcional && !esReprogramacion && (
             <div>
-              <label className="label">Hora inicio <span className="text-red-600">*</span></label>
-              <input className="input" type="time" min="07:00" max="19:00" value={form.start_time} onChange={(e) => set('start_time', e.target.value)} />
-            </div>
-            <div>
-              <label className="label">Hora fin <span className="text-red-600">*</span></label>
-              <input className="input" type="time" min="07:00" max="19:00" value={form.end_time} onChange={(e) => set('end_time', e.target.value)} />
-            </div>
-          </div>
-
-          {/* PROYECTOS-3255 #2.1: capacidad y campo de pacientes ocultos para asesores.
-              Los asesores hacen recepcion/gestion; no atienden pacientes con cita. */}
-          {/* Oct-2026 · Hector pidió quitar "Capacidad calculada", el
-              "(opcional · si lo conoces de la agenda externa)" y el aviso de
-              "Sobrescribirá el cálculo". Queda solo el campo. */}
-          {form.resource_id && recursoSel?.type !== 'asesor_servicios' && (
-            <div>
-              <label className="label">
-                Pacientes programados reales
-                {topePacientes != null && (
-                  <span className="text-gray-400 font-normal"> (máx. {topePacientes})</span>
-                )}
-              </label>
-              <input
-                className="input"
-                type="number"
-                min="0"
-                max={topePacientes ?? 200}
-                placeholder={`Vacío = ${topePacientes != null ? Math.min(capacidad, topePacientes) : capacidad}`}
-                value={form.expected_patients}
-                onChange={(e) => {
-                  // En una reprogramación no se aceptan más pacientes de los que
-                  // faltan por reprogramar: si son 20, el 21 no entra.
-                  const v = e.target.value
-                  if (topePacientes != null && v !== '' && Number(v) > topePacientes) return
-                  set('expected_patients', v)
-                }}
-              />
-            </div>
-          )}
-
-          {/* Toggle "servicio sin auxiliar": solo aplica a especialidades que
-              normalmente la EXIGEN (oftalmo/anestesio). El coord lo marca cuando
-              el doctor realiza el servicio solo (consulta simple, control, etc.). */}
-          {_exigeApoyoPorEspecialidad && !esReprogramacion && (
-            <div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={sinAuxiliar}
-                  onChange={(e) => {
-                    const v = e.target.checked
-                    setSinAuxiliar(v)
-                    if (v) {
-                      // Al marcar "sin aux" limpiamos cualquier aux ya seleccionada
-                      // para que no se persista una asignación inconsistente.
-                      setForm((f) => ({
-                        ...f,
-                        assistant_id: '',
-                        assistant2_id: '',
-                        assistant_start_time: '',
-                        assistant_end_time: '',
-                        assistant2_start_time: '',
-                        assistant2_end_time: '',
-                      }))
-                      setAuxHorarioDistinto(false)
-                      setAux2HorarioDistinto(false)
-                    }
-                  }}
-                />
-                <span className="text-xs font-medium text-gray-700">Este servicio NO requiere auxiliar de enfermería</span>
-              </label>
+              <label className="label">{esDiagnostico ? '¿Requiere técnico de apoyo?' : '¿Requiere auxiliar?'}</label>
+              <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
+                {[{ v: true, t: 'Sí' }, { v: false, t: 'No' }].map((o) => {
+                  const activo = !sinAuxiliar === o.v
+                  return (
+                    <button
+                      key={o.t}
+                      type="button"
+                      className={`px-5 py-1.5 text-sm font-medium transition-colors ${activo ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                      onClick={() => {
+                        setSinAuxiliar(!o.v)
+                        if (!o.v) {
+                          // Con No se limpia lo que hubiera elegido, para no
+                          // guardar una auxiliar en un turno que dice no llevarla.
+                          setForm((f) => ({
+                            ...f,
+                            assistant_id: '',
+                            assistant2_id: '',
+                            assistant_start_time: '',
+                            assistant_end_time: '',
+                            assistant2_start_time: '',
+                            assistant2_end_time: '',
+                          }))
+                          setAuxHorarioDistinto(false)
+                          setAux2HorarioDistinto(false)
+                        }
+                      }}
+                    >
+                      {o.t}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           )}
 
@@ -494,13 +469,14 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
             <>
               <div>
                 <label className="label">
-                  {labelApoyo} {requiereAuxAdicional ? '*' : <span className="text-gray-400 font-normal">(opcional)</span>}
+                  {labelApoyo} {requiereAuxAdicional ? <span className="text-red-600">*</span> : <span className="text-gray-400 font-normal">(opcional)</span>}
                   <span className="text-gray-400 font-normal"> ({auxiliares.length} disponibles)</span>
                 </label>
                 <SearchableSelect
                   value={form.assistant_id}
                   onChange={(id) => set('assistant_id', id)}
                   placeholder={labelApoyoBuscar}
+                  visibles={3}
                   options={auxiliares
                     .filter((a) => a.id !== form.assistant2_id)  // no mostrar la que ya está en aux #2
                     .map((a) => {
@@ -570,6 +546,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                     value={form.assistant2_id}
                     onChange={(id) => set('assistant2_id', id)}
                     placeholder={esDiagnostico ? '🔍 Buscar segundo técnico de apoyo…' : '🔍 Buscar segunda auxiliar (si aplica)…'}
+                    visibles={3}
                     options={auxiliares
                       .filter((a) => a.id !== form.assistant_id)  // no mostrar la que ya está en aux #1
                       .map((a) => {
@@ -639,6 +616,48 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
               )}
             </>
           )}
+
+          {/* Nov-2026 · Hector: hora inicio, hora fin y pacientes en la misma
+              fila. Los pacientes no aplican a asesores (PROYECTOS-3255 #2.1). */}
+          {(() => {
+            const conPacientes = recursoSel?.type !== 'asesor_servicios'
+            return (
+              <div className={`grid grid-cols-1 gap-3 items-end ${conPacientes ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+                <div>
+                  <label className="label">Hora inicio <span className="text-red-600">*</span></label>
+                  <input className="input" type="time" min="07:00" max="19:00" value={form.start_time} onChange={(e) => set('start_time', e.target.value)} />
+                </div>
+                <div>
+                  <label className="label">Hora fin <span className="text-red-600">*</span></label>
+                  <input className="input" type="time" min="07:00" max="19:00" value={form.end_time} onChange={(e) => set('end_time', e.target.value)} />
+                </div>
+                {conPacientes && (
+                  <div>
+                    <label className="label">
+                      Pacientes programados reales
+                      {topePacientes != null && <span className="text-gray-400 font-normal"> (máx. {topePacientes})</span>}
+                    </label>
+                    <input
+                      className="input"
+                      type="number"
+                      min="0"
+                      max={topePacientes ?? 200}
+                      disabled={!form.resource_id}
+                      placeholder={form.resource_id ? `Vacío = ${topePacientes != null ? Math.min(capacidad, topePacientes) : capacidad}` : ''}
+                      value={form.expected_patients}
+                      onChange={(e) => {
+                        // En una reprogramación no se aceptan más pacientes de los que
+                        // faltan por reprogramar: si son 20, el 21 no entra.
+                        const v = e.target.value
+                        if (topePacientes != null && v !== '' && Number(v) > topePacientes) return
+                        set('expected_patients', v)
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           {/* Sep-2026 · Ley 2101 · Autorizacion directivo para aux con sáb+dom */}
           {requiereAutorizacionFinde && (
@@ -787,7 +806,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
         </div>
 
         {conPanel && (
-          <div className="md:w-1/2 md:overflow-y-auto border-t md:border-t-0 md:border-l border-gray-100 bg-gray-50 px-4 py-4 space-y-3">
+          <div className="md:w-1/2 md:overflow-y-auto border-t md:border-t-0 border-gray-100 bg-gray-50 px-4 sm:px-6 py-5 space-y-3">
             {recursoSel && (
               <ResourceWeekLoad
                 persona={recursoSel}
@@ -828,7 +847,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
         )}
         </div>
 
-        <div className="shrink-0 px-5 py-4 border-t border-gray-100 flex flex-col-reverse sm:flex-row gap-2">
+        <div className="shrink-0 bg-white px-4 sm:px-6 py-3 border-t border-gray-200 flex flex-col-reverse sm:flex-row gap-2">
           {editando && (
             <button
               className="btn-danger sm:mr-auto justify-center"
@@ -838,16 +857,15 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
               {eliminando ? <Spinner size="sm" /> : '🗑️ Eliminar'}
             </button>
           )}
-          <button className="btn flex-1 justify-center" onClick={tryClose}>Cancelar</button>
+          <button className="btn justify-center sm:ml-auto sm:w-40" onClick={tryClose}>Cancelar</button>
           <button
-            className="btn-primary flex-1 justify-center"
+            className="btn-primary justify-center sm:w-56"
             onClick={handleGuardar}
             disabled={!valid || isPending || eliminando}
           >
             {isPending ? <Spinner size="sm" /> : (editando ? 'Guardar cambios' : 'Guardar asignación')}
           </button>
         </div>
-      </div>
     </div>
   )
 }
