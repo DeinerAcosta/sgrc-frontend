@@ -166,6 +166,7 @@ export const NAV_ITEMS = {
         { to: '/app/programador',    label: 'Programador',    descripcion: 'Armar la semana del equipo' },
         { to: '/app/ejecucion',      label: 'Ejecución',      descripcion: 'Registrar lo que realmente pasó' },
         { to: '/app/horario-diario', label: 'Resumen diario', descripcion: 'El horario del día, listo para imprimir' },
+        { to: '/app/matriz-asignaciones', label: 'Matriz de asignaciones', descripcion: 'La malla fija de cada auxiliar con sus profesionales' },
       ],
     },
     GESTION_AUSENCIAS,
@@ -201,6 +202,7 @@ export const NAV_ITEMS = {
     // ausentismo. Es la separación que se está haciendo.
     AUSENTISMO,
     { to: '/app/reprogramaciones', icon: '🔄', label: 'Reprogramaciones' },
+    { to: '/app/matriz-asignaciones', icon: '🧩', label: 'Matriz de asignaciones' },
     {
       clave: 'cierre', icon: '🔒', label: 'Cierre y control',
       descripcion: 'Cómo se está cerrando cada semana.',
@@ -222,6 +224,7 @@ export const NAV_ITEMS = {
     GESTION_AUSENCIAS,
     // Para mover agendas y, con motivo, corregir una semana cerrada.
     { to: '/app/programador', icon: '📅', label: 'Programador' },
+    { to: '/app/matriz-asignaciones', icon: '🧩', label: 'Matriz de asignaciones' },
     CONFIGURACION,
     SOLICITUDES,
     { to: '/app/admin/auditoria', icon: '🔍', label: 'Auditoría' },
@@ -275,6 +278,7 @@ export const NAV_ITEMS = {
         // 21-oct · Hector: "Editar semana cerrada" = "Planeación semanal", y
         // "Cierre de semanas" queda segunda.
         { to: '/app/programador',             label: 'Planeación semanal', descripcion: 'Programar la semana; con motivo, corregir una ya cerrada' },
+        { to: '/app/matriz-asignaciones',     label: 'Matriz de asignaciones', descripcion: 'La malla fija de cada auxiliar con sus profesionales' },
         { to: '/app/informes/cierre-semanas', label: 'Cierre de semanas',  descripcion: 'Qué sedes cerraron y cuándo' },
       ],
     },

@@ -45,6 +45,7 @@ const RecursosCoordPage       = lazyConReintento(() => import('@/pages/coordinat
 const BackofficeCoordPage     = lazyConReintento(() => import('@/pages/coordinator/CoordBackofficePage'))
 const HorarioDiarioPage       = lazyConReintento(() => import('@/pages/coordinator/DailySchedulePage'))
 const SolicitudesRecursoCoordPage = lazyConReintento(() => import('@/pages/coordinator/CoordResourceRequestsPage'))
+const MatrizAsignacionesPage  = lazyConReintento(() => import('@/pages/coordinator/AssistantMatrixPage'))
 
 // Directivo
 const DashboardDirectivoPage    = lazyConReintento(() => import('@/pages/executive/ExecutiveDashboardPage'))
@@ -155,6 +156,8 @@ export default function App() {
           <Route path="backoffice-coord" element={<RequireAuth roles={['coordinador']}><BackofficeCoordPage /></RequireAuth>} />
           <Route path="horario-diario" element={<RequireAuth roles={['coordinador', 'supervisor']}><HorarioDiarioPage /></RequireAuth>} />
           <Route path="solicitudes-recurso" element={<RequireAuth roles={['coordinador']}><SolicitudesRecursoCoordPage /></RequireAuth>} />
+          {/* Nov-2026 · Malla fija de auxiliares (antes la hoja HORARIO AUXILIARES del Excel). */}
+          <Route path="matriz-asignaciones" element={<RequireAuth roles={['coordinador', 'supervisor', 'directivo']}><MatrizAsignacionesPage /></RequireAuth>} />
 
           {/* DIRECTIVO */}
           <Route path="dashboard" element={<RequireAuth roles={['directivo']}><DashboardDirectivoPage /></RequireAuth>} />

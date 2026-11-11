@@ -1194,6 +1194,14 @@ export const consultorioService = {
   },
 }
 
+// ============ MATRIZ DE ASIGNACIONES ============
+// Nov-2026 · La malla fija de las auxiliares. Sin modo demo: es una pantalla
+// nueva y el demo ya no se usa para mostrar el sistema.
+export const matrizService = {
+  get: () => api.get('/assistant-matrix'),
+  guardarDia: (auxiliarId, dia, data) => api.put(`/assistant-matrix/${auxiliarId}/${dia}`, data),
+}
+
 // ============ FESTIVOS (RN-06) ============
 export const festivoService = {
   list: async (params = {}) => {
