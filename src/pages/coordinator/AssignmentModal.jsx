@@ -375,9 +375,11 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
         </div>
       </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto md:flex md:overflow-hidden">
-        <div className={`bg-white ${conPanel ? 'md:w-1/2 md:overflow-y-auto md:border-r md:border-gray-200' : 'w-full md:overflow-y-auto'}`}>
-        <div className={`px-4 sm:px-6 py-5 space-y-4 ${conPanel ? '' : 'max-w-2xl mx-auto'}`}>
+        <div className="flex-1 min-h-0 overflow-y-auto lg:flex lg:overflow-hidden">
+        {/* Nov-2026 · Hector: "más adaptativo". El formulario no necesita media
+            pantalla: va angosto y la semana de cada persona ocupa el resto. */}
+        <div className={`bg-white ${conPanel ? 'lg:w-[500px] 2xl:w-[560px] lg:shrink-0 lg:overflow-y-auto lg:border-r lg:border-gray-200' : 'w-full lg:overflow-y-auto'}`}>
+        <div className={`px-4 sm:px-6 py-5 space-y-4 ${conPanel ? 'max-w-2xl mx-auto lg:max-w-none' : 'max-w-2xl mx-auto'}`}>
           {/* Oct-2026 · Viniendo de "Mover la agenda". Sin este aviso, el medico
               aparece puesto sin explicacion y el turno queda atado a una ausencia
               sin que nadie lo haya dicho en voz alta. */}
@@ -388,6 +390,49 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                 : 'del profesional ausente'}
             </div>
           )}
+          {/* Nov-2026 · Hector: el horario va PRIMERO, con hora inicio, hora fin
+              y pacientes en la misma fila. Los pacientes no aplican a asesores
+              (PROYECTOS-3255 #2.1). */}
+          {(() => {
+            const conPacientes = recursoSel?.type !== 'asesor_servicios'
+            return (
+              <div className={`grid grid-cols-1 gap-3 items-end ${conPacientes ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+                <div>
+                  <label className="label">Hora inicio <span className="text-red-600">*</span></label>
+                  <input className="input" type="time" min="07:00" max="19:00" value={form.start_time} onChange={(e) => set('start_time', e.target.value)} />
+                </div>
+                <div>
+                  <label className="label">Hora fin <span className="text-red-600">*</span></label>
+                  <input className="input" type="time" min="07:00" max="19:00" value={form.end_time} onChange={(e) => set('end_time', e.target.value)} />
+                </div>
+                {conPacientes && (
+                  <div>
+                    <label className="label whitespace-nowrap" title="Pacientes programados reales">
+                      Pacientes reales
+                      {topePacientes != null && <span className="text-gray-400 font-normal"> (máx. {topePacientes})</span>}
+                    </label>
+                    <input
+                      className="input"
+                      type="number"
+                      min="0"
+                      max={topePacientes ?? 200}
+                      disabled={!form.resource_id}
+                      placeholder={form.resource_id ? `Vacío = ${topePacientes != null ? Math.min(capacidad, topePacientes) : capacidad}` : ''}
+                      value={form.expected_patients}
+                      onChange={(e) => {
+                        // En una reprogramación no se aceptan más pacientes de los que
+                        // faltan por reprogramar: si son 20, el 21 no entra.
+                        const v = e.target.value
+                        if (topePacientes != null && v !== '' && Number(v) > topePacientes) return
+                        set('expected_patients', v)
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
           {/* Recurso principal — buscable */}
           <div>
             <label className="label">Recurso principal <span className="text-red-600">*</span> <span className="text-gray-400 font-normal">({recursos.length} disponibles)</span></label>
@@ -617,48 +662,6 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
             </>
           )}
 
-          {/* Nov-2026 · Hector: hora inicio, hora fin y pacientes en la misma
-              fila. Los pacientes no aplican a asesores (PROYECTOS-3255 #2.1). */}
-          {(() => {
-            const conPacientes = recursoSel?.type !== 'asesor_servicios'
-            return (
-              <div className={`grid grid-cols-1 gap-3 items-end ${conPacientes ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
-                <div>
-                  <label className="label">Hora inicio <span className="text-red-600">*</span></label>
-                  <input className="input" type="time" min="07:00" max="19:00" value={form.start_time} onChange={(e) => set('start_time', e.target.value)} />
-                </div>
-                <div>
-                  <label className="label">Hora fin <span className="text-red-600">*</span></label>
-                  <input className="input" type="time" min="07:00" max="19:00" value={form.end_time} onChange={(e) => set('end_time', e.target.value)} />
-                </div>
-                {conPacientes && (
-                  <div>
-                    <label className="label">
-                      Pacientes programados reales
-                      {topePacientes != null && <span className="text-gray-400 font-normal"> (máx. {topePacientes})</span>}
-                    </label>
-                    <input
-                      className="input"
-                      type="number"
-                      min="0"
-                      max={topePacientes ?? 200}
-                      disabled={!form.resource_id}
-                      placeholder={form.resource_id ? `Vacío = ${topePacientes != null ? Math.min(capacidad, topePacientes) : capacidad}` : ''}
-                      value={form.expected_patients}
-                      onChange={(e) => {
-                        // En una reprogramación no se aceptan más pacientes de los que
-                        // faltan por reprogramar: si son 20, el 21 no entra.
-                        const v = e.target.value
-                        if (topePacientes != null && v !== '' && Number(v) > topePacientes) return
-                        set('expected_patients', v)
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
-            )
-          })()}
-
           {/* Sep-2026 · Ley 2101 · Autorizacion directivo para aux con sáb+dom */}
           {requiereAutorizacionFinde && (
             <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
@@ -806,8 +809,11 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
         </div>
 
         {conPanel && (
-          <div className="md:w-1/2 md:overflow-y-auto border-t md:border-t-0 border-gray-100 bg-gray-50 px-4 sm:px-6 py-5 space-y-3">
+          // El profesional a lo ancho y las auxiliares lado a lado en pantallas
+          // anchas (una sola auxiliar también va a lo ancho); en angostas, apiladas.
+          <div className="lg:flex-1 lg:min-w-0 lg:overflow-y-auto border-t lg:border-t-0 border-gray-100 bg-gray-50 px-4 sm:px-6 py-5 grid grid-cols-1 xl:grid-cols-2 gap-3 content-start">
             {recursoSel && (
+              <div className="xl:col-span-2">
               <ResourceWeekLoad
                 persona={recursoSel}
                 rol={TIPOS_RECURSO.find((t) => t.value === recursoSel.type)?.label ?? 'Recurso principal'}
@@ -818,8 +824,10 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                 asignacionId={asignacion?.id}
                 turnoActual={turnoActual}
               />
+              </div>
             )}
             {verApoyo && auxSel && (
+              <div className={aux2Sel ? '' : 'xl:col-span-2'}>
               <ResourceWeekLoad
                 persona={auxSel}
                 rol={labelApoyo}
@@ -830,6 +838,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                 asignacionId={asignacion?.id}
                 turnoActual={turnoActual}
               />
+              </div>
             )}
             {verApoyo && aux2Sel && (
               <ResourceWeekLoad
