@@ -7,7 +7,7 @@ import SearchableSelect from '@/components/ui/SearchableSelect'
 import { useDirtyClose } from '@/hooks/useDirtyClose'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { TIPOS_RECURSO, clsx } from '@/utils/helpers'
-import { DIAS_MATRIZ, DIAS_MATRIZ_LABEL, horasDelDiaMatriz, fmtHoras } from '@/utils/matriz'
+import { DIAS_MATRIZ, DIAS_MATRIZ_LABEL, horasDelDiaMatriz, horasPorFranja, fmtHoras } from '@/utils/matriz'
 
 /**
  * MATRIZ DE ASIGNACIONES (nov-2026)
@@ -160,7 +160,6 @@ function SubCabecera() {
 
 /** Las tres casillas de un día. Cualquiera de las tres abre el editor. */
 function CeldaDia({ celda, onClick }) {
-  const horas = horasDelDiaMatriz(celda?.ranges)
   const base = 'px-2 py-1.5 cursor-pointer group-hover:bg-gray-50 hover:!bg-brand-50'
   if (!celda) {
     return (
@@ -169,13 +168,25 @@ function CeldaDia({ celda, onClick }) {
       </td>
     )
   }
+  // 11-nov · Hector: con dos horarios en el día, cada franja va en su propio
+  // recuadro y sus horas al lado, a la misma altura. La asignación sigue
+  // siendo una sola para el día.
+  const horas = horasPorFranja(celda.ranges)
   return (
     <>
       <td onClick={onClick} className={clsx(base, 'text-gray-700 tabular-nums whitespace-nowrap')}>
-        {celda.ranges.map((f) => <div key={f.ini}>{f.ini}–{f.fin}</div>)}
+        <div className="space-y-1">
+          {celda.ranges.map((f) => (
+            <div key={f.ini} className="h-6 flex items-center px-1.5 rounded border border-gray-200 bg-gray-50">
+              {f.ini}–{f.fin}
+            </div>
+          ))}
+        </div>
       </td>
       <td onClick={onClick} className={clsx(base, 'text-center font-semibold text-gray-900 tabular-nums')}>
-        {horas ? fmtHoras(horas) : ''}
+        <div className="space-y-1">
+          {horas.map((h, i) => <div key={i} className="h-6 flex items-center justify-center">{fmtHoras(h)}</div>)}
+        </div>
       </td>
       <td onClick={onClick} className={clsx(base, 'border-r border-gray-200')}>
         {celda.professionals.map((p) => (

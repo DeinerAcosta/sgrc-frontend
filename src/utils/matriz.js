@@ -26,5 +26,15 @@ export function horasDelDiaMatriz(franjas = []) {
   return (minutos - almuerzo) / 60
 }
 
+/**
+ * Las horas de cada franja, para pintarlas una por una. Suman lo mismo que
+ * horasDelDiaMatriz: con una sola franja larga el almuerzo se le descuenta a
+ * ella; con varias, cada una vale lo que dura.
+ */
+export function horasPorFranja(franjas = []) {
+  if (franjas.length === 1) return [horasDelDiaMatriz(franjas)]
+  return franjas.map((f) => Math.max(0, aMin(f.fin) - aMin(f.ini)) / 60)
+}
+
 /** 8.5 → "8,5" · 8 → "8" (como se escribe en la clínica). */
 export const fmtHoras = (h) => (Math.round(h * 10) / 10).toString().replace('.', ',')
