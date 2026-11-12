@@ -8,7 +8,7 @@ import { calcularCapacidadPacientes, DIAS_FULL, DIAS, TIPOS_RECURSO, ESPECIALIDA
 import { useDirtyClose } from '@/hooks/useDirtyClose'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useAuthStore } from '@/store/authStore'
-import AssignmentWeekGrid from '@/pages/coordinator/AssignmentWeekGrid'
+import ResourceWeekLoad from '@/pages/coordinator/ResourceWeekLoad'
 import { AuxiliarBar, AuxiliarTabla } from '@/pages/coordinator/AuxiliarGridSelect'
 import { elegible, huecosSinCubrir, horaPorDefecto } from '@/utils/matriz'
 
@@ -39,7 +39,7 @@ function auxiliaresIniciales(a) {
 }
 const AUX_VACIA = { id: '', ini: '', fin: '', auto: false, horaManual: false }
 
-export default function AsignacionModal({ data, asignacion, sedeId, grilla, onClose, onSaved }) {
+export default function AsignacionModal({ data, asignacion, sedeId, onClose, onSaved }) {
   const {
     roomId: consultorioId, room: consultorio, day: dia, weekId: semanaId, especialidadOverride,
     // Oct-2026 · Cuando se llega desde "Mover la agenda", el modal sabe a quién
@@ -432,6 +432,24 @@ export default function AsignacionModal({ data, asignacion, sedeId, grilla, onCl
     setForm((f) => ({ ...f, auxs: recalcularAuxs([...f.auxs, { ...AUX_VACIA }]) }))
   }
   // "Hasta que se acabe el horario del médico": se agregan mientras quede algo sin cubrir.
+  // Lo que se está armando, para el detalle de "Este turno" en la semana de cada persona.
+  const turnoActual = {
+    consultorio: consultorio?.name,
+    sede: consultorio?.site?.name ?? consultorio?.site_name,
+    ini: form.start_time,
+    fin: form.end_time,
+    profesional: recursoSel?.name,
+    auxiliares: verApoyo
+      ? auxsElegidas.map((x) => {
+          const n = auxiliares.find((a) => a.id === x.id)?.name ?? ''
+          return x.ini !== form.start_time || x.fin !== form.end_time ? `${n} (${x.ini}–${x.fin})` : n
+        })
+      : [],
+    pacientes: form.expected_patients === '' ? capacidad : form.expected_patients,
+  }
+  // Mitad formulario, mitad la semana de cada persona (el diseño de siempre).
+  // Sale en cuanto hay alguien elegido y NO se aparta al elegir auxiliar.
+  const conPanel = !!recursoSel || (verApoyo && auxsElegidas.length > 0)
   const huecosTurno = huecosSinCubrir(form.start_time, form.end_time, auxsElegidas)
   const puedeAgregarAux = verApoyo && horarioValido && huecosTurno.length > 0 && form.auxs.every((x) => x.id)
   // Cada auxiliar con un horario válido dentro del turno.
@@ -476,7 +494,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, grilla, onCl
 
         <div className="flex-1 min-h-0 overflow-y-auto lg:flex lg:overflow-hidden">
         {/* Mitad formulario, mitad grilla (en pantallas angostas, una debajo de la otra). */}
-        <div className="bg-white lg:w-1/2 lg:shrink-0 lg:overflow-y-auto lg:border-r lg:border-gray-200">
+        <div className={`bg-white ${conPanel ? 'lg:w-1/2 lg:shrink-0 lg:overflow-y-auto lg:border-r lg:border-gray-200' : 'w-full lg:overflow-y-auto'}`}>
         <div className="px-4 sm:px-6 py-5 space-y-4 max-w-2xl mx-auto">
           {/* Oct-2026 · Viniendo de "Mover la agenda". Sin este aviso, el medico
               aparece puesto sin explicacion y el turno queda atado a una ausencia
@@ -822,24 +840,42 @@ export default function AsignacionModal({ data, asignacion, sedeId, grilla, onCl
         {editando && <Contingencia asignacion={asignacion} onSaved={onSaved} />}
         </div>
 
-        {/* Nov-2026 · Hector: "mitad asignar y mitad grilla". La grilla va SIEMPRE,
-            también mientras se elige auxiliar ("se pierde la información de la grilla"). */}
-          <div className="lg:w-1/2 lg:min-w-0 h-[70vh] lg:h-auto border-t lg:border-t-0 border-gray-100 bg-gray-50 p-4">
-            <AssignmentWeekGrid
-              consultorios={grilla?.consultorios ?? []}
-              asignaciones={grilla?.asignaciones ?? []}
-              diasFecha={grilla?.diasFecha ?? []}
-              roomId={consultorioId}
-              dia={dia}
-              asignacionId={asignacion?.id}
-              turno={{
-                profesional: recursoSel?.name,
-                ini: form.start_time,
-                fin: form.end_time,
-                auxiliares: verApoyo ? auxsElegidas.map((x) => auxiliares.find((a) => a.id === x.id)?.name).filter(Boolean) : [],
-              }}
-            />
+        {/* Nov-2026 · Hector: "mitad asignar y mitad grilla" — la grilla es la
+            semana de cada persona (profesional y auxiliares), con el diseño de
+            siempre. No se aparta mientras se elige auxiliar. */}
+        {conPanel && (
+          <div className="lg:w-1/2 lg:min-w-0 lg:overflow-y-auto border-t lg:border-t-0 border-gray-100 bg-gray-50 px-4 sm:px-6 py-5 space-y-3">
+            {recursoSel && (
+              <ResourceWeekLoad
+                persona={recursoSel}
+                rol={TIPOS_RECURSO.find((t) => t.value === recursoSel.type)?.label ?? 'Recurso principal'}
+                semanaId={semanaId}
+                dia={dia}
+                ini={form.start_time}
+                fin={form.end_time}
+                asignacionId={asignacion?.id}
+                turnoActual={turnoActual}
+              />
+            )}
+            {verApoyo && auxsElegidas.map((x, i) => {
+              const persona = auxiliares.find((a) => a.id === x.id)
+              if (!persona) return null
+              return (
+                <ResourceWeekLoad
+                  key={x.id}
+                  persona={persona}
+                  rol={`${labelApoyo} ${i + 1}`}
+                  semanaId={semanaId}
+                  dia={dia}
+                  ini={x.ini || form.start_time}
+                  fin={x.fin || form.end_time}
+                  asignacionId={asignacion?.id}
+                  turnoActual={turnoActual}
+                />
+              )
+            })}
           </div>
+        )}
         </div>
 
         <div className="shrink-0 bg-white px-4 sm:px-6 py-3 border-t border-gray-200 flex flex-col-reverse sm:flex-row gap-2">

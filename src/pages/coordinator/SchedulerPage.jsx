@@ -1486,8 +1486,6 @@ export default function ProgramadorPage() {
           data={modalData}
           asignacion={modalData.assignment}
           sedeId={sedeId}
-          // Nov-2026 · Hector: "mitad asignar y mitad grilla": la semana de la sede al lado.
-          grilla={{ consultorios, asignaciones, diasFecha }}
           onClose={() => setModalData(null)}
           onSaved={() => {
             qc.invalidateQueries({ queryKey: ['asignaciones'] })
