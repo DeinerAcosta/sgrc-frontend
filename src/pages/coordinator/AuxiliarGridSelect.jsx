@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { clsx } from '@/utils/helpers'
 import { ESTADOS_AUX, elegible } from '@/utils/matriz'
 
@@ -106,38 +106,45 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
     return l.sort((a, b) => rango(a) - rango(b) || dispo(b) - dispo(a) || porNombre(a, b))
   }, [base, nombre, estado, orden])
 
-  const th = 'border border-gray-200 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-600 bg-gray-50'
-  const td = 'border border-gray-200 px-3 py-2 align-middle'
+  // Al abrirse dentro del formulario, que se vean sus filas sin buscarlas.
+  const raiz = useRef(null)
+  useEffect(() => { raiz.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) }, [])
+
+  const th = 'border border-gray-200 px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-gray-600 bg-gray-50'
+  const td = 'border border-gray-200 px-2 py-1.5 align-middle'
 
   return (
-    <div className="mt-2 rounded-lg border border-gray-300 bg-white shadow-md overflow-hidden">
-      <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-gray-200 bg-gray-50">
-        <input
-          autoFocus
-          className="input !py-1.5 flex-1 min-w-[180px] max-w-sm"
-          placeholder="Buscar por nombre"
-          value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
-        />
+    <div ref={raiz} className="mt-2 rounded-lg border border-gray-300 bg-white shadow-md overflow-hidden">
+      {/* Dos líneas: buscador y orden arriba, estados abajo. */}
+      <div className="px-3 py-2 border-b border-gray-200 bg-gray-50 space-y-2">
+        <div className="flex items-center gap-2">
+          <input
+            autoFocus
+            className="input !py-1.5 flex-1 min-w-0"
+            placeholder="Buscar por nombre"
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+          />
+          <select
+            className="shrink-0 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-400"
+            value={orden}
+            onChange={(e) => setOrden(e.target.value)}
+            aria-label="Ordenar"
+          >
+            {ORDENES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+          <button type="button" onClick={onClose} className="shrink-0 h-7 w-7 rounded-full text-gray-400 hover:bg-gray-200 hover:text-gray-600 leading-none" aria-label="Cerrar">×</button>
+        </div>
         <div className="flex flex-wrap gap-1">
           <FiltroChip activo={!estado} onClick={() => setEstado('')} label="Todos" n={base.length} />
           {FILTROS.map((k) => (
             <FiltroChip key={k} activo={estado === k} onClick={() => setEstado(estado === k ? '' : k)} label={ESTADOS_AUX[k].label} n={conteo[k]} dot={ESTADOS_AUX[k].dot} />
           ))}
         </div>
-        <select
-          className="ml-auto rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-400"
-          value={orden}
-          onChange={(e) => setOrden(e.target.value)}
-          aria-label="Ordenar"
-        >
-          {ORDENES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-        <button type="button" onClick={onClose} className="h-7 w-7 rounded-full text-gray-400 hover:bg-gray-200 hover:text-gray-600 leading-none" aria-label="Cerrar">×</button>
       </div>
 
       <div className="overflow-auto" style={{ maxHeight: 40 + FILAS_VISIBLES * ALTO_FILA_PX }}>
-        <table className="w-full min-w-[820px] border-collapse text-xs">
+        <table className="w-full min-w-[620px] border-collapse text-xs">
           <thead className="sticky top-0 z-10">
             <tr>
               <th className={th}>Auxiliar</th>
@@ -185,7 +192,7 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
                   <td className={td}>
                     <span className="block tabular-nums">{fmt(f.horasSemana)}{f.tope != null && <span className="text-gray-400"> / {fmt(f.tope)}h</span>}</span>
                     {f.tope != null && (
-                      <span className="block h-1 mt-1 w-24 rounded-full bg-gray-100 overflow-hidden">
+                      <span className="block h-1 mt-1 w-16 rounded-full bg-gray-100 overflow-hidden">
                         <span className={clsx('block h-full rounded-full', pct >= 100 ? 'bg-rose-500' : pct >= 90 ? 'bg-amber-500' : 'bg-emerald-500')} style={{ width: `${pct}%` }} />
                       </span>
                     )}

@@ -434,10 +434,6 @@ export default function AsignacionModal({ data, asignacion, sedeId, grilla, onCl
   // "Hasta que se acabe el horario del médico": se agregan mientras quede algo sin cubrir.
   const huecosTurno = huecosSinCubrir(form.start_time, form.end_time, auxsElegidas)
   const puedeAgregarAux = verApoyo && horarioValido && huecosTurno.length > 0 && form.auxs.every((x) => x.id)
-  // Nov-2026 · Hector: "mitad asignar y mitad grilla". La grilla del
-  // Programador va siempre a la derecha; solo se aparta mientras se elige una
-  // auxiliar, porque esa cuadrícula necesita el ancho de la pantalla.
-  const conPanel = eligiendoAux == null
   // Cada auxiliar con un horario válido dentro del turno.
   const horasAuxOk = auxsElegidas.every((x) => x.ini && x.fin && x.ini < x.fin && x.ini >= form.start_time && x.fin <= form.end_time)
   const valid = form.resource_id && form.start_time && form.end_time && (!requiereAuxAdicional || auxsElegidas.length > 0) && (!verApoyo || horasAuxOk) && motivoOk && autorizacionOk
@@ -480,8 +476,8 @@ export default function AsignacionModal({ data, asignacion, sedeId, grilla, onCl
 
         <div className="flex-1 min-h-0 overflow-y-auto lg:flex lg:overflow-hidden">
         {/* Mitad formulario, mitad grilla (en pantallas angostas, una debajo de la otra). */}
-        <div className={`bg-white ${conPanel ? 'lg:w-1/2 lg:shrink-0 lg:overflow-y-auto lg:border-r lg:border-gray-200' : 'w-full lg:overflow-y-auto'}`}>
-        <div className={`px-4 sm:px-6 py-5 space-y-4 ${conPanel ? 'max-w-2xl mx-auto' : 'max-w-2xl mx-auto lg:max-w-[560px]'}`}>
+        <div className="bg-white lg:w-1/2 lg:shrink-0 lg:overflow-y-auto lg:border-r lg:border-gray-200">
+        <div className="px-4 sm:px-6 py-5 space-y-4 max-w-2xl mx-auto">
           {/* Oct-2026 · Viniendo de "Mover la agenda". Sin este aviso, el medico
               aparece puesto sin explicacion y el turno queda atado a una ausencia
               sin que nadie lo haya dicho en voz alta. */}
@@ -624,10 +620,8 @@ export default function AsignacionModal({ data, asignacion, sedeId, grilla, onCl
                       placeholder={labelApoyoBuscar}
                     />
                     {abierta && (
-                      // Mientras se elige, el formulario va centrado y la cuadrícula se
-                      // abre centrada bajo él, con el ancho que haya (hasta 1240px).
-                      // Hector: "que esté centrado… y quede mejor espacio".
-                      <div className="lg:relative lg:left-1/2 lg:-translate-x-1/2 lg:w-[min(1240px,calc(100vw-48px))]">
+                      // Debajo de la barra, dentro de la mitad del formulario.
+                      <div>
                         <AuxiliarTabla
                           value={x.id}
                           excluir={form.auxs.filter((_, j) => j !== i).map((y) => y.id).filter(Boolean)}
@@ -828,7 +822,8 @@ export default function AsignacionModal({ data, asignacion, sedeId, grilla, onCl
         {editando && <Contingencia asignacion={asignacion} onSaved={onSaved} />}
         </div>
 
-        {conPanel && (
+        {/* Nov-2026 · Hector: "mitad asignar y mitad grilla". La grilla va SIEMPRE,
+            también mientras se elige auxiliar ("se pierde la información de la grilla"). */}
           <div className="lg:w-1/2 lg:min-w-0 h-[70vh] lg:h-auto border-t lg:border-t-0 border-gray-100 bg-gray-50 p-4">
             <AssignmentWeekGrid
               consultorios={grilla?.consultorios ?? []}
@@ -845,7 +840,6 @@ export default function AsignacionModal({ data, asignacion, sedeId, grilla, onCl
               }}
             />
           </div>
-        )}
         </div>
 
         <div className="shrink-0 bg-white px-4 sm:px-6 py-3 border-t border-gray-200 flex flex-col-reverse sm:flex-row gap-2">
