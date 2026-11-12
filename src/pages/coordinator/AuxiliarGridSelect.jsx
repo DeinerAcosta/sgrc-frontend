@@ -25,11 +25,6 @@ import { ESTADOS_AUX, elegible } from '@/utils/matriz'
  */
 
 const FILTROS = ['disponible', 'sin_asignar', 'asignado', 'ausente']
-const ORDENES = [
-  ['sugerido', 'Orden: sugerido'],
-  ['alfabetico', 'Orden: alfabético'],
-  ['horas_asc', 'Orden: horas disp. (menor a mayor)'],
-]
 // Hector: se ven 3 filas y las demás con el scroll de la tabla, sin que la
 // pantalla tenga que bajar. Filas de alto fijo (nada se parte en dos líneas).
 const FILAS_VISIBLES = 3
@@ -88,7 +83,17 @@ export function AuxiliarBar({ fila, abierto, onClick, cargando, placeholder }) {
 export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
   const [nombre, setNombre] = useState('')
   const [estado, setEstado] = useState('')
-  const [orden, setOrden] = useState('sugerido')
+  // Cada título ordena por su cuenta (▲ ascendente, ▼ descendente); sin
+  // ninguno activo va el orden sugerido.
+  const [orden, setOrden] = useState({ campo: null, dir: 'asc' })
+  const ordenarPor = (campo) => setOrden((o) => (o.campo === campo
+    ? { campo, dir: o.dir === 'asc' ? 'desc' : 'asc' }
+    : { campo, dir: 'asc' }))
+  const flecha = (campo) => (
+    <span className={clsx('ml-1', orden.campo === campo ? 'text-brand-700' : 'text-gray-300')}>
+      {orden.campo === campo ? (orden.dir === 'asc' ? '▲' : '▼') : '↕'}
+    </span>
+  )
 
   const base = useMemo(() => filas.filter((f) => !excluir?.includes(f.id)), [filas, excluir])
 
@@ -99,8 +104,9 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
       .filter((f) => !estado || f.estado === estado)
     const porNombre = (a, b) => a.name.localeCompare(b.name, 'es')
     const dispo = (f) => f.disponibles ?? -Infinity
-    if (orden === 'alfabetico') return l.sort(porNombre)
-    if (orden === 'horas_asc') return l.sort((a, b) => dispo(a) - dispo(b) || porNombre(a, b))
+    const signo = orden.dir === 'asc' ? 1 : -1
+    if (orden.campo === 'nombre') return l.sort((a, b) => signo * porNombre(a, b))
+    if (orden.campo === 'horas') return l.sort((a, b) => signo * (dispo(a) - dispo(b)) || porNombre(a, b))
     // Arriba la pareja de la Matriz que se puede elegir, luego las elegibles
     // con más horas disponibles y al final las que no se pueden.
     const rango = (f) => (elegible(f.estado) ? (f.preseleccionada ? 0 : 1) : 2)
@@ -116,8 +122,8 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
 
   return (
     <div ref={raiz} className="mt-2 rounded-lg border border-gray-300 bg-white shadow-md overflow-hidden">
-      {/* Hector: filtros por nombre y estado, orden alfabético y horas
-          disponibles de menor a mayor, todo en esta barra. */}
+      {/* Hector: filtros por nombre y estado en esta barra; el orden
+          (alfabético y horas disponibles) con la flecha de cada título. */}
       <div className="flex items-center gap-2 px-2 py-1.5 border-b border-gray-200 bg-gray-50">
         <input
           autoFocus
@@ -132,16 +138,8 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
           onChange={(e) => setEstado(e.target.value)}
           aria-label="Estado"
         >
-          <option value="">Todos los estados</option>
+          <option value="">Estado</option>
           {FILTROS.map((k) => <option key={k} value={k}>{ESTADOS_AUX[k].label}</option>)}
-        </select>
-        <select
-          className="shrink-0 max-w-[40%] rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-400"
-          value={orden}
-          onChange={(e) => setOrden(e.target.value)}
-          aria-label="Orden"
-        >
-          {ORDENES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
         </select>
         <button type="button" onClick={onClose} className="shrink-0 h-7 w-7 rounded-full text-gray-400 hover:bg-gray-200 hover:text-gray-600 leading-none" aria-label="Cerrar">×</button>
       </div>
@@ -160,14 +158,14 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
           </colgroup>
           <thead className="sticky top-0 z-10">
             <tr style={{ height: ALTO_TITULOS_PX }}>
-              <th className={clsx(th, 'cursor-pointer select-none hover:text-brand-700')} onClick={() => setOrden(orden === 'alfabetico' ? 'sugerido' : 'alfabetico')} title="Ordenar alfabéticamente">
-                Auxiliar{orden === 'alfabetico' ? ' ▲' : ''}
+              <th className={clsx(th, 'cursor-pointer select-none hover:text-brand-700')} onClick={() => ordenarPor('nombre')} title="Ordenar alfabéticamente">
+                Auxiliar{flecha('nombre')}
               </th>
               <th className={th}>Estado</th>
               <th className={th}>Recurso par</th>
               <th className={clsx(th, 'text-center')}>Día</th>
-              <th className={clsx(th, 'cursor-pointer select-none hover:text-brand-700')} onClick={() => setOrden(orden === 'horas_asc' ? 'sugerido' : 'horas_asc')} title="Horas disponibles de menor a mayor">
-                Semana{orden === 'horas_asc' ? ' ▲' : ''}
+              <th className={clsx(th, 'cursor-pointer select-none hover:text-brand-700')} onClick={() => ordenarPor('horas')} title="Ordenar por horas disponibles">
+                Semana{flecha('horas')}
               </th>
               <th className={th}>Horario</th>
               <th className={th}>Sede</th>
