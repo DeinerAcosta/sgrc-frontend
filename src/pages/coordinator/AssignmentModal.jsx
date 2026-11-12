@@ -151,6 +151,9 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
   const { data: recursos = [] } = useQuery({
     queryKey: ['recursos-disponibles', especialidadActiva, semanaId],
     queryFn: () => recursoService.list({ especialidad_consultorio: especialidadActiva, active: true, week_id: semanaId }),
+    // Nov-2026 · Hector: "ya puse una asignación y no marca la semanal". Con
+    // el staleTime global (5 min) las horas eran las de antes de asignar.
+    staleTime: 0,
   })
 
   // Pool de recursos de apoyo. En diagnóstico cargamos técnicos; en oftalmo/anest, auxiliares.
@@ -161,6 +164,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
     queryKey: ['pool-apoyo', tipoApoyo, semanaId],
     queryFn: () => recursoService.list({ type: tipoApoyo, active: true, week_id: semanaId }),
     enabled: permiteApoyoOpcional,
+    staleTime: 0,
   })
   const auxiliares = esDiagnostico
     ? poolApoyo.filter((r) => r.id !== form.resource_id)
@@ -645,6 +649,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                           value={x.id}
                           excluir={form.auxs.filter((_, j) => j !== i).map((y) => y.id).filter(Boolean)}
                           filas={filasAux}
+                          dia={diaLabel}
                           onChange={(id) => { setAux(i, { id, auto: false, horaManual: false }); setEligiendoAux(null) }}
                           onClose={() => setEligiendoAux(null)}
                         />

@@ -29,7 +29,7 @@ const FILTROS = ['disponible', 'sin_asignar', 'asignado', 'ausente']
 // pantalla tenga que bajar. Filas de alto fijo (nada se parte en dos líneas).
 const FILAS_VISIBLES = 3
 const ALTO_FILA_PX = 40
-const ALTO_TITULOS_PX = 30
+const ALTO_TITULOS_PX = 34
 
 const normalizar = (t) => (t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 const fmt = (h) => (h == null ? '—' : (Math.round(h * 10) / 10).toString().replace('.', ','))
@@ -80,7 +80,15 @@ export function AuxiliarBar({ fila, abierto, onClick, cargando, placeholder }) {
 }
 
 /** La cuadrícula con líneas, debajo de la barra. */
-export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
+export function AuxiliarTabla({ value, onChange, onClose, filas, excluir, dia = '' }) {
+  // Hector: "¿la sede qué significa?". Los títulos dicen de qué día son.
+  // El día va debajo del título, en pequeño, para que no se corte.
+  const conDia = (t) => (
+    <>
+      <span className="block leading-tight">{t}</span>
+      {dia && <span className="block text-[9px] font-normal normal-case leading-tight text-white/70">{dia.toLowerCase()}</span>}
+    </>
+  )
   const [nombre, setNombre] = useState('')
   const [estado, setEstado] = useState('')
   // Cada título ordena por su cuenta (▲ ascendente, ▼ descendente); sin
@@ -119,7 +127,7 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
 
   const selCls = 'shrink-0 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-400'
   // Títulos en el azul marino de la marca, igual que la Matrix.
-  const th = 'border border-white/20 px-1.5 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wide text-white bg-brand-600 whitespace-nowrap overflow-hidden text-ellipsis'
+  const th = 'border border-white/20 px-1.5 py-1 text-left text-[10px] font-semibold uppercase tracking-wide text-white bg-brand-600 whitespace-nowrap overflow-hidden text-ellipsis'
   const td = 'border border-gray-200 px-1.5 py-1 align-middle whitespace-nowrap overflow-hidden text-ellipsis'
 
   return (
@@ -170,13 +178,13 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
         {/* Anchos fijos para que las 7 columnas quepan en la mitad del formulario. */}
         <table className="w-full table-fixed border-collapse text-xs">
           <colgroup>
-            <col style={{ width: '27%' }} />
-            <col style={{ width: '18%' }} />
+            <col style={{ width: '24%' }} />
             <col style={{ width: '16%' }} />
-            <col style={{ width: '6%' }} />
+            <col style={{ width: '14%' }} />
+            <col style={{ width: '9%' }} />
             <col style={{ width: '12%' }} />
+            <col style={{ width: '14%' }} />
             <col style={{ width: '11%' }} />
-            <col style={{ width: '10%' }} />
           </colgroup>
           <thead className="sticky top-0 z-10">
             <tr style={{ height: ALTO_TITULOS_PX }}>
@@ -185,12 +193,12 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
               </th>
               <th className={th}>Estado</th>
               <th className={th}>Recurso par</th>
-              <th className={clsx(th, 'text-center')}>Día</th>
+              <th className={clsx(th, 'text-center')} title={`Horas que ya tiene el ${dia.toLowerCase()}`}>{conDia('Horas')}</th>
               <th className={clsx(th, 'cursor-pointer select-none hover:text-iris-blue')} onClick={() => ordenarPor('horas')} title="Ordenar por horas disponibles">
                 Semana{flecha('horas')}
               </th>
-              <th className={th}>Horario</th>
-              <th className={th}>Sede</th>
+              <th className={th} title={`Horario que ya tiene el ${dia.toLowerCase()}`}>{conDia('Horario')}</th>
+              <th className={th} title={`Sede donde trabaja el ${dia.toLowerCase()}`}>{conDia('Sede')}</th>
             </tr>
           </thead>
           <tbody>
@@ -237,7 +245,9 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
                     )}
                   </td>
                   <td className={clsx(td, 'tabular-nums whitespace-nowrap')}>
-                    {f.horario.length ? f.horario.map((h) => `${h.ini}–${h.fin}`).join(', ') : '—'}
+                    <span className="block truncate" title={f.horario.map((h) => `${h.ini}–${h.fin}${h.consultorio ? ` · ${h.consultorio}` : ''}${h.este_turno ? ' (este turno)' : ''}`).join(' · ')}>
+                      {f.horario.length ? f.horario.map((h) => `${h.ini}–${h.fin}`).join(', ') : '—'}
+                    </span>
                   </td>
                   <td className={td}>
                     <span className="block truncate" title={f.sedes.join(', ')}>{f.sedes.join(', ') || '—'}</span>
