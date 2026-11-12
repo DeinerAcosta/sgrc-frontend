@@ -26,8 +26,19 @@ import { DIAS_MATRIZ, DIAS_MATRIZ_LABEL, horasDelDiaMatriz, horasPorFranja, fmtH
 const normalizar = (t) => (t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 const etiquetaTipo = (t) => TIPOS_RECURSO.find((x) => x.value === t)?.label ?? t
 
+// Hector: filtrar no solo por nombre, también por estado y lo demás.
+const ESTADOS_MALLA = [
+  ['con_malla', 'Con malla'],
+  ['sin_malla', 'Sin malla'],
+  ['pasa_tope', 'Pasa del tope'],
+]
+const FILTROS_VACIOS = { buscar: '', estado: '', dia: '', profesional: '', nombre: '', horas: '' }
+const selCls = 'rounded-lg border border-gray-200 bg-white px-2 py-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-400'
+
 export default function AssistantMatrixPage() {
-  const [buscar, setBuscar] = useState('')
+  const [f, setF] = useState(FILTROS_VACIOS)
+  const setFiltro = (campo, valor) => setF((x) => ({ ...x, [campo]: valor }))
+  const hayFiltros = Object.values(f).some(Boolean)
   const [editando, setEditando] = useState(null) // { auxiliar, dia }
 
   const { data, isLoading, isError, error } = useQuery({
@@ -48,31 +59,78 @@ export default function AssistantMatrixPage() {
 
   const totalDe = (auxId) => DIAS_MATRIZ.reduce((s, d) => s + horasDelDiaMatriz(celdas[auxId]?.[d]?.ranges), 0)
 
+  // Profesionales que salen en la malla (solo esos tiene sentido filtrar).
+  const profEnMalla = useMemo(() => {
+    const m = new Map()
+    for (const c of data?.cells ?? []) for (const p of c.professionals) m.set(p.id, p.name)
+    return [...m].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, 'es'))
+  }, [data])
+
   // Busca por auxiliar, por profesional o por la nota (ej. "LASER", "FN2").
-  const q = normalizar(buscar.trim())
-  const filas = q
-    ? auxiliares.filter((a) => normalizar(a.name).includes(q) || DIAS_MATRIZ.some((d) => {
-        const c = celdas[a.id]?.[d]
-        return c && (normalizar(c.note).includes(q) || c.professionals.some((p) => normalizar(p.name).includes(q)))
-      }))
-    : auxiliares
+  const q = normalizar(f.buscar.trim())
+  const diasFiltro = f.dia ? [f.dia] : DIAS_MATRIZ
+  const filas = auxiliares
+    .filter((a) => !q || normalizar(a.name).includes(q) || DIAS_MATRIZ.some((d) => {
+      const c = celdas[a.id]?.[d]
+      return c && (normalizar(c.note).includes(q) || c.professionals.some((p) => normalizar(p.name).includes(q)))
+    }))
+    .filter((a) => !f.dia || celdas[a.id]?.[f.dia])
+    .filter((a) => !f.profesional || diasFiltro.some((d) => celdas[a.id]?.[d]?.professionals.some((p) => p.id === f.profesional)))
+    .filter((a) => {
+      if (f.estado === 'con_malla') return !!celdas[a.id]
+      if (f.estado === 'sin_malla') return !celdas[a.id]
+      if (f.estado === 'pasa_tope') return a.max_hours_per_week != null && totalDe(a.id) > a.max_hours_per_week
+      return true
+    })
+  const porNombre = (a, b) => a.name.localeCompare(b.name, 'es')
+  if (f.nombre) filas.sort((a, b) => (f.nombre === 'asc' ? 1 : -1) * porNombre(a, b))
+  else if (f.horas) filas.sort((a, b) => (f.horas === 'asc' ? 1 : -1) * (totalDe(a.id) - totalDe(b.id)) || porNombre(a, b))
   const conMalla = auxiliares.filter((a) => celdas[a.id]).length
 
   return (
     <div className="p-3 sm:p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+      <div className="mb-3">
         <div>
           <h1 className="text-base font-semibold text-gray-900">Matriz de asignaciones</h1>
           <p className="text-xs text-gray-500">
-            {auxiliares.length} auxiliares · {conMalla} con malla
+            {auxiliares.length} auxiliares · {conMalla} con malla{hayFiltros ? ` · ${filas.length} en el filtro` : ''}
           </p>
         </div>
-        <input
-          className="input sm:max-w-xs"
-          placeholder="Buscar auxiliar, profesional o nota…"
-          value={buscar}
-          onChange={(e) => setBuscar(e.target.value)}
-        />
+      </div>
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+          <input
+            className="input !py-2 w-full sm:w-auto sm:flex-1 sm:min-w-[220px]"
+            placeholder="Buscar auxiliar, profesional o nota…"
+            value={f.buscar}
+            onChange={(e) => setFiltro('buscar', e.target.value)}
+          />
+          <select className={selCls} value={f.estado} onChange={(e) => setFiltro('estado', e.target.value)} aria-label="Estado">
+            <option value="">Estado</option>
+            {ESTADOS_MALLA.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+          </select>
+          <select className={selCls} value={f.dia} onChange={(e) => setFiltro('dia', e.target.value)} aria-label="Día">
+            <option value="">Día</option>
+            {DIAS_MATRIZ.map((d) => <option key={d} value={d}>{DIAS_MATRIZ_LABEL[d]}</option>)}
+          </select>
+          <select className={clsx(selCls, 'max-w-[180px]')} value={f.profesional} onChange={(e) => setFiltro('profesional', e.target.value)} aria-label="Profesional">
+            <option value="">Profesional</option>
+            {profEnMalla.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <select className={selCls} value={f.nombre} onChange={(e) => setF((x) => ({ ...x, nombre: e.target.value, horas: '' }))} aria-label="Orden alfabético">
+            <option value="">Nombre</option>
+            <option value="asc">A → Z</option>
+            <option value="desc">Z → A</option>
+          </select>
+          <select className={selCls} value={f.horas} onChange={(e) => setF((x) => ({ ...x, horas: e.target.value, nombre: '' }))} aria-label="Total horas">
+            <option value="">Horas</option>
+            <option value="asc">Menos horas</option>
+            <option value="desc">Más horas</option>
+          </select>
+          {hayFiltros && (
+            <button type="button" className="text-xs font-medium text-brand-600 hover:underline px-1" onClick={() => setF(FILTROS_VACIOS)}>
+              Limpiar
+            </button>
+          )}
       </div>
 
       {isLoading ? (
@@ -82,7 +140,7 @@ export default function AssistantMatrixPage() {
       ) : !auxiliares.length ? (
         <EmptyState icon="👥" title="No hay auxiliares activas" description="Las auxiliares se crean en Configuración › Recursos." />
       ) : (
-        <div className="bg-white border border-gray-200 rounded-xl overflow-auto max-h-[calc(100vh-170px)]">
+        <div className="bg-white border border-gray-200 rounded-xl overflow-auto max-h-[calc(100vh-215px)]">
           <table className="text-[11px] border-collapse min-w-[1500px] w-full">
             <thead className="sticky top-0 z-20">
               <tr className="bg-brand-600 text-white">
@@ -128,7 +186,7 @@ export default function AssistantMatrixPage() {
                 )
               })}
               {!filas.length && (
-                <tr><td colSpan={2 + DIAS_MATRIZ.length * 3} className="text-center text-gray-400 py-8">Nada coincide con “{buscar}”.</td></tr>
+                <tr><td colSpan={2 + DIAS_MATRIZ.length * 3} className="text-center text-gray-400 py-8">Ninguna auxiliar coincide con el filtro.</td></tr>
               )}
             </tbody>
           </table>
