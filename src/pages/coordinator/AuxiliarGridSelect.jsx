@@ -25,6 +25,11 @@ import { ESTADOS_AUX, elegible } from '@/utils/matriz'
  */
 
 const FILTROS = ['disponible', 'sin_asignar', 'asignado', 'ausente']
+const ORDENES = [
+  ['sugerido', 'Orden: sugerido'],
+  ['alfabetico', 'Orden: alfabético'],
+  ['horas_asc', 'Orden: horas disp. (menor a mayor)'],
+]
 // Hector: se ven 3 filas y las demás con el scroll de la tabla, sin que la
 // pantalla tenga que bajar. Filas de alto fijo (nada se parte en dos líneas).
 const FILAS_VISIBLES = 3
@@ -111,8 +116,8 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
 
   return (
     <div ref={raiz} className="mt-2 rounded-lg border border-gray-300 bg-white shadow-md overflow-hidden">
-      {/* Hector: el desplegable es el filtro de estados (no pastillas aparte).
-          El orden se cambia pulsando los títulos "Auxiliar" y "Horas semana". */}
+      {/* Hector: filtros por nombre y estado, orden alfabético y horas
+          disponibles de menor a mayor, todo en esta barra. */}
       <div className="flex items-center gap-2 px-2 py-1.5 border-b border-gray-200 bg-gray-50">
         <input
           autoFocus
@@ -129,6 +134,14 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
         >
           <option value="">Todos los estados</option>
           {FILTROS.map((k) => <option key={k} value={k}>{ESTADOS_AUX[k].label}</option>)}
+        </select>
+        <select
+          className="shrink-0 max-w-[40%] rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-400"
+          value={orden}
+          onChange={(e) => setOrden(e.target.value)}
+          aria-label="Orden"
+        >
+          {ORDENES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
         </select>
         <button type="button" onClick={onClose} className="shrink-0 h-7 w-7 rounded-full text-gray-400 hover:bg-gray-200 hover:text-gray-600 leading-none" aria-label="Cerrar">×</button>
       </div>
