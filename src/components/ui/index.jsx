@@ -142,57 +142,6 @@ export function BarProgress({ value, max = 100, color = 'green' }) {
   )
 }
 
-// ============================================================================
-// COLORES CLÍNICOS (nov-2026)
-// ============================================================================
-// Hector: "más color… tabletas de colores en el sentido clínico" y el azul
-// oscuro de la marca en los banners y títulos. Primero en Matrix y Asignar;
-// si le gusta, se pasa al resto de pantallas con estas mismas piezas.
-//
-// Cada tono significa siempre lo mismo en toda la aplicación:
-//   menta   disponible, confirmado, al día
-//   cielo   asignado, en curso, información
-//   ambar   cerca del tope, pendiente
-//   rojo    ausente, pasa del tope, rechazado
-//   gris    sin asignar, sin datos
-//   marino  institucional (VIU · FOCA)
-const TONOS = {
-  menta:  { tableta: 'bg-iris-green-50 text-iris-green-800 border-iris-green-200', punto: 'bg-iris-green-700' },
-  cielo:  { tableta: 'bg-iris-blue-50 text-iris-blue-800 border-iris-blue-200',    punto: 'bg-iris-blue-700' },
-  ambar:  { tableta: 'bg-amber-50 text-amber-800 border-amber-200',               punto: 'bg-amber-500' },
-  rojo:   { tableta: 'bg-rose-50 text-rose-700 border-rose-200',                  punto: 'bg-rose-500' },
-  gris:   { tableta: 'bg-gray-50 text-gray-600 border-gray-200',                  punto: 'bg-gray-400' },
-  marino: { tableta: 'bg-brand-50 text-brand-800 border-brand-100',               punto: 'bg-brand-600' },
-}
-
-/** Tableta de color: un dato o estado con fondo suave y su punto. */
-export function Tableta({ tono = 'gris', punto = false, className = '', children, ...props }) {
-  const t = TONOS[tono] ?? TONOS.gris
-  return (
-    <span {...props} className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-medium whitespace-nowrap ${t.tableta} ${className}`}>
-      {punto && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${t.punto}`} />}
-      {children}
-    </span>
-  )
-}
-
-/** Banner azul marino de la cabecera de una pantalla, con la franja menta→cielo del logo. */
-export function PageBanner({ title, subtitle, children, right }) {
-  return (
-    <div className="rounded-xl overflow-hidden bg-brand-600 text-white shadow-sm">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-        <div className="min-w-0">
-          <h1 className="text-base font-semibold leading-tight">{title}</h1>
-          {subtitle && <p className="text-xs text-iris-blue mt-0.5">{subtitle}</p>}
-        </div>
-        {children && <div className="flex flex-wrap items-center gap-1.5">{children}</div>}
-        {right && <div className="ml-auto">{right}</div>}
-      </div>
-      <div className="h-1 bg-gradient-to-r from-iris-green via-iris-blue to-iris-blue/40" />
-    </div>
-  )
-}
-
 export function SectionHeader({ title, subtitle, action }) {
   return (
     <div className="flex items-center justify-between mb-3">

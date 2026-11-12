@@ -1084,7 +1084,7 @@ export default function ProgramadorPage() {
         // el sticky top-0 queda "encerrado" arriba del div sin efecto visible.
         // Con max-h el div genera scroll interno y el sticky funciona correctamente.
         // Altura ~ viewport menos el espacio del header/filtros/topbar.
-        <div className="overflow-auto -mx-3 sm:mx-0 max-h-[calc(100vh-260px)]">
+        <div className="overflow-auto -mx-3 sm:mx-0 max-h-[calc(100vh-260px)] bg-white sm:border sm:border-gray-200 sm:rounded-xl">
           <table className="w-full min-w-[800px] border-collapse text-xs" style={{ tableLayout: 'fixed' }}>
             <colgroup>
               <col style={{ width: '100px' }} />
@@ -1095,8 +1095,11 @@ export default function ProgramadorPage() {
                   scroll. La primera celda ("Consultorio") tambien es sticky a
                   la izquierda, con z-index mayor porque es la esquina que se
                   superpone con la columna sticky de los consultorios. */}
-              <tr className="bg-gray-50">
-                <th className="p-2 text-left text-xs font-medium text-gray-500 border-b border-gray-100 sticky top-0 left-0 z-20 bg-gray-50">Consultorio</th>
+              {/* Nov-2026 · Hector: la fila de títulos en el azul marino de la
+                  Matrix ("me parece bonito el azul… en la línea de consultorio
+                  y días"). */}
+              <tr className="bg-brand-600">
+                <th className="p-2 text-left text-xs font-semibold text-white border-r border-white/20 sticky top-0 left-0 z-20 bg-brand-600">Consultorio</th>
                 {DIAS_LABEL.map((d, i) => {
                   const esHoy = format(diasFecha[i], 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
                   const esFestivo = festivosSet.has(fechasISO[i])
@@ -1104,14 +1107,14 @@ export default function ProgramadorPage() {
                   // Solo muestra el botón "Copiar día" si ese día tiene asignaciones
                   const tieneAsigs = asignaciones.some((a) => a.weekday === diaKey)
                   // bg explicito en cada th porque sticky no hereda el bg del tr
-                  const bgClase = esFestivo ? 'bg-amber-50/95' : 'bg-gray-50'
                   return (
-                    <th key={i} className={`p-2 text-center text-xs font-medium border-b border-gray-100 sticky top-0 z-10 ${bgClase} ${esHoy ? 'text-brand-600' : esFestivo ? 'text-amber-700' : 'text-gray-500'}`}>
+                    <th key={i} className="p-2 text-center text-xs font-semibold text-white border-r border-white/20 last:border-r-0 sticky top-0 z-10 bg-brand-600">
                       <div className="flex items-center justify-center gap-1">
-                        <span>{d} {format(diasFecha[i], 'd')}</span>
+                        {/* Hoy: la fecha en una pastilla blanca para que se vea sin buscarla. */}
+                        <span className={esHoy ? 'rounded-full bg-white px-2 py-0.5 text-brand-700' : ''}>{d} {format(diasFecha[i], 'd')}</span>
                         {tieneAsigs && canCopiar && (
                           <button
-                            className="text-gray-400 hover:text-brand-600 text-xs"
+                            className="text-white/70 hover:text-white text-xs"
                             onClick={() => setCopiarDia({ type: 'dia', dayFrom: diaKey, etiqueta: `${d} ${format(diasFecha[i], 'd')}` })}
                             title={isCerrada
                               ? 'Semana cerrada: copie este día a otra semana'
@@ -1119,7 +1122,7 @@ export default function ProgramadorPage() {
                           >📋</button>
                         )}
                       </div>
-                      {esFestivo && <div className="text-xs text-amber-600 font-normal mt-0.5">festivo</div>}
+                      {esFestivo && <div className="mt-0.5"><span className="rounded bg-amber-400 px-1.5 text-[10px] font-semibold text-amber-950">festivo</span></div>}
                     </th>
                   )
                 })}
@@ -1150,7 +1153,7 @@ export default function ProgramadorPage() {
                       dentro de una row alta — asi no se pierde de vista qué
                       consultorio estas mirando cuando revisas la parte inferior
                       de esa row. */}
-                  <td className="p-2 bg-gray-50 border-r border-gray-100 align-top sticky left-0 top-[44px] z-10">
+                  <td className="p-2 bg-white border-r border-gray-200 align-top sticky left-0 top-[44px] z-10">
                     <div className="flex items-center justify-between gap-1">
                       <div>
                         <div className="font-medium text-gray-700 text-xs">{cons.name}</div>

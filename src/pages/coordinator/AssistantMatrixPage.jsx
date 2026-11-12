@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { matrizService } from '@/services/api'
-import { Spinner, EmptyState, PageBanner, Tableta } from '@/components/ui'
+import { Spinner, EmptyState } from '@/components/ui'
 import SearchableSelect from '@/components/ui/SearchableSelect'
 import { useDirtyClose } from '@/hooks/useDirtyClose'
 import { useConfirm } from '@/contexts/ConfirmContext'
@@ -86,19 +86,18 @@ export default function AssistantMatrixPage() {
   if (f.nombre) filas.sort((a, b) => (f.nombre === 'asc' ? 1 : -1) * porNombre(a, b))
   else if (f.horas) filas.sort((a, b) => (f.horas === 'asc' ? 1 : -1) * (totalDe(a.id) - totalDe(b.id)) || porNombre(a, b))
   const conMalla = auxiliares.filter((a) => celdas[a.id]).length
-  const pasanTope = auxiliares.filter((a) => a.max_hours_per_week != null && totalDe(a.id) > a.max_hours_per_week).length
 
   return (
     <div className="p-3 sm:p-4">
-      {/* Nov-2026 · Hector: banner en el azul oscuro y tabletas de colores clínicos. */}
-      <PageBanner title="Matrix de asignaciones" subtitle="Malla fija de auxiliares con sus profesionales">
-        <Tableta tono="cielo" punto>{auxiliares.length} auxiliares</Tableta>
-        <Tableta tono="menta" punto>{conMalla} con malla</Tableta>
-        <Tableta tono="gris" punto>{auxiliares.length - conMalla} sin malla</Tableta>
-        {pasanTope > 0 && <Tableta tono="rojo" punto>{pasanTope} pasan del tope</Tableta>}
-        {hayFiltros && <Tableta tono="ambar" punto>{filas.length} en el filtro</Tableta>}
-      </PageBanner>
-      <div className="flex flex-wrap items-center gap-2 my-3">
+      <div className="mb-3">
+        <div>
+          <h1 className="text-base font-semibold text-gray-900">Matrix de asignaciones</h1>
+          <p className="text-xs text-gray-500">
+            {auxiliares.length} auxiliares · {conMalla} con malla{hayFiltros ? ` · ${filas.length} en el filtro` : ''}
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 mb-3">
           <input
             className="input !py-2 w-full sm:w-auto sm:flex-1 sm:min-w-[220px]"
             placeholder="Buscar auxiliar, profesional o nota…"
@@ -141,7 +140,7 @@ export default function AssistantMatrixPage() {
       ) : !auxiliares.length ? (
         <EmptyState icon="👥" title="No hay auxiliares activas" description="Las auxiliares se crean en Configuración › Recursos." />
       ) : (
-        <div className="bg-white border border-gray-200 rounded-xl overflow-auto max-h-[calc(100vh-235px)]">
+        <div className="bg-white border border-gray-200 rounded-xl overflow-auto max-h-[calc(100vh-215px)]">
           <table className="text-[11px] border-collapse min-w-[1500px] w-full">
             <thead className="sticky top-0 z-20">
               <tr className="bg-brand-600 text-white">
@@ -175,17 +174,13 @@ export default function AssistantMatrixPage() {
                       <CeldaDia key={d} celda={celdas[a.id]?.[d]} onClick={() => setEditando({ auxiliar: a, dia: d })} />
                     ))}
                     <td
-                      className="sticky right-0 z-10 px-2 py-1.5 text-center border-l border-gray-200 bg-white group-hover:bg-gray-50"
+                      className={clsx(
+                        'sticky right-0 z-10 px-2 py-1.5 text-center font-semibold tabular-nums border-l border-gray-200',
+                        tope != null && total > tope ? 'text-red-600 bg-red-50' : 'text-gray-900 bg-white group-hover:bg-gray-50',
+                      )}
                       title={tope != null ? `Tope ${tope}h` : undefined}
                     >
-                      {total ? (
-                        <Tableta
-                          tono={tope != null && total > tope ? 'rojo' : tope != null && total >= tope * 0.9 ? 'ambar' : 'menta'}
-                          className="tabular-nums font-semibold"
-                        >
-                          {fmtHoras(total)}
-                        </Tableta>
-                      ) : <span className="text-gray-300">—</span>}
+                      {total ? fmtHoras(total) : '—'}
                     </td>
                   </tr>
                 )
@@ -240,32 +235,22 @@ function CeldaDia({ celda, onClick }) {
       <td onClick={onClick} className={clsx(base, 'text-gray-700 tabular-nums whitespace-nowrap')}>
         <div className="space-y-1">
           {celda.ranges.map((f) => (
-            <div key={f.ini} className="h-6 flex items-center px-1.5 rounded-md border border-iris-blue-200 bg-iris-blue-50 text-iris-blue-800 font-medium">
+            <div key={f.ini} className="h-6 flex items-center px-1.5 rounded border border-gray-200 bg-gray-50">
               {f.ini}–{f.fin}
             </div>
           ))}
         </div>
       </td>
-      <td onClick={onClick} className={clsx(base, 'text-center font-semibold text-brand-800 tabular-nums')}>
+      <td onClick={onClick} className={clsx(base, 'text-center font-semibold text-gray-900 tabular-nums')}>
         <div className="space-y-1">
           {horas.map((h, i) => <div key={i} className="h-6 flex items-center justify-center">{fmtHoras(h)}</div>)}
         </div>
       </td>
       <td onClick={onClick} className={clsx(base, 'border-r border-gray-200')}>
-        <div className="flex flex-col items-start gap-1">
-          {celda.professionals.map((p) => (
-            <span
-              key={p.id}
-              className={clsx(
-                'rounded-md border px-1.5 py-0.5 font-medium leading-tight',
-                p.active ? 'border-iris-green-200 bg-iris-green-50 text-iris-green-800' : 'border-gray-200 bg-gray-50 text-gray-400 line-through',
-              )}
-            >
-              {p.name}
-            </span>
-          ))}
-          {celda.note && <span className="rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 font-medium leading-tight text-amber-800">{celda.note}</span>}
-        </div>
+        {celda.professionals.map((p) => (
+          <div key={p.id} className={clsx('font-medium', p.active ? 'text-gray-900' : 'text-gray-400 line-through')}>{p.name}</div>
+        ))}
+        {celda.note && <div className="text-gray-500">{celda.note}</div>}
       </td>
     </>
   )
