@@ -24,11 +24,6 @@ import { ESTADOS_AUX, elegible } from '@/utils/matriz'
  *           horasDia, horasSemana, tope, disponibles, horario, sedes }]
  */
 
-const ORDENES = [
-  { value: 'sugerido', label: 'Matriz y más horas disponibles' },
-  { value: 'alfabetico', label: 'Orden alfabético' },
-  { value: 'horas_asc', label: 'Horas disponibles: menor a mayor' },
-]
 const FILTROS = ['disponible', 'sin_asignar', 'asignado', 'ausente']
 // Filas a la vista; las demás con el scroll de la tabla.
 const FILAS_VISIBLES = 5
@@ -49,33 +44,33 @@ function EstadoPill({ estado }) {
   )
 }
 
-/** La barra de una auxiliar en el formulario. */
+/** La barra de una auxiliar en el formulario: una línea, del alto de un campo. */
 export function AuxiliarBar({ fila, abierto, onClick, cargando, placeholder }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={clsx(
-        'w-full flex items-center gap-3 rounded-lg border bg-white px-3 py-2 text-left transition-shadow',
+        'w-full flex items-center gap-2 rounded-lg border bg-white px-3 py-1.5 text-left text-sm transition-shadow',
         abierto ? 'border-brand-400 ring-2 ring-brand-100' : 'border-gray-200 hover:border-gray-300',
       )}
     >
       {fila ? (
         <>
-          <span className="h-8 w-8 shrink-0 rounded-full bg-brand-50 text-brand-700 text-xs font-semibold flex items-center justify-center">
+          <span className="h-5 w-5 shrink-0 rounded-full bg-brand-50 text-brand-700 text-[9px] font-semibold flex items-center justify-center">
             {iniciales(fila.name)}
           </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-medium text-gray-900 truncate">{fila.name}</span>
-            <span className="block text-[11px] text-gray-500 truncate">
-              {fila.preseleccionada ? 'Pareja en la Matriz · ' : ''}
-              {fila.disponibles != null ? `le quedan ${fmt(fila.disponibles)}h esta semana` : `${fmt(fila.horasSemana)}h esta semana`}
+          <span className="min-w-0 flex-1 truncate">
+            <span className="font-medium text-gray-900">{fila.name}</span>
+            <span className="text-xs text-gray-400">
+              {' · '}{fila.disponibles != null ? `le quedan ${fmt(fila.disponibles)}h` : `${fmt(fila.horasSemana)}h`}
+              {fila.preseleccionada ? ' · Matriz' : ''}
             </span>
           </span>
           <EstadoPill estado={fila.estado} />
         </>
       ) : (
-        <span className="flex-1 py-1 text-sm text-gray-400">{cargando ? 'Cargando auxiliares…' : placeholder}</span>
+        <span className="flex-1 text-gray-400">{cargando ? 'Cargando auxiliares…' : placeholder}</span>
       )}
       <span className="text-gray-400 text-xs shrink-0">{abierto ? '▲' : '▼'}</span>
     </button>
@@ -115,43 +110,41 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
 
   return (
     <div ref={raiz} className="mt-2 rounded-lg border border-gray-300 bg-white shadow-md overflow-hidden">
-      {/* Dos líneas: buscador y orden arriba, estados abajo. */}
-      <div className="px-3 py-2 border-b border-gray-200 bg-gray-50 space-y-2">
-        <div className="flex items-center gap-2">
-          <input
-            autoFocus
-            className="input !py-1.5 flex-1 min-w-0"
-            placeholder="Buscar por nombre"
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-          />
-          <select
-            className="shrink-0 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-400"
-            value={orden}
-            onChange={(e) => setOrden(e.target.value)}
-            aria-label="Ordenar"
-          >
-            {ORDENES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-          <button type="button" onClick={onClose} className="shrink-0 h-7 w-7 rounded-full text-gray-400 hover:bg-gray-200 hover:text-gray-600 leading-none" aria-label="Cerrar">×</button>
-        </div>
-        <div className="flex flex-wrap gap-1">
-          <FiltroChip activo={!estado} onClick={() => setEstado('')} label="Todos" n={base.length} />
-          {FILTROS.map((k) => (
-            <FiltroChip key={k} activo={estado === k} onClick={() => setEstado(estado === k ? '' : k)} label={ESTADOS_AUX[k].label} n={conteo[k]} dot={ESTADOS_AUX[k].dot} />
-          ))}
-        </div>
+      {/* Hector: el desplegable es el filtro de estados (no pastillas aparte).
+          El orden se cambia pulsando los títulos "Auxiliar" y "Horas semana". */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-200 bg-gray-50">
+        <input
+          autoFocus
+          className="input !py-1.5 flex-1 min-w-0"
+          placeholder="Buscar por nombre"
+          value={nombre}
+          onChange={(e) => setNombre(e.target.value)}
+        />
+        <select
+          className="shrink-0 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-400"
+          value={estado}
+          onChange={(e) => setEstado(e.target.value)}
+          aria-label="Estado"
+        >
+          <option value="">Todos los estados ({base.length})</option>
+          {FILTROS.map((k) => <option key={k} value={k}>{ESTADOS_AUX[k].label} ({conteo[k]})</option>)}
+        </select>
+        <button type="button" onClick={onClose} className="shrink-0 h-7 w-7 rounded-full text-gray-400 hover:bg-gray-200 hover:text-gray-600 leading-none" aria-label="Cerrar">×</button>
       </div>
 
       <div className="overflow-auto" style={{ maxHeight: 40 + FILAS_VISIBLES * ALTO_FILA_PX }}>
         <table className="w-full min-w-[620px] border-collapse text-xs">
           <thead className="sticky top-0 z-10">
             <tr>
-              <th className={th}>Auxiliar</th>
+              <th className={clsx(th, 'cursor-pointer select-none hover:text-brand-700')} onClick={() => setOrden(orden === 'alfabetico' ? 'sugerido' : 'alfabetico')} title="Ordenar alfabéticamente">
+                Auxiliar{orden === 'alfabetico' ? ' ▲' : ''}
+              </th>
               <th className={th}>Estado</th>
               <th className={th}>Recurso par</th>
               <th className={clsx(th, 'text-center')}>Horas día</th>
-              <th className={th}>Horas semana</th>
+              <th className={clsx(th, 'cursor-pointer select-none hover:text-brand-700')} onClick={() => setOrden(orden === 'horas_asc' ? 'sugerido' : 'horas_asc')} title="Horas disponibles de menor a mayor">
+                Horas semana{orden === 'horas_asc' ? ' ▲' : ''}
+              </th>
               <th className={th}>Horario asignado</th>
               <th className={th}>Sede</th>
             </tr>
@@ -211,22 +204,5 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
         </table>
       </div>
     </div>
-  )
-}
-
-function FiltroChip({ activo, onClick, label, n, dot }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={clsx(
-        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
-        activo ? 'border-brand-600 bg-brand-600 text-white' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300',
-      )}
-    >
-      {dot && <span className={clsx('h-1.5 w-1.5 rounded-full', activo ? 'bg-white' : dot)} />}
-      {label}
-      <span className={clsx('tabular-nums', activo ? 'text-white/80' : 'text-gray-400')}>{n}</span>
-    </button>
   )
 }

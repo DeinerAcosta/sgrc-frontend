@@ -462,9 +462,10 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
   return (
     <div className="fixed inset-0 z-50 bg-gray-50 flex flex-col">
       <div className="shrink-0 bg-white border-b border-gray-200">
-        <div className="flex items-center gap-4 px-4 sm:px-6 py-3">
-          <button onClick={tryClose} className="btn whitespace-nowrap">← Volver al programador</button>
-          <div className="min-w-0">
+        {/* Nov-2026 · Hector: la cabecera más delgada. */}
+        <div className="flex items-center gap-3 px-4 sm:px-6 py-1.5">
+          <button onClick={tryClose} className="btn !py-1 !px-2.5 !text-xs whitespace-nowrap">← Volver al programador</button>
+          <div className="min-w-0 flex flex-wrap items-center gap-x-3 gap-y-0.5">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-sm font-semibold text-gray-900">
                 {editando ? 'Editar asignación' : 'Nueva asignación'}
