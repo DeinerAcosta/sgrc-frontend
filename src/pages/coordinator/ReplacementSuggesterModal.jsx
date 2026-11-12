@@ -3,6 +3,7 @@ import toast from 'react-hot-toast'
 import { recursoService, asignacionService } from '@/services/api'
 import { Avatar, Spinner, EmptyState } from '@/components/ui'
 import { TIPOS_RECURSO } from '@/utils/helpers'
+import { auxiliaresDeTurno } from '@/utils/matriz'
 
 /**
  * HU-C-12 + RN-38: Cuando hay una ausencia sin cubrir, sugiere recursos disponibles
@@ -33,7 +34,7 @@ export default function SugeridorReemplazosModal({ asignacionVacia, ausencia, ci
       week_id: asignacionVacia.week_id,
       room_id: asignacionVacia.room_id,
       resource_id: recursoId,
-      assistant_id: asignacionVacia.assistant_id,
+      assistants: auxiliaresDeTurno(asignacionVacia).map((x) => ({ resource_id: x.id })),
       weekday: asignacionVacia.weekday,
       start_time: asignacionVacia.start_time,
       end_time: asignacionVacia.end_time,

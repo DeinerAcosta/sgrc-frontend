@@ -14,6 +14,7 @@ import AsignarBackofficeModal from '@/pages/coordinator/AssignBackofficeModal'
 import AvisoAusentesSemanaAnterior from '@/pages/coordinator/PreviousAbsencesModal'
 import CambiosSemanaModal from '@/pages/coordinator/WeekChangesModal'
 import { useConfirm } from '@/contexts/ConfirmContext'
+import { auxiliaresDeTurno } from '@/utils/matriz'
 
 // Oct-2026 · Aquí vivía SLOT_COLOR, que pintaba cada casilla según el TIPO de
 // recurso (teal oftalmólogo, morado optómetra, naranja otorrino…). Se eliminó:
@@ -642,8 +643,7 @@ export default function ProgramadorPage() {
       if (a.status && a.status !== 'activa') continue
       const candidatos = [
         a.resource && { obj: a.resource, role: rolLabel(a.resource.type) || 'Principal' },
-        a.assistant && { obj: a.assistant, role: 'Auxiliar' },
-        a.assistant2 && { obj: a.assistant2, role: 'Auxiliar 2' },
+        ...auxiliaresDeTurno(a).map((x, i) => ({ obj: { id: x.id, name: x.name }, role: `Auxiliar ${i + 1}` })),
       ].filter(Boolean)
       for (const c of candidatos) {
         if (normalizarTexto(c.obj.name).includes(q)) {
@@ -1228,7 +1228,7 @@ export default function ProgramadorPage() {
                                   <div className="text-blue-800 font-medium">
                                     Lo cubre: {cubridor.resource?.name} · {cubridor.start_time}–{cubridor.end_time}
                                   </div>
-                                  {cubridor.assistant && <div className="text-gray-600">Aux: {cubridor.assistant.name}</div>}
+                                  {auxiliaresDeTurno(cubridor).map((x, i) => <div key={x.id} className="text-gray-600">Aux {i + 1}: {x.name}</div>)}
                                 </div>
                               </div>
                             )
@@ -1317,7 +1317,11 @@ export default function ProgramadorPage() {
                             </div>
                             <div className="text-xs leading-tight text-gray-700">{a.start_time}–{a.end_time}</div>
                             <div className="text-xs leading-tight text-gray-600 truncate">
-                              {a.assistant ? `Aux: ${nombreCorto(a.assistant.name)}` : ' '}
+                              {(() => {
+                                // Nov-2026 · Un turno puede llevar varias auxiliares: la primera y "+N".
+                                const ax = auxiliaresDeTurno(a)
+                                return ax.length ? `Aux: ${nombreCorto(ax[0].name)}${ax.length > 1 ? ` +${ax.length - 1}` : ''}` : ' '
+                              })()}
                             </div>
                             <div className="text-xs leading-tight text-gray-600">
                               {a.resource?.type === 'asesor_servicios' ? ' ' : a.contingency ? '— pac.' : `${a.patient_capacity} pac.`}
@@ -1333,8 +1337,11 @@ export default function ProgramadorPage() {
                             <div className="hidden group-hover:block mt-1 pt-1 border-t border-black/10 text-[10px] leading-snug">
                               <div className="font-medium text-gray-800">{a.resource?.name}</div>
                               <div className="text-gray-600">{cons.name} · {cons.specialty}</div>
-                              {a.assistant && <div className="text-gray-600">Aux 1: {a.assistant.name}</div>}
-                              {a.assistant2 && <div className="text-gray-600">Aux 2: {a.assistant2.name}</div>}
+                              {auxiliaresDeTurno(a).map((x, i) => (
+                                <div key={x.id} className="text-gray-600">
+                                  Aux {i + 1}: {x.name}{x.ini !== a.start_time || x.fin !== a.end_time ? ` (${x.ini}–${x.fin})` : ''}
+                                </div>
+                              ))}
                               {a.resource?.type !== 'asesor_servicios' && (
                                 <div className="text-gray-600">Capacidad: {a.patient_capacity} pacientes</div>
                               )}
@@ -1479,6 +1486,8 @@ export default function ProgramadorPage() {
           data={modalData}
           asignacion={modalData.assignment}
           sedeId={sedeId}
+          // Nov-2026 · Hector: "mitad asignar y mitad grilla": la semana de la sede al lado.
+          grilla={{ consultorios, asignaciones, diasFecha }}
           onClose={() => setModalData(null)}
           onSaved={() => {
             qc.invalidateQueries({ queryKey: ['asignaciones'] })

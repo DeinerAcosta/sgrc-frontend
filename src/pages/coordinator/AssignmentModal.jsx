@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { asignacionService, recursoService, semanaService, usuarioService, matrizService } from '@/services/api'
@@ -8,9 +8,9 @@ import { calcularCapacidadPacientes, DIAS_FULL, DIAS, TIPOS_RECURSO, ESPECIALIDA
 import { useDirtyClose } from '@/hooks/useDirtyClose'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useAuthStore } from '@/store/authStore'
-import ResourceWeekLoad from '@/pages/coordinator/ResourceWeekLoad'
-import { AuxiliarBar, AuxiliarPicker } from '@/pages/coordinator/AuxiliarGridSelect'
-import { elegible } from '@/utils/matriz'
+import AssignmentWeekGrid from '@/pages/coordinator/AssignmentWeekGrid'
+import { AuxiliarBar, AuxiliarTabla } from '@/pages/coordinator/AuxiliarGridSelect'
+import { elegible, huecosSinCubrir, horaPorDefecto } from '@/utils/matriz'
 
 /**
  * Modal de asignación (crear o editar).
@@ -20,9 +20,26 @@ import { elegible } from '@/utils/matriz'
  *  - asignacion?: object  ← si viene, modo EDICIÓN (prefill + PUT)
  *  - sedeId, onClose, onSaved
  */
-const conHorarioAux = (nombre, distinto, ini, fin) => (distinto && ini && fin ? `${nombre} (${ini}–${fin})` : nombre)
+/**
+ * Nov-2026 · Las auxiliares del turno como lista (antes "auxiliar" y "auxiliar
+ * #2" fijas). Cada una con su horario; `horaManual` = el coordinador la tocó y
+ * ya no se recalcula; `auto` = la puso el sistema por la Matriz.
+ */
+function auxiliaresIniciales(a) {
+  if (!a) return []
+  const ini = a.start_time ?? a.startTime
+  const fin = a.end_time ?? a.endTime
+  const lista = a.assistants?.length
+    ? a.assistants.map((x) => ({ id: x.resource_id ?? x.resourceId, ini: x.start_time ?? x.startTime, fin: x.end_time ?? x.endTime }))
+    : [
+        { id: a.assistant_id ?? a.assistantId, ini: a.assistant_start_time ?? a.assistantStartTime, fin: a.assistant_end_time ?? a.assistantEndTime },
+        { id: a.assistant2_id ?? a.assistant2Id, ini: a.assistant2_start_time ?? a.assistant2StartTime, fin: a.assistant2_end_time ?? a.assistant2EndTime },
+      ]
+  return lista.filter((x) => x.id).map((x) => ({ id: x.id, ini: x.ini || ini, fin: x.fin || fin, auto: false, horaManual: true }))
+}
+const AUX_VACIA = { id: '', ini: '', fin: '', auto: false, horaManual: false }
 
-export default function AsignacionModal({ data, asignacion, sedeId, onClose, onSaved }) {
+export default function AsignacionModal({ data, asignacion, sedeId, grilla, onClose, onSaved }) {
   const {
     roomId: consultorioId, room: consultorio, day: dia, weekId: semanaId, especialidadOverride,
     // Oct-2026 · Cuando se llega desde "Mover la agenda", el modal sabe a quién
@@ -70,22 +87,16 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
   const tipoApoyo = esDiagnostico ? 'tecnico' : 'auxiliar'
   const labelApoyo = esDiagnostico ? 'Técnico de apoyo' : 'Auxiliar de enfermería'
   const labelApoyoBuscar = esDiagnostico ? 'Elegir técnico de apoyo' : 'Elegir auxiliar'
-  const labelApoyo2 = esDiagnostico ? 'Técnico de apoyo #2' : 'Auxiliar de enfermería #2'
 
   const [form, setForm] = useState({
     resource_id:   asignacion?.resource_id   ?? asignacion?.resourceId   ?? recursoPrecargado ?? '',
-    assistant_id:  asignacion?.assistant_id  ?? asignacion?.assistantId  ?? '',
-    assistant2_id: asignacion?.assistant2_id ?? asignacion?.assistant2Id ?? '',
+    // Nov-2026 · Las auxiliares en lista; siempre al menos una fila para la barra.
+    auxs: auxiliaresIniciales(asignacion).length ? auxiliaresIniciales(asignacion) : [{ ...AUX_VACIA }],
     // Oct-2026 · Viniendo de una reprogramacion, la franja nueva arranca con
     // el horario y los pacientes de la que se cayo: es lo que hay que reponer.
     // Se puede cambiar, pero el valor por defecto deja de ser una suposicion.
     start_time:  asignacion?.start_time  ?? asignacion?.startTime  ?? franjaCaida?.start_time ?? '07:00',
     end_time:     asignacion?.end_time     ?? asignacion?.endTime     ?? franjaCaida?.end_time ?? '13:00',
-    // Sub-horarios opcionales por auxiliar. Si "" → hereda del recurso principal.
-    assistant_start_time:  asignacion?.assistant_start_time  ?? asignacion?.assistantStartTime  ?? '',
-    assistant_end_time:     asignacion?.assistant_end_time     ?? asignacion?.assistantEndTime     ?? '',
-    assistant2_start_time: asignacion?.assistant2_start_time ?? asignacion?.assistant2StartTime ?? '',
-    assistant2_end_time:    asignacion?.assistant2_end_time    ?? asignacion?.assistant2EndTime    ?? '',
     // Override manual de pacientes programados. "" = usar el cálculo nominal.
     // Al editar, pre-llenamos con el valor guardado (pacientes_capacidad) para que
     // el coord vea el número actual y pueda editarlo si quiere; si lo borra → recalcula.
@@ -102,20 +113,16 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
     authorized_by_id:    asignacion?.authorized_by_id    ?? asignacion?.authorizedById    ?? '',
     authorization_reason: asignacion?.authorization_reason ?? asignacion?.authorizationReason ?? '',
   })
-  // Toggle local "horario distinto al recurso principal" para cada auxiliar.
-  const [auxHorarioDistinto,  setAuxHorarioDistinto]  = useState(!!(asignacion?.assistant_start_time  ?? asignacion?.assistantStartTime))
-  const [aux2HorarioDistinto, setAux2HorarioDistinto] = useState(!!(asignacion?.assistant2_start_time ?? asignacion?.assistant2StartTime))
   // "Servicio sin auxiliar": algunos doctores realizan consultas/procedimientos
   // que NO requieren apoyo de aux. El coord lo marca conscientemente y el modal
   // deja de exigir aux como obligatoria. Pre-llenado true cuando editamos una
   // asignación que YA fue guardada sin aux en una especialidad que normalmente
   // la exige (lo más probable: el coord ya marcó este check en su momento).
-  const _yaGuardadaSinAux = !!asignacion && !(asignacion?.assistant_id ?? asignacion?.assistantId)
-  // Nov-2026 · Ahora es la pregunta "¿Requiere auxiliar? Sí / No" debajo del
-  // profesional, también donde el apoyo es opcional (diagnóstico): ahí arranca
-  // en No salvo que el turno ya tenga técnico de apoyo.
+  const _yaGuardadaSinAux = !!asignacion && auxiliaresIniciales(asignacion).length === 0
+  // Casilla "Este servicio NO requiere auxiliar". Solo existe donde la auxiliar
+  // es obligatoria; en diagnóstico el técnico de apoyo es opcional y no aplica.
   const [sinAuxiliar, setSinAuxiliar] = useState(
-    ESPECIALIDADES_EXIGEN_APOYO.includes(especialidadActiva) ? _yaGuardadaSinAux : !(asignacion?.assistant_id ?? asignacion?.assistantId),
+    ESPECIALIDADES_EXIGEN_APOYO.includes(especialidadActiva) ? _yaGuardadaSinAux : false,
   )
   // Si el coord marca "sin auxiliar", la exigencia se cae. La sección de apoyo
   // sigue mostrándose como opcional (o ni siquiera, ver más abajo) por si
@@ -126,8 +133,8 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
   const esReprogramacion = !!cubreAusenciaId && !editando
   // Solo en una reprogramación hay tope: lo que falta por reprogramar del caso.
   const topePacientes = esReprogramacion && pacientesPorReprogramar > 0 ? pacientesPorReprogramar : null
-  // Si respondió Sí, la auxiliar (o el técnico de apoyo) pasa a ser obligatoria.
-  const requiereAuxAdicional = permiteApoyoOpcional && !sinAuxiliar && !esReprogramacion
+  // Obligatoria donde la especialidad la exige, salvo que marque la casilla.
+  const requiereAuxAdicional = _exigeApoyoPorEspecialidad && !sinAuxiliar && !esReprogramacion
   const [conflicto, setConflicto] = useState(null)
   // El resumen previo a guardar. null = cerrado. { conflicto } se llena solo
   // si el servidor rechazo por turno solapado, y entonces el mismo resumen
@@ -158,13 +165,12 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
   const auxiliares = esDiagnostico
     ? poolApoyo.filter((r) => r.id !== form.resource_id)
     : poolApoyo
-  const auxSel = auxiliares.find((a) => a.id === form.assistant_id)
-  const aux2Sel = auxiliares.find((a) => a.id === form.assistant2_id)
+  const auxsElegidas = form.auxs.filter((x) => x.id)
 
   // Sep-2026 · Ley 2101 · Autorización directivo para aux sáb+dom.
   const esFinde = dia === 'sabado' || dia === 'domingo'
   const otroDiaFinde = dia === 'sabado' ? 'domingo' : 'sabado'
-  const auxsSeleccionados = [form.assistant_id, form.assistant2_id].filter(Boolean)
+  const auxsSeleccionados = auxsElegidas.map((x) => x.id)
   const auxsTipoAuxiliar = auxsSeleccionados
     .map((id) => auxiliares.find((a) => a.id === id))
     .filter((r) => r?.type === 'auxiliar')
@@ -225,16 +231,13 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
         week_id:      semanaId,
         room_id: consultorioId,
         resource_id:     form.resource_id,
-        assistant_id:    form.assistant_id || null,
-        assistant2_id:   form.assistant2_id || null,
+        // Nov-2026 · Todas las auxiliares, cada una con su horario.
+        assistants: verApoyo
+          ? auxsElegidas.map((x) => ({ resource_id: x.id, start_time: x.ini || form.start_time, end_time: x.fin || form.end_time }))
+          : [],
         weekday:     dia,
         start_time:    form.start_time,
         end_time:       form.end_time,
-        // Sub-horarios: solo se envían si el toggle está activo. Si no, null = hereda.
-        assistant_start_time:  auxHorarioDistinto  && form.assistant_id  ? form.assistant_start_time  : null,
-        assistant_end_time:     auxHorarioDistinto  && form.assistant_id  ? form.assistant_end_time     : null,
-        assistant2_start_time: aux2HorarioDistinto && form.assistant2_id ? form.assistant2_start_time : null,
-        assistant2_end_time:    aux2HorarioDistinto && form.assistant2_id ? form.assistant2_end_time    : null,
         // Override manual: si el coord escribió un número, lo manda. Vacío = backend calcula.
         expected_patients: form.expected_patients === '' ? null : Number(form.expected_patients),
         // Motivo: solo se envía si la sede está cerrada y el supervisor llenó el campo.
@@ -371,45 +374,73 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
     })
   })()
 
-  // Preselección: solo al crear (al editar se respeta la que tiene el turno) y
-  // nunca encima de una que el coordinador eligió a mano. Si cambia el
-  // profesional, la preseleccionada se recalcula; si la nueva no tiene pareja
-  // en la Matriz, se quita la que había puesto el sistema.
-  const auxAuto = useRef(null)
-  // Qué auxiliar se está eligiendo en el panel de la derecha (1, 2 o ninguna).
-  const [eligiendoAux, setEligiendoAux] = useState(null)
-  const pickerRef = useRef(null)
-  useEffect(() => { if (!verApoyo) setEligiendoAux(null) }, [verApoyo])
-  // En pantallas angostas el panel queda debajo del formulario: se lleva a la vista.
-  useEffect(() => { if (eligiendoAux) pickerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) }, [eligiendoAux])
-  useEffect(() => {
-    if (editando || !verApoyo || cargandoTurno || !estadoTurno.length) return
-    const actual = form.assistant_id
-    if (actual && actual !== auxAuto.current) return
-    const candidata = filasAux
-      .filter((f) => f.preseleccionada && elegible(f.estado) && f.id !== form.assistant2_id)
-      .sort((a, b) => (b.disponibles ?? 0) - (a.disponibles ?? 0))[0]
-    const nueva = candidata?.id ?? ''
-    if (nueva !== actual) {
-      auxAuto.current = nueva || null
-      setForm((f) => ({ ...f, assistant_id: nueva }))
+  // Nov-2026 · Hector: "en el 3 aux que vuelva y venga por defecto la de la
+  // Matriz… hay que ir calculando que la hora siempre vaya viniendo por
+  // defecto". Cada fila sin auxiliar (o puesta por el sistema) toma la
+  // siguiente pareja de la Matriz que se pueda elegir, y la hora de cada una
+  // es su franja de la Matriz recortada al turno o, si no tiene, el primer
+  // tramo que falta cubrir. Se recalcula en orden, fila por fila, cuando cambian
+  // el profesional, el horario del turno o los estados. Lo que el coordinador
+  // eligió o escribió a mano no se pisa.
+  const franjasMatriz = new Map(estadoTurno.map((e) => [e.id, e.franjas_matriz ?? []]))
+  const candidatasMatriz = filasAux
+    .filter((f) => f.preseleccionada && elegible(f.estado))
+    .sort((a, b) => (b.disponibles ?? 0) - (a.disponibles ?? 0))
+  const recalcularAuxs = (filas) => {
+    const salida = []
+    for (const fila of filas) {
+      let x = { ...fila }
+      if (!x.id || x.auto) {
+        const usadas = new Set([...salida.map((y) => y.id), ...filas.filter((y) => y !== fila && !y.auto).map((y) => y.id)])
+        const c = candidatasMatriz.find((f) => !usadas.has(f.id))
+        if (c) x = { ...x, id: c.id, auto: true, horaManual: false }
+        else if (x.auto) x = { ...AUX_VACIA }
+      }
+      if (x.id && !x.horaManual && horarioValido) {
+        const huecos = huecosSinCubrir(form.start_time, form.end_time, salida.filter((y) => y.id))
+        x = { ...x, ...horaPorDefecto({ franjasMatriz: franjasMatriz.get(x.id), ini: form.start_time, fin: form.end_time, huecos }) }
+      }
+      salida.push(x)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [estadoTurno, cargandoTurno, verApoyo, editando])
-  const conPanel = !!recursoSel || (verApoyo && !!auxSel) || !!eligiendoAux
-  const turnoActual = {
-    consultorio: consultorio?.name,
-    sede: consultorio?.site?.name ?? consultorio?.site_name,
-    ini: form.start_time,
-    fin: form.end_time,
-    profesional: recursoSel?.name,
-    auxiliares: verApoyo ? [
-      auxSel && conHorarioAux(auxSel.name, auxHorarioDistinto, form.assistant_start_time, form.assistant_end_time),
-      aux2Sel && conHorarioAux(aux2Sel.name, aux2HorarioDistinto, form.assistant2_start_time, form.assistant2_end_time),
-    ].filter(Boolean) : [],
-    pacientes: form.expected_patients === '' ? capacidad : form.expected_patients,
+    return salida
   }
-  const valid = form.resource_id && form.start_time && form.end_time && (!requiereAuxAdicional || form.assistant_id) && motivoOk && autorizacionOk
+  useEffect(() => {
+    if (!verApoyo || cargandoTurno) return
+    setForm((f) => {
+      const nuevas = recalcularAuxs(f.auxs)
+      return JSON.stringify(nuevas) === JSON.stringify(f.auxs) ? f : { ...f, auxs: nuevas }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estadoTurno, cargandoTurno, verApoyo, form.start_time, form.end_time])
+
+  // Qué fila se está eligiendo en la cuadrícula (índice o null).
+  const [eligiendoAux, setEligiendoAux] = useState(null)
+  useEffect(() => { if (!verApoyo) setEligiendoAux(null) }, [verApoyo])
+
+  const setAux = (i, cambios) => {
+    setConflicto(null)
+    setForm((f) => ({ ...f, auxs: recalcularAuxs(f.auxs.map((x, j) => (j === i ? { ...x, ...cambios } : x))) }))
+  }
+  const quitarAux = (i) => {
+    setEligiendoAux(null)
+    setForm((f) => {
+      const resto = f.auxs.filter((_, j) => j !== i)
+      return { ...f, auxs: resto.length ? recalcularAuxs(resto) : [{ ...AUX_VACIA }] }
+    })
+  }
+  const agregarAux = () => {
+    setForm((f) => ({ ...f, auxs: recalcularAuxs([...f.auxs, { ...AUX_VACIA }]) }))
+  }
+  // "Hasta que se acabe el horario del médico": se agregan mientras quede algo sin cubrir.
+  const huecosTurno = huecosSinCubrir(form.start_time, form.end_time, auxsElegidas)
+  const puedeAgregarAux = verApoyo && horarioValido && huecosTurno.length > 0 && form.auxs.every((x) => x.id)
+  // Nov-2026 · Hector: "mitad asignar y mitad grilla". La grilla del
+  // Programador va siempre a la derecha; solo se aparta mientras se elige una
+  // auxiliar, porque esa cuadrícula necesita el ancho de la pantalla.
+  const conPanel = eligiendoAux == null
+  // Cada auxiliar con un horario válido dentro del turno.
+  const horasAuxOk = auxsElegidas.every((x) => x.ini && x.fin && x.ini < x.fin && x.ini >= form.start_time && x.fin <= form.end_time)
+  const valid = form.resource_id && form.start_time && form.end_time && (!requiereAuxAdicional || auxsElegidas.length > 0) && (!verApoyo || horasAuxOk) && motivoOk && autorizacionOk
 
   // Nov-2026 · Hector: asignar ya no es un modal sino una pantalla completa.
   // Encima del Programador (no es una ruta aparte) para no perder la semana,
@@ -448,10 +479,9 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
       </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto lg:flex lg:overflow-hidden">
-        {/* Nov-2026 · Hector: "más adaptativo". El formulario no necesita media
-            pantalla: va angosto y la semana de cada persona ocupa el resto. */}
-        <div className={`bg-white ${conPanel ? 'lg:w-[500px] 2xl:w-[560px] lg:shrink-0 lg:overflow-y-auto lg:border-r lg:border-gray-200' : 'w-full lg:overflow-y-auto'}`}>
-        <div className={`px-4 sm:px-6 py-5 space-y-4 ${conPanel ? 'max-w-2xl mx-auto lg:max-w-none' : 'max-w-2xl mx-auto'}`}>
+        {/* Mitad formulario, mitad grilla (en pantallas angostas, una debajo de la otra). */}
+        <div className={`bg-white ${conPanel ? 'lg:w-1/2 lg:shrink-0 lg:overflow-y-auto lg:border-r lg:border-gray-200' : 'w-full lg:overflow-y-auto'}`}>
+        <div className={`px-4 sm:px-6 py-5 space-y-4 ${conPanel ? 'max-w-2xl mx-auto' : 'max-w-2xl mx-auto lg:max-w-[560px]'}`}>
           {/* Oct-2026 · Viniendo de "Mover la agenda". Sin este aviso, el medico
               aparece puesto sin explicacion y el turno queda atado a una ausencia
               sin que nadie lo haya dicho en voz alta. */}
@@ -486,45 +516,24 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
             />
           </div>
 
-          {/* Nov-2026 · Hector: debajo del profesional, si requiere o no
-              auxiliar. Reemplaza la casilla "NO requiere auxiliar" que iba más
-              abajo. Con Sí, la auxiliar es obligatoria. */}
-          {permiteApoyoOpcional && !esReprogramacion && (
-            <div>
-              <label className="label">{esDiagnostico ? '¿Requiere técnico de apoyo?' : '¿Requiere auxiliar?'}</label>
-              <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
-                {[{ v: true, t: 'Sí' }, { v: false, t: 'No' }].map((o) => {
-                  const activo = !sinAuxiliar === o.v
-                  return (
-                    <button
-                      key={o.t}
-                      type="button"
-                      className={`px-5 py-1.5 text-sm font-medium transition-colors ${activo ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-                      onClick={() => {
-                        setSinAuxiliar(!o.v)
-                        if (!o.v) {
-                          // Con No se limpia lo que hubiera elegido, para no
-                          // guardar una auxiliar en un turno que dice no llevarla.
-                          setForm((f) => ({
-                            ...f,
-                            assistant_id: '',
-                            assistant2_id: '',
-                            assistant_start_time: '',
-                            assistant_end_time: '',
-                            assistant2_start_time: '',
-                            assistant2_end_time: '',
-                          }))
-                          setAuxHorarioDistinto(false)
-                          setAux2HorarioDistinto(false)
-                        }
-                      }}
-                    >
-                      {o.t}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
+          {/* Nov-2026 · Hector: debajo del profesional, la casilla de siempre
+              ("como antes, un check para ir cortando espacios"). Solo donde la
+              auxiliar es obligatoria (oftalmo, anestesio, otorrino); en
+              diagnóstico el técnico de apoyo es opcional y no hace falta. */}
+          {_exigeApoyoPorEspecialidad && !esReprogramacion && (
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={sinAuxiliar}
+                onChange={(e) => {
+                  setSinAuxiliar(e.target.checked)
+                  // Al marcarla se limpia lo que hubiera elegido, para no
+                  // guardar una auxiliar en un turno que dice no llevarla.
+                  if (e.target.checked) setForm((f) => ({ ...f, auxs: [{ ...AUX_VACIA }] }))
+                }}
+              />
+              <span className="text-xs font-medium text-gray-700">Este servicio NO requiere auxiliar de enfermería</span>
+            </label>
           )}
 
           {/* Nov-2026 · Hector: orden recurso → ¿requiere auxiliar? → horario →
@@ -582,134 +591,94 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
             </div>
           )}
 
-          {permiteApoyoOpcional && !sinAuxiliar && !esReprogramacion && (
-            <>
-              <div>
-                <label className="label">
-                  {labelApoyo} {requiereAuxAdicional ? <span className="text-red-600">*</span> : <span className="text-gray-400 font-normal">(opcional)</span>}
-                  <span className="text-gray-400 font-normal"> ({auxiliares.length} disponibles)</span>
-                </label>
-                <AuxiliarBar
-                  fila={filasAux.find((f) => f.id === form.assistant_id)}
-                  abierto={eligiendoAux === 1}
-                  onClick={() => setEligiendoAux((v) => (v === 1 ? null : 1))}
-                  cargando={cargandoTurno && !estadoTurno.length}
-                  placeholder={labelApoyoBuscar}
-                />
-                {form.assistant_id && (
-                  <>
-                    <label className="flex items-center gap-2 text-xs text-gray-600 mt-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={auxHorarioDistinto}
-                        onChange={(e) => {
-                          setAuxHorarioDistinto(e.target.checked)
-                          if (e.target.checked && !form.assistant_start_time) {
-                            set('assistant_start_time', form.start_time)
-                            set('assistant_end_time', form.end_time)
-                          }
-                        }}
-                      />
-                      Horario distinto al recurso principal {esDiagnostico ? '(este técnico se va antes para otro servicio)' : '(esta aux cubre solo parte del turno)'}
-                    </label>
-                    {auxHorarioDistinto && (
+          {/* Nov-2026 · Hector: las auxiliares en lista, "hasta que se acabe el
+              horario del médico". Cada una con su barra; al pulsarla, la
+              cuadrícula se abre DEBAJO (con líneas) y se cierra al elegir. La
+              hora llega sola (Matriz o lo que falta cubrir) y se puede cambiar. */}
+          {verApoyo && (
+            <div className="space-y-3">
+              {form.auxs.map((x, i) => {
+                const fila = filasAux.find((f) => f.id === x.id)
+                const abierta = eligiendoAux === i
+                return (
+                  <div key={i}>
+                    <div className="flex items-center justify-between">
+                      <label className="label">
+                        {labelApoyo} {i + 1}
+                        {i === 0 && (requiereAuxAdicional
+                          ? <span className="text-red-600"> *</span>
+                          : <span className="text-gray-400 font-normal"> (opcional)</span>)}
+                        {i === 0 && <span className="text-gray-400 font-normal"> ({auxiliares.length} en total)</span>}
+                      </label>
+                      {(i > 0 || x.id) && (
+                        <button type="button" className="text-xs text-gray-400 hover:text-red-600 mb-1" onClick={() => quitarAux(i)}>
+                          Quitar
+                        </button>
+                      )}
+                    </div>
+                    <AuxiliarBar
+                      fila={fila}
+                      abierto={abierta}
+                      onClick={() => setEligiendoAux(abierta ? null : i)}
+                      cargando={cargandoTurno && !estadoTurno.length}
+                      placeholder={labelApoyoBuscar}
+                    />
+                    {abierta && (
+                      // Mientras se elige, el formulario va centrado y la cuadrícula se
+                      // abre centrada bajo él, con el ancho que haya (hasta 1240px).
+                      // Hector: "que esté centrado… y quede mejor espacio".
+                      <div className="lg:relative lg:left-1/2 lg:-translate-x-1/2 lg:w-[min(1240px,calc(100vw-48px))]">
+                        <AuxiliarTabla
+                          value={x.id}
+                          excluir={form.auxs.filter((_, j) => j !== i).map((y) => y.id).filter(Boolean)}
+                          filas={filasAux}
+                          onChange={(id) => { setAux(i, { id, auto: false, horaManual: false }); setEligiendoAux(null) }}
+                          onClose={() => setEligiendoAux(null)}
+                        />
+                      </div>
+                    )}
+                    {x.id && !abierta && (
                       <div className="grid grid-cols-2 gap-2 mt-2">
                         <div>
-                          <label className="text-[11px] font-semibold text-gray-600">Aux hora inicio</label>
+                          <label className="text-[11px] font-semibold text-gray-600">Desde</label>
                           <input
                             className="input"
                             type="time"
                             min={form.start_time}
                             max={form.end_time}
-                            value={form.assistant_start_time}
-                            onChange={(e) => set('assistant_start_time', e.target.value)}
+                            value={x.ini}
+                            onChange={(e) => setAux(i, { ini: e.target.value, horaManual: true })}
                           />
                         </div>
                         <div>
-                          <label className="text-[11px] font-semibold text-gray-600">Aux hora fin</label>
+                          <label className="text-[11px] font-semibold text-gray-600">Hasta</label>
                           <input
                             className="input"
                             type="time"
                             min={form.start_time}
                             max={form.end_time}
-                            value={form.assistant_end_time}
-                            onChange={(e) => set('assistant_end_time', e.target.value)}
+                            value={x.fin}
+                            onChange={(e) => setAux(i, { fin: e.target.value, horaManual: true })}
                           />
                         </div>
                       </div>
                     )}
-                  </>
-                )}
-              </div>
-
-              {/* Recurso de apoyo #2 — opcional. Solo aparece si el #1 ya está seleccionado. */}
-              {form.assistant_id && (
-                <div>
-                  <label className="label">
-                    {labelApoyo2} <span className="text-gray-400 font-normal">(opcional{esDiagnostico ? '' : ' · doc complejos / cirugías'})</span>
-                  </label>
-                  <AuxiliarBar
-                    fila={filasAux.find((f) => f.id === form.assistant2_id)}
-                    abierto={eligiendoAux === 2}
-                    onClick={() => setEligiendoAux((v) => (v === 2 ? null : 2))}
-                    cargando={cargandoTurno && !estadoTurno.length}
-                    placeholder={esDiagnostico ? 'Elegir segundo técnico de apoyo (si aplica)' : 'Elegir segunda auxiliar (si aplica)'}
-                  />
-                  {form.assistant2_id && (
-                    <>
-                      <label className="flex items-center gap-2 text-xs text-gray-600 mt-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={aux2HorarioDistinto}
-                          onChange={(e) => {
-                            setAux2HorarioDistinto(e.target.checked)
-                            if (e.target.checked && !form.assistant2_start_time) {
-                              set('assistant2_start_time', form.start_time)
-                              set('assistant2_end_time', form.end_time)
-                            }
-                          }}
-                        />
-                        Horario distinto al recurso principal
-                      </label>
-                      {aux2HorarioDistinto && (
-                        <div className="grid grid-cols-2 gap-2 mt-2">
-                          <div>
-                            <label className="text-[11px] font-semibold text-gray-600">Aux #2 hora inicio</label>
-                            <input
-                              className="input"
-                              type="time"
-                              min={form.start_time}
-                              max={form.end_time}
-                              value={form.assistant2_start_time}
-                              onChange={(e) => set('assistant2_start_time', e.target.value)}
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[11px] font-semibold text-gray-600">Aux #2 hora fin</label>
-                            <input
-                              className="input"
-                              type="time"
-                              min={form.start_time}
-                              max={form.end_time}
-                              value={form.assistant2_end_time}
-                              onChange={(e) => set('assistant2_end_time', e.target.value)}
-                            />
-                          </div>
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        className="text-xs text-gray-400 hover:text-red-500 mt-1"
-                        onClick={() => { set('assistant2_id', ''); setAux2HorarioDistinto(false) }}
-                        title="Quitar"
-                      >
-                        × Quitar {esDiagnostico ? 'técnico de apoyo #2' : 'segunda auxiliar'}
-                      </button>
-                    </>
+                  </div>
+                )
+              })}
+              {huecosTurno.length > 0 && auxsElegidas.length > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs text-amber-700">
+                    Sin cubrir: {huecosTurno.map((h) => `${h.ini}–${h.fin}`).join(', ')}
+                  </span>
+                  {puedeAgregarAux && (
+                    <button type="button" className="text-xs font-medium text-brand-600 hover:underline" onClick={agregarAux}>
+                      + Agregar {esDiagnostico ? 'técnico de apoyo' : 'auxiliar'}
+                    </button>
                   )}
                 </div>
               )}
-            </>
+            </div>
           )}
 
           {/* Sep-2026 · Ley 2101 · Autorizacion directivo para aux con sáb+dom */}
@@ -800,12 +769,13 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                       <span className="text-gray-400">Pacientes:</span>{' '}
                       <strong>{form.expected_patients === '' ? capacidad : form.expected_patients}</strong>
                     </div>
-                    {form.assistant_id && (
-                      <div>
-                        <span className="text-gray-400">{labelApoyo}:</span>{' '}
-                        <strong>{auxiliares.find((a) => a.id === form.assistant_id)?.name ?? '—'}</strong>
+                    {verApoyo && auxsElegidas.map((x, i) => (
+                      <div key={x.id}>
+                        <span className="text-gray-400">{labelApoyo} {i + 1}:</span>{' '}
+                        <strong>{auxiliares.find((a) => a.id === x.id)?.name ?? '—'}</strong>
+                        <span className="text-gray-500"> · {x.ini}–{x.fin}</span>
                       </div>
-                    )}
+                    ))}
                   </div>
 
                   {cubreAusenciaId && (
@@ -858,65 +828,22 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
         {editando && <Contingencia asignacion={asignacion} onSaved={onSaved} />}
         </div>
 
-        {eligiendoAux ? (
-          <div ref={pickerRef} className="lg:flex-1 lg:min-w-0 bg-gray-50 p-4 sm:p-6 flex flex-col h-[78vh] lg:h-auto">
-            <AuxiliarPicker
-              titulo={`Elegir ${(eligiendoAux === 1 ? labelApoyo : labelApoyo2).toLowerCase()}`}
-              subtitulo={`${diaLabel} · ${form.start_time}–${form.end_time}`}
-              value={eligiendoAux === 1 ? form.assistant_id : form.assistant2_id}
-              excluir={eligiendoAux === 1 ? form.assistant2_id : form.assistant_id}
-              filas={filasAux}
-              onChange={(id) => {
-                if (eligiendoAux === 1) { auxAuto.current = null; set('assistant_id', id) } else set('assistant2_id', id)
-                setEligiendoAux(null)
+        {conPanel && (
+          <div className="lg:w-1/2 lg:min-w-0 h-[70vh] lg:h-auto border-t lg:border-t-0 border-gray-100 bg-gray-50 p-4">
+            <AssignmentWeekGrid
+              consultorios={grilla?.consultorios ?? []}
+              asignaciones={grilla?.asignaciones ?? []}
+              diasFecha={grilla?.diasFecha ?? []}
+              roomId={consultorioId}
+              dia={dia}
+              asignacionId={asignacion?.id}
+              turno={{
+                profesional: recursoSel?.name,
+                ini: form.start_time,
+                fin: form.end_time,
+                auxiliares: verApoyo ? auxsElegidas.map((x) => auxiliares.find((a) => a.id === x.id)?.name).filter(Boolean) : [],
               }}
-              onClose={() => setEligiendoAux(null)}
             />
-          </div>
-        ) : conPanel && (
-          // El profesional a lo ancho y las auxiliares lado a lado en pantallas
-          // anchas (una sola auxiliar también va a lo ancho); en angostas, apiladas.
-          <div className="lg:flex-1 lg:min-w-0 lg:overflow-y-auto border-t lg:border-t-0 border-gray-100 bg-gray-50 px-4 sm:px-6 py-5 grid grid-cols-1 xl:grid-cols-2 gap-3 content-start">
-            {recursoSel && (
-              <div className="xl:col-span-2">
-              <ResourceWeekLoad
-                persona={recursoSel}
-                rol={TIPOS_RECURSO.find((t) => t.value === recursoSel.type)?.label ?? 'Recurso principal'}
-                semanaId={semanaId}
-                dia={dia}
-                ini={form.start_time}
-                fin={form.end_time}
-                asignacionId={asignacion?.id}
-                turnoActual={turnoActual}
-              />
-              </div>
-            )}
-            {verApoyo && auxSel && (
-              <div className={aux2Sel ? '' : 'xl:col-span-2'}>
-              <ResourceWeekLoad
-                persona={auxSel}
-                rol={labelApoyo}
-                semanaId={semanaId}
-                dia={dia}
-                ini={auxHorarioDistinto ? form.assistant_start_time : form.start_time}
-                fin={auxHorarioDistinto ? form.assistant_end_time : form.end_time}
-                asignacionId={asignacion?.id}
-                turnoActual={turnoActual}
-              />
-              </div>
-            )}
-            {verApoyo && aux2Sel && (
-              <ResourceWeekLoad
-                persona={aux2Sel}
-                rol={labelApoyo2}
-                semanaId={semanaId}
-                dia={dia}
-                ini={aux2HorarioDistinto ? form.assistant2_start_time : form.start_time}
-                fin={aux2HorarioDistinto ? form.assistant2_end_time : form.end_time}
-                asignacionId={asignacion?.id}
-                turnoActual={turnoActual}
-              />
-            )}
           </div>
         )}
         </div>

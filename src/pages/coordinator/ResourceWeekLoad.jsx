@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { asignacionService } from '@/services/api'
 import { DIAS, DIAS_LABEL, debeDescontarAlmuerzo, clsx } from '@/utils/helpers'
+import { auxiliaresDeTurno } from '@/utils/matriz'
 
 const aMin = (hhmm) => {
   const [h, m] = (hhmm ?? '00:00').split(':').map(Number)
@@ -10,9 +11,8 @@ const aMin = (hhmm) => {
 
 /** Horario de la persona dentro del turno: el suyo si es auxiliar con sub-horario. */
 function horarioEnTurno(a, personaId) {
-  if (a.assistant_id === personaId) return [a.assistant_start_time || a.start_time, a.assistant_end_time || a.end_time]
-  if (a.assistant2_id === personaId) return [a.assistant2_start_time || a.start_time, a.assistant2_end_time || a.end_time]
-  return [a.start_time, a.end_time]
+  const aux = auxiliaresDeTurno(a).find((x) => x.id === personaId)
+  return aux ? [aux.ini, aux.fin] : [a.start_time, a.end_time]
 }
 
 /** Horas efectivas de un día: unión de franjas menos el almuerzo (misma regla que el backend). */
@@ -35,9 +35,8 @@ const redondear = (h) => Math.round(h * 10) / 10
 
 /** En qué va la persona dentro del turno. */
 function papelEnTurno(a, personaId) {
-  if (a.assistant_id === personaId) return 'Auxiliar'
-  if (a.assistant2_id === personaId) return 'Auxiliar #2'
-  return 'Profesional'
+  const i = auxiliaresDeTurno(a).findIndex((x) => x.id === personaId)
+  return i < 0 ? 'Profesional' : `Auxiliar ${i + 1}`
 }
 
 const conHorario = (nombre, ini, fin) => (ini && fin ? `${nombre} (${ini}–${fin})` : nombre)
@@ -64,7 +63,7 @@ function DetalleTurno({ f, rect, choca, tipo }) {
       {fila('Consultorio', [d.consultorio, d.sede].filter(Boolean).join(' · '))}
       {fila('Va como', parcial ? `${d.papel} · turno de ${d.turnoIni}–${d.turnoFin}` : d.papel)}
       {fila('Profesional', d.profesional)}
-      {(d.auxiliares ?? []).map((x, i) => <div key={i}>{fila(i === 0 ? 'Auxiliar' : 'Auxiliar #2', x)}</div>)}
+      {(d.auxiliares ?? []).map((x, i) => <div key={i}>{fila(`Auxiliar ${i + 1}`, x)}</div>)}
       {fila('Pacientes', d.pacientes != null && d.pacientes !== '' ? String(d.pacientes) : null)}
       {d.contingencia && <div className="text-orange-700 font-medium">🟧 En contingencia</div>}
       {d.reprogramacion && <div className="text-blue-700 font-medium">🔀 Cubre una ausencia</div>}
@@ -105,10 +104,8 @@ export default function ResourceWeekLoad({ persona, rol, semanaId, dia, ini, fin
           consultorio: a.room?.name, sede: a.room?.site?.name,
           papel: papelEnTurno(a, persona.id), turnoIni: a.start_time, turnoFin: a.end_time,
           profesional: a.resource?.name,
-          auxiliares: [
-            a.assistant && conHorario(a.assistant.name, a.assistant_start_time, a.assistant_end_time),
-            a.assistant2 && conHorario(a.assistant2.name, a.assistant2_start_time, a.assistant2_end_time),
-          ].filter(Boolean),
+          auxiliares: auxiliaresDeTurno(a).map((x) =>
+            conHorario(x.name, x.ini !== a.start_time || x.fin !== a.end_time ? x.ini : null, x.fin)),
           pacientes: a.patient_capacity,
           contingencia: a.contingency,
           reprogramacion: !!a.covered_absence_id,

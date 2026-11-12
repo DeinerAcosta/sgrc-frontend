@@ -11,11 +11,12 @@ import { ESTADOS_AUX, elegible } from '@/utils/matriz'
  * semana · Horario asignado · Sede, con filtros por nombre y estado y orden
  * alfabético u horas disponibles de menor a mayor.
  *
- * Primero fue un globo flotante sobre el formulario; tapaba la cabecera y con
- * siete columnas no cabía ("se ve feo"). Ahora son dos piezas:
- *   · AuxiliarBar    la barra del formulario (muestra la elegida y su estado)
- *   · AuxiliarPicker el panel que ocupa el lado derecho de la pantalla de
- *                    asignar mientras se elige; al elegir vuelve la semana.
+ * Tercera versión. Fue un globo flotante (tapaba la cabecera) y luego un panel
+ * al lado; Hector: "no debe ser al lado, tiene que ser debajo… cuadrícula con
+ * líneas y todo, y cuando ya seleccione se quite". Ahora:
+ *   · AuxiliarBar   la barra de cada auxiliar en el formulario
+ *   · AuxiliarTabla la cuadrícula con líneas que se abre DEBAJO de la barra;
+ *                   al elegir se cierra.
  *
  * Ausente y Asignado se ven pero no se pueden elegir.
  *
@@ -29,26 +30,26 @@ const ORDENES = [
   { value: 'horas_asc', label: 'Horas disponibles: menor a mayor' },
 ]
 const FILTROS = ['disponible', 'sin_asignar', 'asignado', 'ausente']
+// Filas a la vista; las demás con el scroll de la tabla.
+const FILAS_VISIBLES = 5
+const ALTO_FILA_PX = 44
 
 const normalizar = (t) => (t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 const fmt = (h) => (h == null ? '—' : (Math.round(h * 10) / 10).toString().replace('.', ','))
 const iniciales = (n) => (n ?? '').split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase()
 
-// Columnas compartidas por el encabezado y las filas.
-const COLUMNAS = 'grid grid-cols-[minmax(170px,1.5fr)_104px_minmax(110px,1fr)_56px_minmax(110px,1fr)_minmax(92px,0.8fr)_minmax(90px,0.9fr)] gap-3 items-center'
-
-function EstadoPill({ estado, chico = false }) {
+function EstadoPill({ estado }) {
   const e = ESTADOS_AUX[estado]
   if (!e) return null
   return (
-    <span className={clsx('inline-flex items-center gap-1.5 rounded-full font-medium whitespace-nowrap', e.cls, chico ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-xs')}>
+    <span className={clsx('inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap', e.cls)}>
       <span className={clsx('h-1.5 w-1.5 rounded-full', e.dot)} />
       {e.label}
     </span>
   )
 }
 
-/** La barra del formulario. Al pulsarla se abre el panel de la derecha. */
+/** La barra de una auxiliar en el formulario. */
 export function AuxiliarBar({ fila, abierto, onClick, cargando, placeholder }) {
   return (
     <button
@@ -71,23 +72,23 @@ export function AuxiliarBar({ fila, abierto, onClick, cargando, placeholder }) {
               {fila.disponibles != null ? `le quedan ${fmt(fila.disponibles)}h esta semana` : `${fmt(fila.horasSemana)}h esta semana`}
             </span>
           </span>
-          <EstadoPill estado={fila.estado} chico />
+          <EstadoPill estado={fila.estado} />
         </>
       ) : (
         <span className="flex-1 py-1 text-sm text-gray-400">{cargando ? 'Cargando auxiliares…' : placeholder}</span>
       )}
-      <span className="text-xs text-brand-600 font-medium shrink-0">{abierto ? 'Eligiendo…' : fila ? 'Cambiar' : 'Elegir'}</span>
+      <span className="text-gray-400 text-xs shrink-0">{abierto ? '▲' : '▼'}</span>
     </button>
   )
 }
 
-/** El panel para elegir. Ocupa el lado derecho de la pantalla de asignar. */
-export function AuxiliarPicker({ titulo, subtitulo, value, onChange, onClose, filas, excluir }) {
+/** La cuadrícula con líneas, debajo de la barra. */
+export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
   const [nombre, setNombre] = useState('')
   const [estado, setEstado] = useState('')
   const [orden, setOrden] = useState('sugerido')
 
-  const base = useMemo(() => filas.filter((f) => f.id !== excluir), [filas, excluir])
+  const base = useMemo(() => filas.filter((f) => !excluir?.includes(f.id)), [filas, excluir])
   const conteo = useMemo(() => Object.fromEntries(FILTROS.map((k) => [k, base.filter((f) => f.estado === k).length])), [base])
 
   const lista = useMemo(() => {
@@ -105,121 +106,102 @@ export function AuxiliarPicker({ titulo, subtitulo, value, onChange, onClose, fi
     return l.sort((a, b) => rango(a) - rango(b) || dispo(b) - dispo(a) || porNombre(a, b))
   }, [base, nombre, estado, orden])
 
+  const th = 'border border-gray-200 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-600 bg-gray-50'
+  const td = 'border border-gray-200 px-3 py-2 align-middle'
+
   return (
-    <div className="flex flex-col h-full min-h-[420px] bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="px-5 pt-4 pb-3 border-b border-gray-100">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900">{titulo}</h3>
-            {subtitulo && <p className="text-xs text-gray-500 mt-0.5">{subtitulo}</p>}
-          </div>
-          <button type="button" onClick={onClose} className="h-8 w-8 -mr-1 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 text-lg leading-none" aria-label="Cerrar">×</button>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 mt-3">
-          <div className="relative flex-1 min-w-[200px]">
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">⌕</span>
-            <input
-              autoFocus
-              className="input !pl-8 !py-1.5"
-              placeholder="Buscar por nombre"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-            />
-          </div>
-          <label className="flex items-center gap-1.5 text-xs text-gray-500">
-            Ordenar
-            <select
-              className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-400"
-              value={orden}
-              onChange={(e) => setOrden(e.target.value)}
-            >
-              {ORDENES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </label>
-        </div>
-
-        <div className="flex flex-wrap gap-1.5 mt-3">
+    <div className="mt-2 rounded-lg border border-gray-300 bg-white shadow-md overflow-hidden">
+      <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-gray-200 bg-gray-50">
+        <input
+          autoFocus
+          className="input !py-1.5 flex-1 min-w-[180px] max-w-sm"
+          placeholder="Buscar por nombre"
+          value={nombre}
+          onChange={(e) => setNombre(e.target.value)}
+        />
+        <div className="flex flex-wrap gap-1">
           <FiltroChip activo={!estado} onClick={() => setEstado('')} label="Todos" n={base.length} />
           {FILTROS.map((k) => (
             <FiltroChip key={k} activo={estado === k} onClick={() => setEstado(estado === k ? '' : k)} label={ESTADOS_AUX[k].label} n={conteo[k]} dot={ESTADOS_AUX[k].dot} />
           ))}
         </div>
+        <select
+          className="ml-auto rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-400"
+          value={orden}
+          onChange={(e) => setOrden(e.target.value)}
+          aria-label="Ordenar"
+        >
+          {ORDENES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        <button type="button" onClick={onClose} className="h-7 w-7 rounded-full text-gray-400 hover:bg-gray-200 hover:text-gray-600 leading-none" aria-label="Cerrar">×</button>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-auto">
-        <div className="min-w-[780px]">
-          <div className={clsx(COLUMNAS, 'sticky top-0 z-10 bg-gray-50/95 backdrop-blur px-5 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 border-b border-gray-100')}>
-            <span>Auxiliar</span>
-            <span>Estado</span>
-            <span>Recurso par</span>
-            <span className="text-center">Día</span>
-            <span>Semana</span>
-            <span>Horario</span>
-            <span>Sede</span>
-          </div>
-
-          <ul className="p-2 space-y-1">
+      <div className="overflow-auto" style={{ maxHeight: 40 + FILAS_VISIBLES * ALTO_FILA_PX }}>
+        <table className="w-full min-w-[820px] border-collapse text-xs">
+          <thead className="sticky top-0 z-10">
+            <tr>
+              <th className={th}>Auxiliar</th>
+              <th className={th}>Estado</th>
+              <th className={th}>Recurso par</th>
+              <th className={clsx(th, 'text-center')}>Horas día</th>
+              <th className={th}>Horas semana</th>
+              <th className={th}>Horario asignado</th>
+              <th className={th}>Sede</th>
+            </tr>
+          </thead>
+          <tbody>
             {lista.map((f) => {
               const elegida = f.id === value
               const puede = elegible(f.estado) || elegida
               const pct = f.tope ? Math.min(100, (f.horasSemana / f.tope) * 100) : 0
               return (
-                <li key={f.id}>
-                  <button
-                    type="button"
-                    disabled={!puede}
-                    onClick={() => onChange(f.id)}
-                    title={f.estado === 'ausente' ? (f.motivoAusencia ?? 'Ausente') : undefined}
-                    className={clsx(
-                      COLUMNAS,
-                      'w-full text-left rounded-lg px-3 py-2.5 transition-colors',
-                      elegida ? 'bg-brand-50 ring-1 ring-brand-300' : puede ? 'hover:bg-gray-50' : 'opacity-50 cursor-not-allowed',
-                    )}
-                  >
-                    <span className="flex items-center gap-2.5 min-w-0">
+                <tr
+                  key={f.id}
+                  onClick={() => puede && onChange(f.id)}
+                  title={f.estado === 'ausente' ? (f.motivoAusencia ?? 'Ausente') : undefined}
+                  style={{ height: ALTO_FILA_PX }}
+                  className={clsx(
+                    'transition-colors',
+                    elegida ? 'bg-brand-50' : puede ? 'cursor-pointer hover:bg-brand-50/60' : 'cursor-not-allowed bg-gray-50/60 text-gray-400',
+                  )}
+                >
+                  <td className={td}>
+                    <span className="flex items-center gap-2">
                       <span className={clsx(
-                        'h-8 w-8 shrink-0 rounded-full text-xs font-semibold flex items-center justify-center',
+                        'h-7 w-7 shrink-0 rounded-full text-[11px] font-semibold flex items-center justify-center',
                         elegida ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600',
                       )}>
                         {elegida ? '✓' : iniciales(f.name)}
                       </span>
-                      <span className="min-w-0">
-                        <span className="block text-sm font-medium leading-tight text-gray-900">{f.name}</span>
-                        {f.preseleccionada && <span className="block text-[11px] font-medium text-brand-600">Pareja en la Matriz</span>}
+                      <span>
+                        <span className={clsx('block text-[13px] font-medium leading-tight', puede ? 'text-gray-900' : 'text-gray-400')}>{f.name}</span>
+                        {f.preseleccionada && <span className="block text-[10px] font-semibold text-brand-600">Pareja en la Matriz</span>}
                       </span>
                     </span>
-                    <span><EstadoPill estado={f.estado} chico /></span>
-                    <span className="text-xs leading-tight text-gray-600">{f.recursosPar.map((p) => p.name).join(', ') || <span className="text-gray-300">—</span>}</span>
-                    <span className="text-sm text-center tabular-nums text-gray-800">{fmt(f.horasDia)}<span className="text-[10px] text-gray-400">h</span></span>
-                    <span className="min-w-0">
-                      <span className="block text-xs tabular-nums text-gray-700">
-                        {fmt(f.horasSemana)}{f.tope != null && <span className="text-gray-400"> / {fmt(f.tope)}h</span>}
+                  </td>
+                  <td className={td}><EstadoPill estado={f.estado} /></td>
+                  <td className={clsx(td, 'leading-tight')}>{f.recursosPar.map((p) => p.name).join(', ') || '—'}</td>
+                  <td className={clsx(td, 'text-center tabular-nums')}>{fmt(f.horasDia)}</td>
+                  <td className={td}>
+                    <span className="block tabular-nums">{fmt(f.horasSemana)}{f.tope != null && <span className="text-gray-400"> / {fmt(f.tope)}h</span>}</span>
+                    {f.tope != null && (
+                      <span className="block h-1 mt-1 w-24 rounded-full bg-gray-100 overflow-hidden">
+                        <span className={clsx('block h-full rounded-full', pct >= 100 ? 'bg-rose-500' : pct >= 90 ? 'bg-amber-500' : 'bg-emerald-500')} style={{ width: `${pct}%` }} />
                       </span>
-                      {f.tope != null && (
-                        <span className="block h-1 mt-1 rounded-full bg-gray-100 overflow-hidden">
-                          <span className={clsx('block h-full rounded-full', pct >= 100 ? 'bg-rose-500' : pct >= 90 ? 'bg-amber-500' : 'bg-emerald-500')} style={{ width: `${pct}%` }} />
-                        </span>
-                      )}
-                      {f.disponibles != null && <span className="block text-[10px] text-gray-400 mt-0.5">quedan {fmt(f.disponibles)}h</span>}
-                    </span>
-                    <span className="flex flex-wrap gap-1">
-                      {f.horario.length
-                        ? f.horario.map((h, i) => (
-                          <span key={i} className="rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] tabular-nums text-gray-700">{h.ini}–{h.fin}</span>
-                        ))
-                        : <span className="text-gray-300 text-xs">—</span>}
-                    </span>
-                    <span className="text-xs leading-tight text-gray-600">{f.sedes.join(', ') || <span className="text-gray-300">—</span>}</span>
-                  </button>
-                </li>
+                    )}
+                  </td>
+                  <td className={clsx(td, 'tabular-nums whitespace-nowrap')}>
+                    {f.horario.length ? f.horario.map((h, i) => <div key={i}>{h.ini}–{h.fin}</div>) : '—'}
+                  </td>
+                  <td className={clsx(td, 'leading-tight')}>{f.sedes.join(', ') || '—'}</td>
+                </tr>
               )
             })}
             {!lista.length && (
-              <li className="py-10 text-center text-sm text-gray-400">Ninguna auxiliar coincide.</li>
+              <tr><td colSpan={7} className={clsx(td, 'py-6 text-center text-gray-400')}>Ninguna auxiliar coincide.</td></tr>
             )}
-          </ul>
-        </div>
+          </tbody>
+        </table>
       </div>
     </div>
   )
@@ -231,7 +213,7 @@ function FiltroChip({ activo, onClick, label, n, dot }) {
       type="button"
       onClick={onClick}
       className={clsx(
-        'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
         activo ? 'border-brand-600 bg-brand-600 text-white' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300',
       )}
     >

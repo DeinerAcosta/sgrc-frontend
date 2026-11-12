@@ -5,6 +5,7 @@ import { es } from 'date-fns/locale'
 import { horarioDiarioService, sedeService } from '@/services/api'
 import { useAuthStore } from '@/store/authStore'
 import { Badge, Spinner, EmptyState, SectionHeader } from '@/components/ui'
+import { auxiliaresDeTurno } from '@/utils/matriz'
 
 /**
  * Resumen diario del horario por sede. Pensado para que el coordinador imprima
@@ -143,7 +144,7 @@ export default function HorarioDiarioPage() {
                     <div className="font-medium">{it.resource?.name}</div>
                     {it.resource?.specialty && <div className="text-gray-500 text-xs">{it.resource.specialty}</div>}
                   </td>
-                  <td className="px-3 py-2 text-xs">{it.assistant?.name ?? '—'}</td>
+                  <td className="px-3 py-2 text-xs">{auxiliaresDeTurno(it).map((x) => x.name).join(', ') || '—'}</td>
                   {/* PROYECTOS-3255 #2.1: asesores no muestran # pacientes. */}
                   <td className="px-3 py-2 text-xs text-right">{it.resource?.type === 'asesor_servicios' ? '—' : it.patient_capacity}</td>
                   <td className="px-3 py-2 text-center print:hidden">

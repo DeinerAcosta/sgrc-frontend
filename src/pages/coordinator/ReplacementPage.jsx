@@ -11,6 +11,7 @@ import { Avatar, Spinner, EmptyState, Badge } from '@/components/ui'
 import { GRUPOS_AUSENCIAS, TIPOS_RECURSO, parseFechaLocal, pacientesDelCaso, palabraDelRecurso, coordSoloVe } from '@/utils/helpers'
 import { RAIZ_AUSENCIAS } from '@/config/nav'
 import { horaDeCorte } from '@/utils/tramos'
+import { auxiliaresDeTurno } from '@/utils/matriz'
 
 // Los que reparte la líder. Los demás (técnicos, auxiliares, asesores) los
 // reparte el coordinador de su sede.
@@ -765,8 +766,10 @@ function TarjetaFranja({ franja, ausencia, cuenta, soloVe = false }) {
               : <span className="text-gray-300">sin coordinador asignado a la sede</span>}
           </div>
 
-          {franja.assistant && (
-            <div className="text-xs text-gray-500 mt-0.5">Auxiliar: {franja.assistant.name}</div>
+          {auxiliaresDeTurno(franja).length > 0 && (
+            <div className="text-xs text-gray-500 mt-0.5">
+              {auxiliaresDeTurno(franja).length === 1 ? 'Auxiliar' : 'Auxiliares'}: {auxiliaresDeTurno(franja).map((x) => x.name).join(', ')}
+            </div>
           )}
 
           {/* Quién atiende cada tramo y qué falta. Es lo que se le dice al
@@ -965,7 +968,8 @@ function Candidatos({ franja, ausencia, hueco, faltanEnElCaso, onListo }) {
       week_id: franja.week_id,
       room_id: franja.room_id,
       resource_id: recursoId,
-      assistant_id: franja.assistant_id,
+      // Nov-2026 · Todas las auxiliares del turno; sin horas: heredan las del turno nuevo.
+      assistants: auxiliaresDeTurno(franja).map((x) => ({ resource_id: x.id })),
       weekday: franja.weekday,
       start_time: hueco.start_time,
       end_time: horaHasta(n),

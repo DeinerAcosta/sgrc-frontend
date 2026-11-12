@@ -51,3 +51,66 @@ export const ESTADOS_AUX = {
   ausente:     { label: 'Ausente',     cls: 'bg-rose-50 text-rose-700',       dot: 'bg-rose-500' },
 }
 export const elegible = (estado) => estado === 'disponible' || estado === 'sin_asignar'
+
+const aHHMM = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+const valida = (f) => HHMM.test(f?.ini ?? '') && HHMM.test(f?.fin ?? '') && aMin(f.fin) > aMin(f.ini)
+
+/**
+ * Nov-2026 · Hector: un turno lleva auxiliares "hasta que se acabe el horario
+ * del médico". Devuelve los tramos del turno [ini, fin) que ninguna auxiliar
+ * cubre todavía, como [{ ini, fin }] en HH:MM. Vacío = turno cubierto.
+ */
+export function huecosSinCubrir(ini, fin, rangos = []) {
+  if (!valida({ ini, fin })) return []
+  const s = aMin(ini), e = aMin(fin)
+  const tramos = rangos.filter(valida)
+    .map((r) => [Math.max(s, aMin(r.ini)), Math.min(e, aMin(r.fin))])
+    .filter(([a, b]) => b > a)
+    .sort((x, y) => x[0] - y[0])
+  const huecos = []
+  let cursor = s
+  for (const [a, b] of tramos) {
+    if (a > cursor) huecos.push({ ini: aHHMM(cursor), fin: aHHMM(a) })
+    cursor = Math.max(cursor, b)
+  }
+  if (cursor < e) huecos.push({ ini: aHHMM(cursor), fin: aHHMM(e) })
+  return huecos
+}
+
+/**
+ * La hora con la que llega una auxiliar al turno. Hector: "la de la Matriz".
+ * Se toma su franja de la Matriz que más se cruza con el turno, recortada al
+ * turno. Si no tiene franja en la Matriz que caiga en el turno, el primer
+ * tramo que falta cubrir; y si ya está todo cubierto, el turno completo.
+ */
+export function horaPorDefecto({ franjasMatriz = [], ini, fin, huecos = [] }) {
+  if (!valida({ ini, fin })) return { ini, fin }
+  const s = aMin(ini), e = aMin(fin)
+  let mejor = null
+  for (const f of franjasMatriz.filter(valida)) {
+    const a = Math.max(s, aMin(f.ini)), b = Math.min(e, aMin(f.fin))
+    if (b > a && (!mejor || b - a > mejor[1] - mejor[0])) mejor = [a, b]
+  }
+  if (mejor) return { ini: aHHMM(mejor[0]), fin: aHHMM(mejor[1]) }
+  if (huecos.length) return { ...huecos[0] }
+  return { ini, fin }
+}
+
+/**
+ * Nov-2026 · Las auxiliares de un turno, en orden: [{ id, name, ini, fin }]
+ * con la hora efectiva de cada una. Lee la lista nueva (`assistants`) y, si
+ * no viene, los campos viejos auxiliar/auxiliar #2.
+ */
+export function auxiliaresDeTurno(a) {
+  if (!a) return []
+  const ini = a.start_time, fin = a.end_time
+  if (Array.isArray(a.assistants)) {
+    return a.assistants.map((x) => ({
+      id: x.resource_id, name: x.resource?.name ?? '', ini: x.start_time || ini, fin: x.end_time || fin,
+    }))
+  }
+  return [
+    a.assistant_id && { id: a.assistant_id, name: a.assistant?.name ?? '', ini: a.assistant_start_time || ini, fin: a.assistant_end_time || fin },
+    a.assistant2_id && { id: a.assistant2_id, name: a.assistant2?.name ?? '', ini: a.assistant2_start_time || ini, fin: a.assistant2_end_time || fin },
+  ].filter(Boolean)
+}

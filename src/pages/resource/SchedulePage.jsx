@@ -6,6 +6,7 @@ import { recursoService, semanaService } from '@/services/api'
 import { useAuthStore } from '@/store/authStore'
 import { Badge, KpiCard, Spinner, EmptyState } from '@/components/ui'
 import { DIAS_FULL, semanaLabel } from '@/utils/helpers'
+import { auxiliaresDeTurno } from '@/utils/matriz'
 import AusenciaFormModal from '@/pages/resource/AbsenceFormModal'
 
 export default function HorarioPage() {
@@ -142,16 +143,12 @@ export default function HorarioPage() {
                               Soy aux. de <strong>{a.resource?.name}</strong>
                             </div>
                           )}
-                          {soyTitular && a.assistant && (
-                            <div className="text-xs text-teal-700 mt-1">
-                              Mi auxiliar: <strong>{a.assistant?.name}</strong>
+                          {soyTitular && auxiliaresDeTurno(a).map((x, i) => (
+                            <div key={x.id} className={`text-xs text-teal-700${i === 0 ? ' mt-1' : ''}`}>
+                              {i === 0 ? 'Mi auxiliar' : `Auxiliar ${i + 1}`}: <strong>{x.name}</strong>
+                              {x.ini !== a.start_time || x.fin !== a.end_time ? ` · ${x.ini}–${x.fin}` : ''}
                             </div>
-                          )}
-                          {soyTitular && a.assistant2 && (
-                            <div className="text-xs text-teal-700">
-                              Auxiliar 2: <strong>{a.assistant2?.name}</strong>
-                            </div>
-                          )}
+                          ))}
                           {/* Línea 5: Coordinador responsable. Si no hay (recurso sin
                               líder asignado), mostramos el aviso para que el recurso
                               sepa que es un dato faltante, no un bug del sistema. */}
