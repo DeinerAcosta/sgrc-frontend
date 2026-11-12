@@ -59,7 +59,7 @@ export function AuxiliarBar({ fila, abierto, onClick, cargando, placeholder }) {
     >
       {fila ? (
         <>
-          <span className="h-5 w-5 shrink-0 rounded-full bg-brand-50 text-brand-700 text-[9px] font-semibold flex items-center justify-center">
+          <span className="h-5 w-5 shrink-0 rounded-full bg-iris-green-100 text-iris-green-800 text-[9px] font-semibold flex items-center justify-center">
             {iniciales(fila.name)}
           </span>
           <span className="min-w-0 flex-1 truncate">
@@ -90,7 +90,7 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
     ? { campo, dir: o.dir === 'asc' ? 'desc' : 'asc' }
     : { campo, dir: 'asc' }))
   const flecha = (campo) => (
-    <span className={clsx('ml-1', orden.campo === campo ? 'text-brand-700' : 'text-gray-300')}>
+    <span className={clsx('ml-1', orden.campo === campo ? 'text-iris-green' : 'text-white/40')}>
       {orden.campo === campo ? (orden.dir === 'asc' ? '▲' : '▼') : '↕'}
     </span>
   )
@@ -118,14 +118,15 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
   useEffect(() => { raiz.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) }, [])
 
   const selCls = 'shrink-0 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-400'
-  const th = 'border border-gray-200 px-1.5 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wide text-gray-600 bg-gray-50 whitespace-nowrap overflow-hidden text-ellipsis'
+  // Títulos en el azul marino de la marca, como la Matrix.
+  const th = 'border border-brand-400/40 px-1.5 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wide text-white bg-brand-600 whitespace-nowrap overflow-hidden text-ellipsis'
   const td = 'border border-gray-200 px-1.5 py-1 align-middle whitespace-nowrap overflow-hidden text-ellipsis'
 
   return (
-    <div ref={raiz} className="mt-2 rounded-lg border border-gray-300 bg-white shadow-md overflow-hidden">
+    <div ref={raiz} className="mt-2 rounded-lg border border-brand-200 bg-white shadow-md overflow-hidden">
       {/* Hector: buscar, estado, orden alfabético y horas disponibles, cada
           uno en su campo; las flechas de los títulos hacen lo mismo. */}
-      <div className="flex items-center gap-2 px-2 py-1.5 border-b border-gray-200 bg-gray-50">
+      <div className="flex items-center gap-2 px-2 py-1.5 border-b border-brand-100 bg-brand-50">
         <input
           autoFocus
           className="input !py-1.5 flex-1 min-w-0"
@@ -179,13 +180,13 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
           </colgroup>
           <thead className="sticky top-0 z-10">
             <tr style={{ height: ALTO_TITULOS_PX }}>
-              <th className={clsx(th, 'cursor-pointer select-none hover:text-brand-700')} onClick={() => ordenarPor('nombre')} title="Ordenar alfabéticamente">
+              <th className={clsx(th, 'cursor-pointer select-none hover:text-iris-green')} onClick={() => ordenarPor('nombre')} title="Ordenar alfabéticamente">
                 Auxiliar{flecha('nombre')}
               </th>
               <th className={th}>Estado</th>
               <th className={th}>Recurso par</th>
               <th className={clsx(th, 'text-center')}>Día</th>
-              <th className={clsx(th, 'cursor-pointer select-none hover:text-brand-700')} onClick={() => ordenarPor('horas')} title="Ordenar por horas disponibles">
+              <th className={clsx(th, 'cursor-pointer select-none hover:text-iris-green')} onClick={() => ordenarPor('horas')} title="Ordenar por horas disponibles">
                 Semana{flecha('horas')}
               </th>
               <th className={th}>Horario</th>
@@ -205,20 +206,20 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
                   style={{ height: ALTO_FILA_PX }}
                   className={clsx(
                     'transition-colors',
-                    elegida ? 'bg-brand-50' : puede ? 'cursor-pointer hover:bg-brand-50/60' : 'cursor-not-allowed bg-gray-50/60 text-gray-400',
+                    elegida ? 'bg-iris-green-50' : puede ? 'cursor-pointer hover:bg-iris-blue-50' : 'cursor-not-allowed bg-gray-50/60 text-gray-400',
                   )}
                 >
                   <td className={td}>
                     <span className="flex items-center gap-1.5 min-w-0">
                       <span className={clsx(
                         'h-6 w-6 shrink-0 rounded-full text-[10px] font-semibold flex items-center justify-center',
-                        elegida ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600',
+                        elegida ? 'bg-iris-green-700 text-white' : puede ? 'bg-iris-blue-50 text-brand-800' : 'bg-gray-100 text-gray-400',
                       )}>
                         {elegida ? '✓' : iniciales(f.name)}
                       </span>
                       <span className="min-w-0">
                         <span className={clsx('block truncate text-[13px] font-medium leading-tight', puede ? 'text-gray-900' : 'text-gray-400')} title={f.name}>{f.name}</span>
-                        {f.preseleccionada && <span className="block text-[10px] font-semibold leading-tight text-brand-600">Pareja en la Matrix</span>}
+                        {f.preseleccionada && <span className="block text-[10px] font-semibold leading-tight text-iris-green-700">Pareja en la Matrix</span>}
                       </span>
                     </span>
                   </td>
@@ -231,7 +232,7 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
                     <span className="block tabular-nums">{fmt(f.horasSemana)}{f.tope != null && <span className="text-gray-400"> / {fmt(f.tope)}h</span>}</span>
                     {f.tope != null && (
                       <span className="block h-1 mt-1 w-full max-w-[64px] rounded-full bg-gray-100 overflow-hidden">
-                        <span className={clsx('block h-full rounded-full', pct >= 100 ? 'bg-rose-500' : pct >= 90 ? 'bg-amber-500' : 'bg-emerald-500')} style={{ width: `${pct}%` }} />
+                        <span className={clsx('block h-full rounded-full', pct >= 100 ? 'bg-rose-500' : pct >= 90 ? 'bg-amber-500' : 'bg-iris-green-700')} style={{ width: `${pct}%` }} />
                       </span>
                     )}
                   </td>

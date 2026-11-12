@@ -461,13 +461,14 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
   // la sede ni el caso que se está reprogramando al volver.
   return (
     <div className="fixed inset-0 z-50 bg-gray-50 flex flex-col">
-      <div className="shrink-0 bg-white border-b border-gray-200">
-        {/* Nov-2026 · Hector: la cabecera más delgada. */}
+      {/* Nov-2026 · Hector: la cabecera delgada y en el azul marino de la
+          marca, con la franja menta→cielo del logo (colores clínicos). */}
+      <div className="shrink-0 bg-brand-600 text-white">
         <div className="flex items-center gap-3 px-4 sm:px-6 py-1.5">
-          <button onClick={tryClose} className="btn !py-1 !px-2.5 !text-xs whitespace-nowrap">← Volver al programador</button>
+          <button onClick={tryClose} className="rounded-md border border-white/25 bg-white/10 px-2.5 py-1 text-xs font-medium text-white hover:bg-white/20 whitespace-nowrap">← Volver al programador</button>
           <div className="min-w-0 flex flex-wrap items-center gap-x-3 gap-y-0.5">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-sm font-semibold text-gray-900">
+              <h2 className="text-sm font-semibold text-white">
                 {editando ? 'Editar asignación' : 'Nueva asignación'}
               </h2>
               {/* 3739 · Hector: "Crear contingencia", arriba al lado del título. */}
@@ -481,16 +482,17 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                 </button>
               )}
             </div>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-iris-blue">
               {consultorio.name} · {diaLabel}
               {esServicioAlternativo && (
-                <span className="ml-2 inline-block px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-medium uppercase tracking-wide">
+                <span className="ml-2 inline-block px-1.5 py-0.5 bg-iris-blue-50 text-iris-blue-800 rounded text-[10px] font-medium uppercase tracking-wide">
                   Servicio alterno
                 </span>
               )}
             </p>
           </div>
         </div>
+        <div className="h-1 bg-gradient-to-r from-iris-green via-iris-blue to-iris-blue/40" />
       </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto lg:flex lg:overflow-hidden">
@@ -681,7 +683,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
               })}
               {huecosTurno.length > 0 && auxsElegidas.length > 0 && (
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-xs text-amber-700">
+                  <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
                     Sin cubrir: {huecosTurno.map((h) => `${h.ini}–${h.fin}`).join(', ')}
                   </span>
                   {puedeAgregarAux && (
@@ -845,7 +847,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
             semana de cada persona (profesional y auxiliares), con el diseño de
             siempre. No se aparta mientras se elige auxiliar. */}
         {conPanel && (
-          <div className="lg:w-1/2 lg:min-w-0 lg:overflow-y-auto border-t lg:border-t-0 border-gray-100 bg-gray-50 px-4 sm:px-6 py-5 space-y-3">
+          <div className="lg:w-1/2 lg:min-w-0 lg:overflow-y-auto border-t lg:border-t-0 border-gray-100 bg-brand-50/50 px-4 sm:px-6 py-5 space-y-3">
             {recursoSel && (
               <ResourceWeekLoad
                 persona={recursoSel}
