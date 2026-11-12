@@ -86,7 +86,6 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
   const [orden, setOrden] = useState('sugerido')
 
   const base = useMemo(() => filas.filter((f) => !excluir?.includes(f.id)), [filas, excluir])
-  const conteo = useMemo(() => Object.fromEntries(FILTROS.map((k) => [k, base.filter((f) => f.estado === k).length])), [base])
 
   const lista = useMemo(() => {
     const q = normalizar(nombre.trim())
@@ -128,8 +127,8 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
           onChange={(e) => setEstado(e.target.value)}
           aria-label="Estado"
         >
-          <option value="">Todos los estados ({base.length})</option>
-          {FILTROS.map((k) => <option key={k} value={k}>{ESTADOS_AUX[k].label} ({conteo[k]})</option>)}
+          <option value="">Todos los estados</option>
+          {FILTROS.map((k) => <option key={k} value={k}>{ESTADOS_AUX[k].label}</option>)}
         </select>
         <button type="button" onClick={onClose} className="shrink-0 h-7 w-7 rounded-full text-gray-400 hover:bg-gray-200 hover:text-gray-600 leading-none" aria-label="Cerrar">×</button>
       </div>
