@@ -117,13 +117,14 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
   const raiz = useRef(null)
   useEffect(() => { raiz.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) }, [])
 
+  const selCls = 'shrink-0 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-400'
   const th = 'border border-gray-200 px-1.5 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wide text-gray-600 bg-gray-50 whitespace-nowrap overflow-hidden text-ellipsis'
   const td = 'border border-gray-200 px-1.5 py-1 align-middle whitespace-nowrap overflow-hidden text-ellipsis'
 
   return (
     <div ref={raiz} className="mt-2 rounded-lg border border-gray-300 bg-white shadow-md overflow-hidden">
-      {/* Hector: filtros por nombre y estado en esta barra; el orden
-          (alfabético y horas disponibles) con la flecha de cada título. */}
+      {/* Hector: buscar, estado, orden alfabético y horas disponibles, cada
+          uno en su campo; las flechas de los títulos hacen lo mismo. */}
       <div className="flex items-center gap-2 px-2 py-1.5 border-b border-gray-200 bg-gray-50">
         <input
           autoFocus
@@ -133,13 +134,33 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
           onChange={(e) => setNombre(e.target.value)}
         />
         <select
-          className="shrink-0 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-400"
+          className={selCls}
           value={estado}
           onChange={(e) => setEstado(e.target.value)}
           aria-label="Estado"
         >
           <option value="">Estado</option>
           {FILTROS.map((k) => <option key={k} value={k}>{ESTADOS_AUX[k].label}</option>)}
+        </select>
+        <select
+          className={selCls}
+          value={orden.campo === 'nombre' ? orden.dir : ''}
+          onChange={(e) => setOrden(e.target.value ? { campo: 'nombre', dir: e.target.value } : { campo: null, dir: 'asc' })}
+          aria-label="Orden alfabético"
+        >
+          <option value="">Nombre</option>
+          <option value="asc">A → Z</option>
+          <option value="desc">Z → A</option>
+        </select>
+        <select
+          className={selCls}
+          value={orden.campo === 'horas' ? orden.dir : ''}
+          onChange={(e) => setOrden(e.target.value ? { campo: 'horas', dir: e.target.value } : { campo: null, dir: 'asc' })}
+          aria-label="Horas disponibles"
+        >
+          <option value="">Horas</option>
+          <option value="asc">Menos horas</option>
+          <option value="desc">Más horas</option>
         </select>
         <button type="button" onClick={onClose} className="shrink-0 h-7 w-7 rounded-full text-gray-400 hover:bg-gray-200 hover:text-gray-600 leading-none" aria-label="Cerrar">×</button>
       </div>
