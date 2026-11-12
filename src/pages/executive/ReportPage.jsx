@@ -268,7 +268,7 @@ function PorFamiliaPanel({ filas }) {
       <div className="text-xs font-medium text-gray-700 mb-2">Desglose por familia (agregado del periodo)</div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
-          <thead>
+          <thead className="thead-marino">
             <tr className="text-gray-500 border-b border-gray-100">
               <th className="text-left px-2 py-1 font-medium">Familia</th>
               <th className="text-right px-2 py-1 font-medium">Ausencias</th>
@@ -619,7 +619,7 @@ export default function InformePage() {
              bordes de una celda sticky y el encabezado queda sin línea. */
           <div className="overflow-auto -mx-4 sm:mx-0 max-h-[calc(100vh-320px)]">
             <table className="w-full text-xs border-separate border-spacing-0 min-w-[800px]">
-              <thead>
+              <thead className="thead-marino">
                 <tr className="bg-gray-50">
                   {colsVisibles.map((col, colIdx) => {
                     // Tooltip explicativo — solo aplica a informes de ausentismo

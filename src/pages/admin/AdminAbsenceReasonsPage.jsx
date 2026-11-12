@@ -109,7 +109,7 @@ export default function AdminMotivosAusenciaPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead>
+              <thead className="thead-marino">
                 <tr className="text-xs text-gray-500 border-b border-gray-100">
                   <th className="text-left px-2 py-2">Orden</th>
                   <th className="text-left px-2 py-2">Motivo</th>

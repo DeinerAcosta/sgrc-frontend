@@ -306,7 +306,7 @@ export default function EjecucionPage() {
           <>
             <div className="overflow-x-auto -mx-4 sm:mx-0">
               <table className="w-full text-sm min-w-[720px]">
-                <thead>
+                <thead className="thead-marino">
                   <tr className="bg-gray-50 text-xs text-gray-500">
                     <th className="px-3 py-2 text-left">Consultorio</th>
                     <th className="px-3 py-2 text-left">Recurso</th>

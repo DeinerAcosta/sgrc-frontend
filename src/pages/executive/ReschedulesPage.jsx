@@ -439,10 +439,10 @@ function TabReprogramadores({ rango }) {
         {/* 26-oct · Hector: que la tabla quepa completa. Los títulos largos
             bajan a dos líneas y los números van a la derecha. */}
         <table className="w-full text-xs border-separate border-spacing-0 min-w-[760px]">
-          <thead>
+          <thead className="thead-marino">
             <tr>
               {['Reprogramador', ...COLS.map(([, l]) => l), '% contestaron'].map((c, i) => (
-                <th key={c} className={`sticky top-0 bg-brand-800 text-white font-semibold px-2 py-2 leading-tight align-bottom ${i === 0 ? 'text-left' : 'text-right'}`}>{c}</th>
+                <th key={c} className={`sticky top-0 bg-brand-600 text-white font-semibold px-2 py-2 leading-tight align-bottom ${i === 0 ? 'text-left' : 'text-right'}`}>{c}</th>
               ))}
             </tr>
           </thead>

@@ -133,7 +133,7 @@ export default function RecursosCoordPage() {
           <>
             <div className="overflow-x-auto -mx-4 px-4">
               <table className="w-full text-xs min-w-[760px]">
-                <thead className="sticky top-0 bg-white z-10">
+                <thead className="thead-marino sticky top-0 z-10">
                   <tr className="text-left text-gray-500 border-b border-gray-200">
                     <th className="px-3 py-2 font-medium">Recurso</th>
                     <th className="px-3 py-2 font-medium">Tipo</th>

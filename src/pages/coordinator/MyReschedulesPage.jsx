@@ -467,7 +467,7 @@ function TablaDeLlamadas({ caso, onGuardar, guardando }) {
     <div className="mt-3">
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
-          <thead>
+          <thead className="thead-marino">
             <tr className="text-[11px] uppercase tracking-wide text-gray-400 text-left">
               <th className={`${celda} font-semibold`}>Lo cubre</th>
               <th className={`${celda} font-semibold`}>Contestaron</th>

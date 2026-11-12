@@ -21,6 +21,15 @@
 }
 
 @layer components {
+  /* Nov-2026 · Hector: la fila de títulos de las tablas en el azul marino de
+     la marca, como la Matrix. Se pone en el <thead>; gana a los bg/text de
+     cada <th> por especificidad. */
+  .thead-marino th {
+    @apply bg-brand-600 text-white font-semibold border-white/20;
+  }
+  .thead-marino th + th {
+    @apply border-l border-white/20;
+  }
   .btn {
     @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium
            border border-gray-200 bg-white text-gray-700

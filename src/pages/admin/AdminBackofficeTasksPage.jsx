@@ -95,7 +95,7 @@ export default function AdminTareasBackofficePage() {
         ) : (
           <div className="overflow-x-auto -mx-4 sm:mx-0">
           <table className="w-full text-sm min-w-[640px]">
-            <thead>
+            <thead className="thead-marino">
               <tr className="bg-gray-50 text-xs text-gray-500">
                 <th className="px-3 py-2 text-left">Nombre</th>
                 <th className="px-3 py-2 text-left">Descripción</th>

@@ -419,10 +419,10 @@ export default function AusenciasCoordPage() {
             <>
               <div className="overflow-auto max-h-[calc(100vh-290px)]">
                 <table className="w-full text-xs border-separate border-spacing-0 min-w-[620px]">
-                  <thead>
+                  <thead className="thead-marino">
                     <tr>
                       {['Recurso', 'Motivo', 'Fechas', 'Antelación', 'Clasificación', 'Remunerada', 'Estado'].map((c) => (
-                        <th key={c} className="sticky top-0 z-10 bg-brand-800 text-white text-left font-semibold px-3 py-2 whitespace-nowrap">
+                        <th key={c} className="sticky top-0 z-10 bg-brand-600 text-white text-left font-semibold px-3 py-2 whitespace-nowrap">
                           {c}
                         </th>
                       ))}
