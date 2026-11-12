@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { clsx } from '@/utils/helpers'
+import { clsx, debeDescontarAlmuerzo } from '@/utils/helpers'
 import { ESTADOS_AUX, elegible } from '@/utils/matriz'
 
 /**
@@ -33,6 +33,28 @@ const ALTO_TITULOS_PX = 34
 
 const normalizar = (t) => (t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 const fmt = (h) => (h == null ? '—' : (Math.round(h * 10) / 10).toString().replace('.', ','))
+const aMin = (h) => { const [a, b] = (h ?? '').split(':').map(Number); return a * 60 + b }
+// Horas efectivas de una franja (misma regla de almuerzo que el backend).
+const horasFranja = (ini, fin) => {
+  const s = aMin(ini), e = aMin(fin), m = e - s
+  if (!(m > 0)) return 0
+  return (m - (debeDescontarAlmuerzo(m, s, e, 'auxiliar') ? 60 : 0)) / 60
+}
+// La fila con el turno que se está armando: su horario en este turno, y las
+// horas del día y de la semana contándolo (si se edita, en lugar del guardado).
+function conPlan(f0, plan) {
+  if (!f0 || !plan) return f0
+  const guardado = f0.horario.find((h) => h.este_turno)
+  const delta = horasFranja(plan.ini, plan.fin) - (guardado ? horasFranja(guardado.ini, guardado.fin) : 0)
+  return {
+    ...f0,
+    horario: [...f0.horario.filter((h) => !h.este_turno), { ...plan, este_turno: true }].sort((a, b) => (a.ini < b.ini ? -1 : 1)),
+    horasDia: (f0.horasDia ?? 0) + delta,
+    horasSemana: (f0.horasSemana ?? 0) + delta,
+    disponibles: f0.disponibles == null ? null : Math.max(0, f0.disponibles - delta),
+    sedes: plan.sede && !f0.sedes.includes(plan.sede) ? [...f0.sedes, plan.sede] : f0.sedes,
+  }
+}
 const iniciales = (n) => (n ?? '').split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase()
 
 function EstadoPill({ estado }) {
@@ -47,7 +69,9 @@ function EstadoPill({ estado }) {
 }
 
 /** La barra de una auxiliar en el formulario: una línea, del alto de un campo. */
-export function AuxiliarBar({ fila, abierto, onClick, cargando, placeholder }) {
+export function AuxiliarBar({ fila: fila0, abierto, onClick, cargando, placeholder, plan = null }) {
+  const fila = conPlan(fila0, plan)
+  const horario = plan ? `${plan.ini}–${plan.fin}` : null
   return (
     <button
       type="button"
@@ -64,6 +88,7 @@ export function AuxiliarBar({ fila, abierto, onClick, cargando, placeholder }) {
           </span>
           <span className="min-w-0 flex-1 truncate">
             <span className="font-medium text-gray-900">{fila.name}</span>
+            {horario && <span className="ml-1.5 text-xs font-semibold text-brand-700 tabular-nums">{horario}</span>}
             <span className="text-xs text-gray-400">
               {' · '}{fila.disponibles != null ? `le quedan ${fmt(fila.disponibles)}h` : `${fmt(fila.horasSemana)}h`}
               {fila.preseleccionada ? ' · Matrix' : ''}
@@ -80,7 +105,7 @@ export function AuxiliarBar({ fila, abierto, onClick, cargando, placeholder }) {
 }
 
 /** La cuadrícula con líneas, debajo de la barra. */
-export function AuxiliarTabla({ value, onChange, onClose, filas, excluir, dia = '' }) {
+export function AuxiliarTabla({ value, onChange, onClose, filas, excluir, dia = '', plan = null }) {
   // Hector: "¿la sede qué significa?". Los títulos dicen de qué día son.
   // El día va debajo del título, en pequeño, para que no se corte.
   const conDia = (t) => (
@@ -178,12 +203,12 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir, dia = 
         {/* Anchos fijos para que las 7 columnas quepan en la mitad del formulario. */}
         <table className="w-full table-fixed border-collapse text-xs">
           <colgroup>
-            <col style={{ width: '24%' }} />
+            <col style={{ width: '22%' }} />
             <col style={{ width: '16%' }} />
-            <col style={{ width: '14%' }} />
+            <col style={{ width: '13%' }} />
             <col style={{ width: '9%' }} />
             <col style={{ width: '12%' }} />
-            <col style={{ width: '14%' }} />
+            <col style={{ width: '17%' }} />
             <col style={{ width: '11%' }} />
           </colgroup>
           <thead className="sticky top-0 z-10">
@@ -202,8 +227,11 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir, dia = 
             </tr>
           </thead>
           <tbody>
-            {lista.map((f) => {
-              const elegida = f.id === value
+            {lista.map((f0) => {
+              const elegida = f0.id === value
+              // Hector: la elegida muestra la hora en que va a estar en este
+              // turno (en su horario, horas del día y de la semana).
+              const f = elegida ? conPlan(f0, plan) : f0
               const puede = elegible(f.estado) || elegida
               const pct = f.tope ? Math.min(100, (f.horasSemana / f.tope) * 100) : 0
               return (
@@ -246,7 +274,13 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir, dia = 
                   </td>
                   <td className={clsx(td, 'tabular-nums whitespace-nowrap')}>
                     <span className="block truncate" title={f.horario.map((h) => `${h.ini}–${h.fin}${h.consultorio ? ` · ${h.consultorio}` : ''}${h.este_turno ? ' (este turno)' : ''}`).join(' · ')}>
-                      {f.horario.length ? f.horario.map((h) => `${h.ini}–${h.fin}`).join(', ') : '—'}
+                      {f.horario.length
+                        ? f.horario.map((h, k) => (
+                            <span key={k} className={h.este_turno ? 'font-semibold text-brand-700' : ''}>
+                              {k > 0 && ', '}{h.ini}–{h.fin}
+                            </span>
+                          ))
+                        : '—'}
                     </span>
                   </td>
                   <td className={td}>

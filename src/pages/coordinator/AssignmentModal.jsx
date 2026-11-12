@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { asignacionService, recursoService, semanaService, usuarioService, matrizService } from '@/services/api'
+import { asignacionService, recursoService, semanaService, usuarioService, matrizService, sedeService } from '@/services/api'
 import { Spinner } from '@/components/ui'
 import SearchableSelect from '@/components/ui/SearchableSelect'
 import { calcularCapacidadPacientes, DIAS_FULL, DIAS, TIPOS_RECURSO, ESPECIALIDADES_EXIGEN_APOYO, ESPECIALIDADES_PERMITEN_APOYO } from '@/utils/helpers'
@@ -35,9 +35,14 @@ function auxiliaresIniciales(a) {
         { id: a.assistant_id ?? a.assistantId, ini: a.assistant_start_time ?? a.assistantStartTime, fin: a.assistant_end_time ?? a.assistantEndTime },
         { id: a.assistant2_id ?? a.assistant2Id, ini: a.assistant2_start_time ?? a.assistant2StartTime, fin: a.assistant2_end_time ?? a.assistant2EndTime },
       ]
-  return lista.filter((x) => x.id).map((x) => ({ id: x.id, ini: x.ini || ini, fin: x.fin || fin, auto: false, horaManual: true }))
+  return lista.filter((x) => x.id).map((x) => {
+    const xi = x.ini || ini, xf = x.fin || fin
+    return { id: x.id, ini: xi, fin: xf, auto: false, horaManual: true, parcial: xi !== ini || xf !== fin }
+  })
 }
-const AUX_VACIA = { id: '', ini: '', fin: '', auto: false, horaManual: false }
+// `parcial` = la casilla "Horario distinto al recurso principal". Sin marcar,
+// la auxiliar va con el horario del médico (como siempre ha sido).
+const AUX_VACIA = { id: '', ini: '', fin: '', auto: false, horaManual: false, parcial: false }
 
 export default function AsignacionModal({ data, asignacion, sedeId, onClose, onSaved }) {
   const {
@@ -170,6 +175,10 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
     ? poolApoyo.filter((r) => r.id !== form.resource_id)
     : poolApoyo
   const auxsElegidas = form.auxs.filter((x) => x.id)
+  // Nombre de la sede del consultorio (la misma lista que usa el Programador).
+  const { data: sedesTodas = [] } = useQuery({ queryKey: ['sedes-programador'], queryFn: () => sedeService.list() })
+  const nombreSede = consultorio?.site?.name ?? consultorio?.site_name
+    ?? sedesTodas.find((x) => x.id === (consultorio?.site_id ?? sedeId))?.name
 
   // Sep-2026 · Ley 2101 · Autorización directivo para aux sáb+dom.
   const esFinde = dia === 'sabado' || dia === 'domingo'
@@ -400,7 +409,11 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
         if (c) x = { ...x, id: c.id, auto: true, horaManual: false }
         else if (x.auto) x = { ...AUX_VACIA }
       }
-      if (x.id && !x.horaManual && horarioValido) {
+      // Nov-2026 · Hector: la auxiliar va con el horario del médico; solo con la
+      // casilla "Horario distinto" se le pone otro (de la Matrix o lo que falte).
+      if (x.id && !x.parcial && horarioValido) {
+        x = { ...x, ini: form.start_time, fin: form.end_time }
+      } else if (x.id && !x.horaManual && horarioValido) {
         const huecos = huecosSinCubrir(form.start_time, form.end_time, salida.filter((y) => y.id))
         x = { ...x, ...horaPorDefecto({ franjasMatriz: franjasMatriz.get(x.id), ini: form.start_time, fin: form.end_time, huecos }) }
       }
@@ -433,13 +446,14 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
     })
   }
   const agregarAux = () => {
-    setForm((f) => ({ ...f, auxs: recalcularAuxs([...f.auxs, { ...AUX_VACIA }]) }))
+    // La que se agrega es para cubrir lo que falta: entra con horario distinto.
+    setForm((f) => ({ ...f, auxs: recalcularAuxs([...f.auxs, { ...AUX_VACIA, parcial: true }]) }))
   }
   // "Hasta que se acabe el horario del médico": se agregan mientras quede algo sin cubrir.
   // Lo que se está armando, para el detalle de "Este turno" en la semana de cada persona.
   const turnoActual = {
     consultorio: consultorio?.name,
-    sede: consultorio?.site?.name ?? consultorio?.site_name,
+    sede: nombreSede,
     ini: form.start_time,
     fin: form.end_time,
     profesional: recursoSel?.name,
@@ -641,6 +655,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                       onClick={() => setEligiendoAux(abierta ? null : i)}
                       cargando={cargandoTurno && !estadoTurno.length}
                       placeholder={labelApoyoBuscar}
+                      plan={x.id && x.ini && x.fin ? { ini: x.ini, fin: x.fin, sede: nombreSede } : null}
                     />
                     {abierta && (
                       // Debajo de la barra, dentro de la mitad del formulario.
@@ -650,12 +665,25 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                           excluir={form.auxs.filter((_, j) => j !== i).map((y) => y.id).filter(Boolean)}
                           filas={filasAux}
                           dia={diaLabel}
+                          plan={x.ini && x.fin ? { ini: x.ini, fin: x.fin, sede: nombreSede } : null}
                           onChange={(id) => { setAux(i, { id, auto: false, horaManual: false }); setEligiendoAux(null) }}
                           onClose={() => setEligiendoAux(null)}
                         />
                       </div>
                     )}
+                    {/* Hector: "como ha estado siempre": la casilla y, solo si se
+                        marca, Desde / Hasta. */}
                     {x.id && !abierta && (
+                      <label className="flex items-center gap-2 cursor-pointer mt-2">
+                        <input
+                          type="checkbox"
+                          checked={!!x.parcial}
+                          onChange={(e) => setAux(i, { parcial: e.target.checked, horaManual: false })}
+                        />
+                        <span className="text-xs text-gray-700">Horario distinto al recurso principal (esta aux cubre solo parte del turno)</span>
+                      </label>
+                    )}
+                    {x.id && !abierta && x.parcial && (
                       <div className="grid grid-cols-2 gap-2 mt-2">
                         <div>
                           <label className="text-[11px] font-semibold text-gray-600">Desde</label>
