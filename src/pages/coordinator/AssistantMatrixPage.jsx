@@ -91,7 +91,7 @@ export default function AssistantMatrixPage() {
     <div className="p-3 sm:p-4">
       <div className="mb-3">
         <div>
-          <h1 className="text-base font-semibold text-gray-900">Matriz de asignaciones</h1>
+          <h1 className="text-base font-semibold text-gray-900">Matrix de asignaciones</h1>
           <p className="text-xs text-gray-500">
             {auxiliares.length} auxiliares · {conMalla} con malla{hayFiltros ? ` · ${filas.length} en el filtro` : ''}
           </p>
@@ -136,7 +136,7 @@ export default function AssistantMatrixPage() {
       {isLoading ? (
         <div className="flex justify-center py-16"><Spinner /></div>
       ) : isError ? (
-        <EmptyState icon="⚠️" title="No se pudo cargar la matriz" description={error?.message} />
+        <EmptyState icon="⚠️" title="No se pudo cargar la Matrix" description={error?.message} />
       ) : !auxiliares.length ? (
         <EmptyState icon="👥" title="No hay auxiliares activas" description="Las auxiliares se crean en Configuración › Recursos." />
       ) : (

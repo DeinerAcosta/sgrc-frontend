@@ -66,7 +66,7 @@ export function AuxiliarBar({ fila, abierto, onClick, cargando, placeholder }) {
             <span className="font-medium text-gray-900">{fila.name}</span>
             <span className="text-xs text-gray-400">
               {' · '}{fila.disponibles != null ? `le quedan ${fmt(fila.disponibles)}h` : `${fmt(fila.horasSemana)}h`}
-              {fila.preseleccionada ? ' · Matriz' : ''}
+              {fila.preseleccionada ? ' · Matrix' : ''}
             </span>
           </span>
           <EstadoPill estado={fila.estado} />
@@ -218,7 +218,7 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
                       </span>
                       <span className="min-w-0">
                         <span className={clsx('block truncate text-[13px] font-medium leading-tight', puede ? 'text-gray-900' : 'text-gray-400')} title={f.name}>{f.name}</span>
-                        {f.preseleccionada && <span className="block text-[10px] font-semibold leading-tight text-brand-600">Pareja en la Matriz</span>}
+                        {f.preseleccionada && <span className="block text-[10px] font-semibold leading-tight text-brand-600">Pareja en la Matrix</span>}
                       </span>
                     </span>
                   </td>
