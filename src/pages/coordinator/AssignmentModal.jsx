@@ -496,7 +496,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
         <div className="flex-1 min-h-0 overflow-y-auto lg:flex lg:overflow-hidden">
         {/* Mitad formulario, mitad grilla (en pantallas angostas, una debajo de la otra). */}
         <div className={`bg-white ${conPanel ? 'lg:w-1/2 lg:shrink-0 lg:overflow-y-auto lg:border-r lg:border-gray-200' : 'w-full lg:overflow-y-auto'}`}>
-        <div className="px-4 sm:px-6 py-5 space-y-4 max-w-2xl mx-auto">
+        <div className="px-4 sm:px-6 py-4 space-y-3 max-w-2xl mx-auto">
           {/* Oct-2026 · Viniendo de "Mover la agenda". Sin este aviso, el medico
               aparece puesto sin explicacion y el turno queda atado a una ausencia
               sin que nadie lo haya dicho en voz alta. */}

@@ -25,9 +25,11 @@ import { ESTADOS_AUX, elegible } from '@/utils/matriz'
  */
 
 const FILTROS = ['disponible', 'sin_asignar', 'asignado', 'ausente']
-// Filas a la vista; las demás con el scroll de la tabla.
-const FILAS_VISIBLES = 5
-const ALTO_FILA_PX = 44
+// Hector: se ven 3 filas y las demás con el scroll de la tabla, sin que la
+// pantalla tenga que bajar. Filas de alto fijo (nada se parte en dos líneas).
+const FILAS_VISIBLES = 3
+const ALTO_FILA_PX = 40
+const ALTO_TITULOS_PX = 30
 
 const normalizar = (t) => (t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 const fmt = (h) => (h == null ? '—' : (Math.round(h * 10) / 10).toString().replace('.', ','))
@@ -105,14 +107,14 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
   const raiz = useRef(null)
   useEffect(() => { raiz.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) }, [])
 
-  const th = 'border border-gray-200 px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-gray-600 bg-gray-50'
-  const td = 'border border-gray-200 px-2 py-1.5 align-middle'
+  const th = 'border border-gray-200 px-1.5 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wide text-gray-600 bg-gray-50 whitespace-nowrap overflow-hidden text-ellipsis'
+  const td = 'border border-gray-200 px-1.5 py-1 align-middle whitespace-nowrap overflow-hidden text-ellipsis'
 
   return (
     <div ref={raiz} className="mt-2 rounded-lg border border-gray-300 bg-white shadow-md overflow-hidden">
       {/* Hector: el desplegable es el filtro de estados (no pastillas aparte).
           El orden se cambia pulsando los títulos "Auxiliar" y "Horas semana". */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-200 bg-gray-50">
+      <div className="flex items-center gap-2 px-2 py-1.5 border-b border-gray-200 bg-gray-50">
         <input
           autoFocus
           className="input !py-1.5 flex-1 min-w-0"
@@ -132,20 +134,30 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
         <button type="button" onClick={onClose} className="shrink-0 h-7 w-7 rounded-full text-gray-400 hover:bg-gray-200 hover:text-gray-600 leading-none" aria-label="Cerrar">×</button>
       </div>
 
-      <div className="overflow-auto" style={{ maxHeight: 40 + FILAS_VISIBLES * ALTO_FILA_PX }}>
-        <table className="w-full min-w-[620px] border-collapse text-xs">
+      <div className="overflow-auto" style={{ maxHeight: ALTO_TITULOS_PX + FILAS_VISIBLES * ALTO_FILA_PX + 2 }}>
+        {/* Anchos fijos para que las 7 columnas quepan en la mitad del formulario. */}
+        <table className="w-full table-fixed border-collapse text-xs">
+          <colgroup>
+            <col style={{ width: '27%' }} />
+            <col style={{ width: '18%' }} />
+            <col style={{ width: '16%' }} />
+            <col style={{ width: '6%' }} />
+            <col style={{ width: '12%' }} />
+            <col style={{ width: '11%' }} />
+            <col style={{ width: '10%' }} />
+          </colgroup>
           <thead className="sticky top-0 z-10">
-            <tr>
+            <tr style={{ height: ALTO_TITULOS_PX }}>
               <th className={clsx(th, 'cursor-pointer select-none hover:text-brand-700')} onClick={() => setOrden(orden === 'alfabetico' ? 'sugerido' : 'alfabetico')} title="Ordenar alfabéticamente">
                 Auxiliar{orden === 'alfabetico' ? ' ▲' : ''}
               </th>
               <th className={th}>Estado</th>
               <th className={th}>Recurso par</th>
-              <th className={clsx(th, 'text-center')}>Horas día</th>
+              <th className={clsx(th, 'text-center')}>Día</th>
               <th className={clsx(th, 'cursor-pointer select-none hover:text-brand-700')} onClick={() => setOrden(orden === 'horas_asc' ? 'sugerido' : 'horas_asc')} title="Horas disponibles de menor a mayor">
-                Horas semana{orden === 'horas_asc' ? ' ▲' : ''}
+                Semana{orden === 'horas_asc' ? ' ▲' : ''}
               </th>
-              <th className={th}>Horario asignado</th>
+              <th className={th}>Horario</th>
               <th className={th}>Sede</th>
             </tr>
           </thead>
@@ -166,34 +178,38 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir }) {
                   )}
                 >
                   <td className={td}>
-                    <span className="flex items-center gap-2">
+                    <span className="flex items-center gap-1.5 min-w-0">
                       <span className={clsx(
-                        'h-7 w-7 shrink-0 rounded-full text-[11px] font-semibold flex items-center justify-center',
+                        'h-6 w-6 shrink-0 rounded-full text-[10px] font-semibold flex items-center justify-center',
                         elegida ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600',
                       )}>
                         {elegida ? '✓' : iniciales(f.name)}
                       </span>
-                      <span>
-                        <span className={clsx('block text-[13px] font-medium leading-tight', puede ? 'text-gray-900' : 'text-gray-400')}>{f.name}</span>
-                        {f.preseleccionada && <span className="block text-[10px] font-semibold text-brand-600">Pareja en la Matriz</span>}
+                      <span className="min-w-0">
+                        <span className={clsx('block truncate text-[13px] font-medium leading-tight', puede ? 'text-gray-900' : 'text-gray-400')} title={f.name}>{f.name}</span>
+                        {f.preseleccionada && <span className="block text-[10px] font-semibold leading-tight text-brand-600">Pareja en la Matriz</span>}
                       </span>
                     </span>
                   </td>
                   <td className={td}><EstadoPill estado={f.estado} /></td>
-                  <td className={clsx(td, 'leading-tight')}>{f.recursosPar.map((p) => p.name).join(', ') || '—'}</td>
+                  <td className={td}>
+                    <span className="block truncate" title={f.recursosPar.map((p) => p.name).join(', ')}>{f.recursosPar.map((p) => p.name).join(', ') || '—'}</span>
+                  </td>
                   <td className={clsx(td, 'text-center tabular-nums')}>{fmt(f.horasDia)}</td>
                   <td className={td}>
                     <span className="block tabular-nums">{fmt(f.horasSemana)}{f.tope != null && <span className="text-gray-400"> / {fmt(f.tope)}h</span>}</span>
                     {f.tope != null && (
-                      <span className="block h-1 mt-1 w-16 rounded-full bg-gray-100 overflow-hidden">
+                      <span className="block h-1 mt-1 w-full max-w-[64px] rounded-full bg-gray-100 overflow-hidden">
                         <span className={clsx('block h-full rounded-full', pct >= 100 ? 'bg-rose-500' : pct >= 90 ? 'bg-amber-500' : 'bg-emerald-500')} style={{ width: `${pct}%` }} />
                       </span>
                     )}
                   </td>
                   <td className={clsx(td, 'tabular-nums whitespace-nowrap')}>
-                    {f.horario.length ? f.horario.map((h, i) => <div key={i}>{h.ini}–{h.fin}</div>) : '—'}
+                    {f.horario.length ? f.horario.map((h) => `${h.ini}–${h.fin}`).join(', ') : '—'}
                   </td>
-                  <td className={clsx(td, 'leading-tight')}>{f.sedes.join(', ') || '—'}</td>
+                  <td className={td}>
+                    <span className="block truncate" title={f.sedes.join(', ')}>{f.sedes.join(', ') || '—'}</span>
+                  </td>
                 </tr>
               )
             })}
