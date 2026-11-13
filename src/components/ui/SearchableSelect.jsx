@@ -26,7 +26,9 @@ const normalizar = (t) => (t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toL
  */
 const ALTO_OPCION_REM = 2.25 // py-2 + text-sm (1.25rem de línea)
 
-export default function SearchableSelect({ value, onChange, options, placeholder = 'Seleccionar…', disabled, visibles }) {
+// `anchoLista`: ancho mínimo de la lista (px) cuando el campo es angosto, para
+// que se lean los nombres completos.
+export default function SearchableSelect({ value, onChange, options, placeholder = 'Seleccionar…', disabled, visibles, anchoLista }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [activo, setActivo] = useState(0)
@@ -50,9 +52,10 @@ export default function SearchableSelect({ value, onChange, options, placeholder
     const abajo = window.innerHeight - r.bottom - 12
     const arriba = r.top - 12
     const haciaArriba = abajo < 240 && arriba > abajo
+    const ancho = Math.max(r.width, anchoLista ?? 0)
     setPos({
-      left: r.left,
-      width: r.width,
+      left: Math.max(8, Math.min(r.left, window.innerWidth - ancho - 8)),
+      width: ancho,
       maxHeight: Math.min(420, haciaArriba ? arriba : abajo),
       ...(haciaArriba ? { bottom: window.innerHeight - r.top + 4 } : { top: r.bottom + 4 }),
     })

@@ -141,7 +141,7 @@ export default function AssistantMatrixPage() {
         <EmptyState icon="👥" title="No hay auxiliares activas" description="Las auxiliares se crean en Configuración › Recursos." />
       ) : (
         <div className="bg-white border border-gray-200 rounded-xl overflow-auto max-h-[calc(100vh-215px)]">
-          <table className="text-[11px] border-collapse min-w-[1500px] w-full">
+          <table className="text-[11px] border-collapse min-w-[1750px] w-full">
             <thead className="sticky top-0 z-20">
               <tr className="bg-brand-600 text-white">
                 <th rowSpan={2} className="sticky left-0 z-30 bg-brand-600 px-2 py-2 text-left font-semibold w-48 border-r border-white/20">
@@ -330,7 +330,8 @@ function EditarDiaModal({ auxiliar, dia, celdasAux, profesionales, onClose }) {
   // Un profesional ya inactivo sigue saliendo si estaba en la malla.
   const todosProf = [...profesionales, ...(actual?.professionals ?? []).filter((p) => !profesionales.some((x) => x.id === p.id))]
   const opcionesProf = todosProf
-    .map((p) => ({ id: p.id, label: p.name, sublabel: [etiquetaTipo(p.type), p.specialty].filter(Boolean).join(' · ') }))
+    // Hector: el nombre completo y solo el tipo (Oftalmólogo), sin la subespecialidad.
+    .map((p) => ({ id: p.id, label: p.name, sublabel: etiquetaTipo(p.type) }))
 
   const { mutate: guardar, isPending } = useMutation({
     mutationFn: async (vaciar) => {
@@ -399,6 +400,7 @@ function EditarDiaModal({ auxiliar, dia, celdasAux, profesionales, onClose }) {
                         value={f.prof || null}
                         onChange={(id) => setFranja(i, 'prof', id || '')}
                         options={opcionesProf}
+                        anchoLista={340}
                         placeholder="Profesional…"
                       />
                     </div>
