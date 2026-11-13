@@ -55,6 +55,19 @@ function auxiliaresIniciales(a) {
 }
 // `parcial` = la casilla "Horario distinto al recurso principal". Sin marcar,
 // la auxiliar va con el horario del médico (como siempre ha sido).
+// Nov-2026 · Hector: el descanso solo aplica si la auxiliar trabaja lo
+// suficiente para tener almuerzo: 6 h o más, la misma regla con la que se
+// descuenta el almuerzo (debeDescontarAlmuerzo). Con 07:00–12:00 no sale.
+const MIN_PARA_DESCANSO = 360
+const aMinutos = (h) => { const [a, b] = (h ?? '').split(':').map(Number); return a * 60 + b }
+const aHora = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+const puedeDescanso = (x) => !!x.ini && !!x.fin && aMinutos(x.fin) - aMinutos(x.ini) >= MIN_PARA_DESCANSO
+/** Descanso por defecto: 12:00–13:00 si cabe; si no, 1 h a mitad de su horario. */
+function descansoPorDefecto(x) {
+  if (x.ini <= '12:00' && x.fin >= '13:00') return { dIni: '12:00', dFin: '13:00' }
+  const medio = Math.floor((aMinutos(x.ini) + aMinutos(x.fin)) / 2 / 30) * 30
+  return { dIni: aHora(medio - 30), dFin: aHora(medio + 30) }
+}
 // `descanso` = la casilla "Horario de descanso (almuerzo)": dIni–dFin y la
 // auxiliar que lo cubre (relevoId; relevoAuto = la puso el sistema).
 const AUX_VACIA = {
@@ -494,6 +507,12 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
         const huecos = huecosSinCubrir(form.start_time, form.end_time, salida.filter((y) => y.id))
         x = { ...x, ...horaPorDefecto({ franjasMatriz: franjasMatriz.get(x.id), ini: form.start_time, fin: form.end_time, huecos }) }
       }
+      if (x.descanso && !puedeDescanso(x)) {
+        x = { ...x, descanso: false, dIni: '', dFin: '', relevoId: '', relevoAuto: false }
+      } else if (x.descanso && x.dIni && x.dFin && (x.dIni < x.ini || x.dFin > x.fin)) {
+        // Si le cambian el horario y el descanso queda por fuera, se recoloca.
+        x = { ...x, ...descansoPorDefecto(x), relevoId: x.relevoAuto ? '' : x.relevoId }
+      }
       salida.push(x)
     }
     return salida
@@ -778,17 +797,15 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                     </div>
                     {/* Nov-2026 · Hector: el descanso (almuerzo) de la auxiliar,
                         de qué hora a qué hora, y la auxiliar que lo cubre. */}
-                    {x.id && !abierta && (
+                    {x.id && !abierta && puedeDescanso(x) && (
                       <label className="flex items-center gap-2 cursor-pointer mt-2">
                         <input
                           type="checkbox"
                           checked={!!x.descanso}
                           onChange={(e) => {
                             const on = e.target.checked
-                            // 12:00–13:00 si cabe en su horario.
-                            const cabe = x.ini <= '12:00' && x.fin >= '13:00'
                             setAux(i, on
-                              ? { descanso: true, dIni: x.dIni || (cabe ? '12:00' : ''), dFin: x.dFin || (cabe ? '13:00' : ''), relevoId: '', relevoAuto: false }
+                              ? { descanso: true, ...descansoPorDefecto(x), relevoId: '', relevoAuto: false }
                               : { descanso: false, dIni: '', dFin: '', relevoId: '', relevoAuto: false })
                             if (!on) setEligiendoRelevo(null)
                           }}
@@ -796,7 +813,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                         <span className="text-xs text-gray-700">Horario de descanso (almuerzo)</span>
                       </label>
                     )}
-                    {x.id && !abierta && x.descanso && (() => {
+                    {x.id && !abierta && x.descanso && puedeDescanso(x) && (() => {
                       const filasR = filasDescanso(x)
                       const filaR = filasR.find((r) => r.id === x.relevoId)
                       const abiertaR = eligiendoRelevo === i
