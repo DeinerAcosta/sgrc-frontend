@@ -18,22 +18,23 @@ const aMin = (hhmm) => {
 /**
  * Horas de un día: el hueco entre franjas es el almuerzo; una sola franja
  * corrida de más de 7h descuenta 1h. Es la cuenta que hacía el Excel.
+ * Nov-2026 · Si la franja trae su almuerzo marcado (`lunch`), se descuenta
+ * ese y ya no el automático.
  */
 export function horasDelDiaMatriz(franjas = []) {
-  const validas = franjas.filter((f) => HHMM.test(f?.ini ?? '') && HHMM.test(f?.fin ?? '') && aMin(f.fin) > aMin(f.ini))
-  const minutos = validas.reduce((s, f) => s + aMin(f.fin) - aMin(f.ini), 0)
-  const almuerzo = validas.length === 1 && minutos > 7 * 60 ? 60 : 0
-  return (minutos - almuerzo) / 60
+  return horasPorFranja(franjas).reduce((s, h) => s + h, 0)
 }
 
-/**
- * Las horas de cada franja, para pintarlas una por una. Suman lo mismo que
- * horasDelDiaMatriz: con una sola franja larga el almuerzo se le descuenta a
- * ella; con varias, cada una vale lo que dura.
- */
+/** Las horas de cada franja, para pintarlas una por una (suman lo mismo que horasDelDiaMatriz). */
 export function horasPorFranja(franjas = []) {
-  if (franjas.length === 1) return [horasDelDiaMatriz(franjas)]
-  return franjas.map((f) => Math.max(0, aMin(f.fin) - aMin(f.ini)) / 60)
+  const validas = (franjas ?? []).filter((f) => HHMM.test(f?.ini ?? '') && HHMM.test(f?.fin ?? '') && aMin(f.fin) > aMin(f.ini))
+  const unaSola = validas.length === 1
+  return validas.map((f) => {
+    const minutos = aMin(f.fin) - aMin(f.ini)
+    const li = f.lunch?.ini, lf = f.lunch?.fin
+    if (HHMM.test(li ?? '') && HHMM.test(lf ?? '') && aMin(lf) > aMin(li)) return Math.max(0, minutos - (aMin(lf) - aMin(li))) / 60
+    return (minutos - (unaSola && minutos > 7 * 60 ? 60 : 0)) / 60
+  })
 }
 
 /** 8.5 → "8,5" · 8 → "8" (como se escribe en la clínica). */

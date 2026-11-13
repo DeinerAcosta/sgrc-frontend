@@ -227,45 +227,85 @@ function CeldaDia({ celda, onClick }) {
     )
   }
   // 11-nov · Hector: con dos horarios en el día, cada franja va en su propio
-  // recuadro y sus horas al lado, a la misma altura. La asignación sigue
-  // siendo una sola para el día.
+  // recuadro y sus horas al lado, a la misma altura.
+  // 13-nov · Y cada franja con SU profesional (a la misma altura) y, si lo
+  // tiene, su almuerzo debajo del horario.
   const horas = horasPorFranja(celda.ranges)
+  const porFranja = celda.ranges.some((f) => f.professional_id)
+  const prof = (f) => celda.professionals.find((p) => p.id === f.professional_id)
+  const alto = (f) => (f.lunch ? 'h-10' : 'h-6')
   return (
     <>
       <td onClick={onClick} className={clsx(base, 'text-gray-700 tabular-nums whitespace-nowrap')}>
         <div className="space-y-1">
           {celda.ranges.map((f) => (
-            <div key={f.ini} className="h-6 flex items-center px-1.5 rounded border border-gray-200 bg-gray-50">
-              {f.ini}–{f.fin}
+            <div key={f.ini} className={clsx(alto(f), 'flex flex-col justify-center px-1.5 rounded border border-gray-200 bg-gray-50')}>
+              <span>{f.ini}–{f.fin}</span>
+              {f.lunch && <span className="text-[10px] text-gray-500">Almuerzo {f.lunch.ini}–{f.lunch.fin}</span>}
             </div>
           ))}
         </div>
       </td>
       <td onClick={onClick} className={clsx(base, 'text-center font-semibold text-gray-900 tabular-nums')}>
         <div className="space-y-1">
-          {horas.map((h, i) => <div key={i} className="h-6 flex items-center justify-center">{fmtHoras(h)}</div>)}
+          {horas.map((h, i) => <div key={i} className={clsx(alto(celda.ranges[i] ?? {}), 'flex items-center justify-center')}>{fmtHoras(h)}</div>)}
         </div>
       </td>
       <td onClick={onClick} className={clsx(base, 'border-r border-gray-200')}>
-        {celda.professionals.map((p) => (
+        {porFranja ? (
+          <div className="space-y-1">
+            {celda.ranges.map((f) => {
+              const p = prof(f)
+              return (
+                <div key={f.ini} className={clsx(alto(f), 'flex items-center font-medium truncate', p && !p.active ? 'text-gray-400 line-through' : 'text-gray-900')} title={p?.name}>
+                  {p?.name ?? <span className="text-gray-300 font-normal">—</span>}
+                </div>
+              )
+            })}
+          </div>
+        ) : celda.professionals.map((p) => (
           <div key={p.id} className={clsx('font-medium', p.active ? 'text-gray-900' : 'text-gray-400 line-through')}>{p.name}</div>
         ))}
-        {celda.note && <div className="text-gray-500">{celda.note}</div>}
+        {celda.note && <div className="text-gray-500 mt-1">{celda.note}</div>}
       </td>
     </>
   )
 }
 
-const FRANJA_VACIA = { ini: '', fin: '' }
+// Cada franja con su profesional y, si se marca, su almuerzo.
+const FRANJA_VACIA = { ini: '', fin: '', prof: '', almuerzo: false, aIni: '', aFin: '' }
+const aMinutos = (h) => { const [a, b] = (h ?? '').split(':').map(Number); return a * 60 + b }
+const aHora = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+/** Almuerzo por defecto: 12:00–13:00 si cabe en la franja; si no, 1 h a la mitad. */
+function almuerzoPorDefecto(f) {
+  if (!f.ini || !f.fin) return { aIni: '', aFin: '' }
+  if (f.ini <= '12:00' && f.fin >= '13:00') return { aIni: '12:00', aFin: '13:00' }
+  const medio = Math.floor((aMinutos(f.ini) + aMinutos(f.fin)) / 2 / 30) * 30
+  return { aIni: aHora(Math.max(aMinutos(f.ini), medio - 30)), aFin: aHora(Math.min(aMinutos(f.fin), medio + 30)) }
+}
+const conAlmuerzo = (f) => f.almuerzo && f.aIni && f.aFin && f.aIni < f.aFin
+/** La franja como la guarda el backend (y como la cuentan las horas). */
+const aRango = (f) => ({ ini: f.ini, fin: f.fin, professional_id: f.prof || null, lunch: conAlmuerzo(f) ? { ini: f.aIni, fin: f.aFin } : null })
 
 function EditarDiaModal({ auxiliar, dia, celdasAux, profesionales, onClose }) {
   const qc = useQueryClient()
   const confirm = useConfirm()
   const actual = celdasAux[dia]
 
+  // Las celdas de antes tenían los profesionales por día: al abrirlas, a cada
+  // franja se le pone el suyo (el primero, el segundo…) o el primero.
   const [form, setForm] = useState(() => ({
-    franjas: actual?.ranges?.length ? actual.ranges.map((f) => ({ ...f })) : [{ ...FRANJA_VACIA }],
-    profesionalIds: actual?.professionals.map((p) => p.id) ?? [],
+    franjas: actual?.ranges?.length
+      ? actual.ranges.map((f, i) => ({
+          ...FRANJA_VACIA,
+          ini: f.ini,
+          fin: f.fin,
+          prof: f.professional_id ?? actual.professionals[i]?.id ?? actual.professionals[0]?.id ?? '',
+          almuerzo: !!f.lunch,
+          aIni: f.lunch?.ini ?? '',
+          aFin: f.lunch?.fin ?? '',
+        }))
+      : [{ ...FRANJA_VACIA }],
     nota: actual?.note ?? '',
     copiarA: [],
   }))
@@ -279,25 +319,24 @@ function EditarDiaModal({ auxiliar, dia, celdasAux, profesionales, onClose }) {
   // se avisan para que no se pierdan sin querer.
   const franjasLlenas = form.franjas.filter((f) => f.ini && f.fin)
   const incompleta = form.franjas.some((f) => (f.ini && !f.fin) || (!f.ini && f.fin))
-  const horasDia = horasDelDiaMatriz(franjasLlenas)
+  const almuerzoMal = franjasLlenas.some((f) => f.almuerzo && (!conAlmuerzo(f) || f.aIni < f.ini || f.aFin > f.fin))
+  const horasDia = horasDelDiaMatriz(franjasLlenas.map(aRango))
   const horasSemana = DIAS_MATRIZ.reduce(
     (s, d) => s + (d === dia || form.copiarA.includes(d) ? horasDia : horasDelDiaMatriz(celdasAux[d]?.ranges)),
     0,
   )
   const tope = auxiliar.max_hours_per_week
 
-  const opcionesProf = profesionales
-    .filter((p) => !form.profesionalIds.includes(p.id))
-    .map((p) => ({ id: p.id, label: p.name, sublabel: [etiquetaTipo(p.type), p.specialty].filter(Boolean).join(' · ') }))
-  const porId = Object.fromEntries(profesionales.map((p) => [p.id, p]))
   // Un profesional ya inactivo sigue saliendo si estaba en la malla.
-  for (const p of actual?.professionals ?? []) porId[p.id] ??= p
+  const todosProf = [...profesionales, ...(actual?.professionals ?? []).filter((p) => !profesionales.some((x) => x.id === p.id))]
+  const opcionesProf = todosProf
+    .map((p) => ({ id: p.id, label: p.name, sublabel: [etiquetaTipo(p.type), p.specialty].filter(Boolean).join(' · ') }))
 
   const { mutate: guardar, isPending } = useMutation({
     mutationFn: async (vaciar) => {
       const datos = vaciar
         ? { ranges: [], professional_ids: [], note: '' }
-        : { ranges: franjasLlenas, professional_ids: form.profesionalIds, note: form.nota }
+        : { ranges: franjasLlenas.map(aRango), professional_ids: [], note: form.nota }
       // Uno por uno: si un día falla, los anteriores ya quedaron y se dice cuál.
       for (const d of [dia, ...(vaciar ? [] : form.copiarA)]) {
         try {
@@ -322,7 +361,7 @@ function EditarDiaModal({ auxiliar, dia, celdasAux, profesionales, onClose }) {
   const pedirVaciar = async () => {
     const ok = await confirm({
       title: `¿Vaciar el ${DIAS_MATRIZ_LABEL[dia].toLowerCase()} de ${auxiliar.name}?`,
-      message: 'Se borran el horario, los profesionales y la nota de ese día.',
+      message: 'Se borran las franjas, sus profesionales y la nota de ese día.',
       confirmLabel: 'Vaciar',
       cancelLabel: 'Cancelar',
       variant: 'danger',
@@ -334,7 +373,7 @@ function EditarDiaModal({ auxiliar, dia, celdasAux, profesionales, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && tryClose()}>
-      <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden max-h-[92vh] flex flex-col">
+      <div className="bg-white rounded-2xl w-full max-w-2xl overflow-hidden max-h-[92vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="min-w-0">
             <h2 className="text-sm font-semibold text-gray-900">Editar malla</h2>
@@ -345,21 +384,54 @@ function EditarDiaModal({ auxiliar, dia, celdasAux, profesionales, onClose }) {
 
         <div className="px-5 py-4 space-y-4 overflow-y-auto">
           <div>
-            <label className="label">Horario</label>
+            {/* 13-nov · Hector: cada franja con su profesional ("de 8 a 12 con
+                uno y de 1 a 5 con otro" son dos franjas) y su hora de almuerzo. */}
+            <label className="label">Horario y profesional</label>
             <div className="space-y-2">
               {form.franjas.map((f, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <input type="time" className="input" value={f.ini} onChange={(e) => setFranja(i, 'ini', e.target.value)} />
-                  <span className="text-gray-400 text-xs">a</span>
-                  <input type="time" className="input" value={f.fin} onChange={(e) => setFranja(i, 'fin', e.target.value)} />
-                  <button
-                    type="button"
-                    className="text-gray-400 hover:text-red-600 px-1 text-lg leading-none"
-                    title="Quitar franja"
-                    onClick={() => set({ franjas: form.franjas.length > 1 ? form.franjas.filter((_, j) => j !== i) : [{ ...FRANJA_VACIA }] })}
-                  >
-                    ×
-                  </button>
+                <div key={i} className="rounded-lg border border-gray-200 p-2 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input type="time" className="input !w-[132px] shrink-0 !px-2" aria-label="Desde" value={f.ini} onChange={(e) => setFranja(i, 'ini', e.target.value)} />
+                    <span className="text-gray-400 text-xs">a</span>
+                    <input type="time" className="input !w-[132px] shrink-0 !px-2" aria-label="Hasta" value={f.fin} onChange={(e) => setFranja(i, 'fin', e.target.value)} />
+                    <div className="min-w-0 flex-1">
+                      <SearchableSelect
+                        value={f.prof || null}
+                        onChange={(id) => setFranja(i, 'prof', id || '')}
+                        options={opcionesProf}
+                        placeholder="Profesional…"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="text-gray-400 hover:text-red-600 px-1 text-lg leading-none"
+                      title="Eliminar franja"
+                      onClick={() => set({ franjas: form.franjas.length > 1 ? form.franjas.filter((_, j) => j !== i) : [{ ...FRANJA_VACIA }] })}
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!f.almuerzo}
+                        onChange={(e) => set({
+                          franjas: form.franjas.map((x, j) => (j !== i ? x : e.target.checked
+                            ? { ...x, almuerzo: true, ...almuerzoPorDefecto(x) }
+                            : { ...x, almuerzo: false, aIni: '', aFin: '' })),
+                        })}
+                      />
+                      <span className="text-xs text-gray-700">Hora de almuerzo</span>
+                    </label>
+                    {f.almuerzo && (
+                      <>
+                        <input type="time" className="input !w-[132px] shrink-0 !px-2 !py-1" aria-label="Almuerzo desde" value={f.aIni} onChange={(e) => setFranja(i, 'aIni', e.target.value)} />
+                        <span className="text-gray-400 text-xs">a</span>
+                        <input type="time" className="input !w-[132px] shrink-0 !px-2 !py-1" aria-label="Almuerzo hasta" value={f.aFin} onChange={(e) => setFranja(i, 'aFin', e.target.value)} />
+                      </>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -379,32 +451,7 @@ function EditarDiaModal({ auxiliar, dia, celdasAux, profesionales, onClose }) {
               </span>
             </div>
             {incompleta && <p className="text-xs text-red-600 mt-1">Hay una franja con una sola hora.</p>}
-          </div>
-
-          <div>
-            <label className="label">Profesionales</label>
-            <SearchableSelect
-              value={null}
-              onChange={(id) => id && set({ profesionalIds: [...form.profesionalIds, id] })}
-              options={opcionesProf}
-              placeholder="Agregar profesional…"
-            />
-            {form.profesionalIds.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {form.profesionalIds.map((id) => (
-                  <span key={id} className="inline-flex items-center gap-1 rounded-full bg-brand-50 border border-brand-100 text-brand-800 text-xs px-2 py-0.5">
-                    {porId[id]?.name ?? 'Profesional'}
-                    <button
-                      type="button"
-                      className="text-brand-400 hover:text-red-600 leading-none"
-                      onClick={() => set({ profesionalIds: form.profesionalIds.filter((x) => x !== id) })}
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
+            {almuerzoMal && <p className="text-xs text-red-600 mt-1">El almuerzo debe estar dentro del horario de su franja.</p>}
           </div>
 
           <div>
@@ -451,7 +498,7 @@ function EditarDiaModal({ auxiliar, dia, celdasAux, profesionales, onClose }) {
             <button className="btn-danger" onClick={pedirVaciar} disabled={isPending}>Vaciar día</button>
           )}
           <button className="btn flex-1 justify-center" onClick={tryClose} disabled={isPending}>Cancelar</button>
-          <button className="btn-primary flex-1 justify-center" onClick={() => guardar(false)} disabled={isPending || incompleta}>
+          <button className="btn-primary flex-1 justify-center" onClick={() => guardar(false)} disabled={isPending || incompleta || almuerzoMal}>
             {isPending ? <Spinner size="sm" /> : 'Guardar'}
           </button>
         </div>
