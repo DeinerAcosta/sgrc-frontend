@@ -594,9 +594,13 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
         </div>
       </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto lg:flex lg:overflow-hidden">
-        {/* Mitad formulario, mitad grilla (en pantallas angostas, una debajo de la otra). */}
-        <div className={`bg-white ${conPanel ? 'lg:w-1/2 lg:shrink-0 lg:overflow-y-auto lg:border-r lg:border-gray-200' : 'w-full lg:overflow-y-auto'}`}>
+        <div className="flex-1 min-h-0 overflow-y-auto">
+        {/* Nov-2026 · Hector: arriba, mitad formulario y mitad la semana de cada
+            persona, que llega solo hasta donde llega el formulario y tiene su
+            propio scroll; abajo, a todo el ancho, la cuadrícula de auxiliares
+            para que se vean los nombres completos. */}
+        <div className="lg:flex lg:items-stretch">
+        <div className={`bg-white ${conPanel ? 'lg:w-1/2 lg:shrink-0 lg:border-r lg:border-gray-200' : 'w-full'}`}>
         <div className="px-4 sm:px-6 py-4 space-y-3 max-w-2xl mx-auto">
           {/* Oct-2026 · Viniendo de "Mover la agenda". Sin este aviso, el medico
               aparece puesto sin explicacion y el turno queda atado a una ausencia
@@ -772,20 +776,6 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                         </>
                       )}
                     </div>
-                    {abierta && (
-                      // Debajo de la barra, dentro de la mitad del formulario.
-                      <div>
-                        <AuxiliarTabla
-                          value={x.id}
-                          excluir={form.auxs.filter((_, j) => j !== i).map((y) => y.id).filter(Boolean)}
-                          filas={filasAux}
-                          dia={diaLabel}
-                          plan={x.ini && x.fin ? { ini: x.ini, fin: x.fin, sede: nombreSede, descanso: descansoValido(x) ? { ini: x.dIni, fin: x.dFin } : null } : null}
-                          onChange={(id) => { setAux(i, { id, auto: false, horaManual: false }); setEligiendoAux(null) }}
-                          onClose={() => setEligiendoAux(null)}
-                        />
-                      </div>
-                    )}
                     {/* Nov-2026 · Hector: el descanso (almuerzo) de la auxiliar,
                         de qué hora a qué hora, y la auxiliar que lo cubre. */}
                     {x.id && !abierta && (
@@ -833,19 +823,6 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                               onChange={(e) => setAux(i, { dFin: e.target.value, relevoId: x.relevoAuto ? '' : x.relevoId })} />
                           </div>
                           {fueraDeHorario && <p className="text-xs text-red-600 mt-1">El descanso debe estar dentro de {x.ini}–{x.fin}.</p>}
-                          <div>
-                            {abiertaR && descansoValido(x) && (
-                              <AuxiliarTabla
-                                value={x.relevoId}
-                                excluir={[...idsEnTurno, ...form.auxs.filter((_, j) => j !== i).map((y) => y.relevoId)].filter(Boolean)}
-                                filas={filasR}
-                                dia={diaLabel}
-                                plan={{ ini: x.dIni, fin: x.dFin, sede: nombreSede }}
-                                onChange={(id) => { setAux(i, { relevoId: id, relevoAuto: false }); setEligiendoRelevo(null) }}
-                                onClose={() => setEligiendoRelevo(null)}
-                              />
-                            )}
-                          </div>
                         </div>
                       )
                     })()}
@@ -1023,7 +1000,8 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
             semana de cada persona (profesional y auxiliares), con el diseño de
             siempre. No se aparta mientras se elige auxiliar. */}
         {conPanel && (
-          <div className="lg:w-1/2 lg:min-w-0 lg:overflow-y-auto border-t lg:border-t-0 border-gray-100 bg-gray-50 px-4 sm:px-6 py-5 space-y-3">
+          <div className="lg:w-1/2 lg:min-w-0 relative border-t lg:border-t-0 border-gray-100 bg-gray-50">
+          <div className="lg:absolute lg:inset-0 lg:overflow-y-auto px-4 sm:px-6 py-4 space-y-3">
             {recursoSel && (
               <ResourceWeekLoad
                 persona={recursoSel}
@@ -1072,7 +1050,45 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
               )
             })}
           </div>
+          </div>
         )}
+        </div>
+
+        {/* La cuadrícula de la auxiliar que se está eligiendo, a todo el ancho. */}
+        {verApoyo && eligiendoAux != null && form.auxs[eligiendoAux] && (() => {
+          const i = eligiendoAux
+          const x = form.auxs[i]
+          return (
+            <div className="border-t border-gray-200 bg-white px-4 sm:px-6 pb-3">
+              <AuxiliarTabla
+                value={x.id}
+                excluir={form.auxs.filter((_, j) => j !== i).map((y) => y.id).filter(Boolean)}
+                filas={filasAux}
+                dia={diaLabel}
+                plan={x.ini && x.fin ? { ini: x.ini, fin: x.fin, sede: nombreSede, descanso: descansoValido(x) ? { ini: x.dIni, fin: x.dFin } : null } : null}
+                onChange={(id) => { setAux(i, { id, auto: false, horaManual: false }); setEligiendoAux(null) }}
+                onClose={() => setEligiendoAux(null)}
+              />
+            </div>
+          )
+        })()}
+        {verApoyo && eligiendoRelevo != null && form.auxs[eligiendoRelevo] && descansoValido(form.auxs[eligiendoRelevo]) && (() => {
+          const i = eligiendoRelevo
+          const x = form.auxs[i]
+          return (
+            <div className="border-t border-gray-200 bg-white px-4 sm:px-6 pb-3">
+              <AuxiliarTabla
+                value={x.relevoId}
+                excluir={[...idsEnTurno, ...form.auxs.filter((_, j) => j !== i).map((y) => y.relevoId)].filter(Boolean)}
+                filas={filasDescanso(x)}
+                dia={diaLabel}
+                plan={{ ini: x.dIni, fin: x.dFin, sede: nombreSede }}
+                onChange={(id) => { setAux(i, { relevoId: id, relevoAuto: false }); setEligiendoRelevo(null) }}
+                onClose={() => setEligiendoRelevo(null)}
+              />
+            </div>
+          )
+        })()}
         </div>
 
         <div className="shrink-0 bg-white px-4 sm:px-6 py-3 border-t border-gray-200 flex flex-col-reverse sm:flex-row gap-2">
