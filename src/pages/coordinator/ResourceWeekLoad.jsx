@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { asignacionService } from '@/services/api'
-import { DIAS, DIAS_LABEL, debeDescontarAlmuerzo, clsx } from '@/utils/helpers'
+import { DIAS, DIAS_LABEL, minutosEfectivosDia, clsx } from '@/utils/helpers'
 import { auxiliaresDeTurno } from '@/utils/matriz'
 
 const aMin = (hhmm) => {
@@ -15,24 +15,18 @@ function horarioEnTurno(a, personaId) {
   return aux ? [aux.ini, aux.fin, aux.dIni && aux.dFin ? { ini: aux.dIni, fin: aux.dFin } : null] : [a.start_time, a.end_time, null]
 }
 
-/** Horas efectivas de un día: unión de franjas menos el almuerzo (misma regla que el backend). */
+/**
+ * Horas efectivas de un día (misma regla que el backend): el almuerzo se
+ * descuenta por bloque continuo, no sobre el total — 07:30–12:00 + 13:00–17:00
+ * son 8,5 h. Con descanso marcado en el bloque se descuenta ese descanso.
+ */
 function horasDelDia(franjas, tipo) {
-  const ivs = franjas.map((f) => [aMin(f.ini), aMin(f.fin)]).filter(([i, f]) => f > i).sort((x, y) => x[0] - y[0])
-  if (!ivs.length) return 0
-  let total = 0
-  let [ci, cf] = ivs[0]
-  for (const [i, f] of ivs.slice(1)) {
-    if (i <= cf) cf = Math.max(cf, f)
-    else { total += cf - ci; ci = i; cf = f }
-  }
-  total += cf - ci
-  // Nov-2026 · Con descanso marcado se descuenta ese descanso en vez del
-  // almuerzo automático (misma regla que el backend).
-  const pausas = franjas.reduce((s, f) => s + (f.descanso ? Math.max(0, aMin(f.descanso.fin) - aMin(f.descanso.ini)) : 0), 0)
-  if (pausas > 0) return Math.max(0, total - pausas) / 60
-  const ini = ivs[0][0]
-  const fin = Math.max(...ivs.map(([, f]) => f))
-  return (total - (debeDescontarAlmuerzo(total, ini, fin, tipo) ? 60 : 0)) / 60
+  const ivs = franjas.map((f) => [aMin(f.ini), aMin(f.fin)])
+  const pausaDe = (i, f) => franjas.reduce((s, x) => {
+    if (!x.descanso || aMin(x.ini) < i || aMin(x.fin) > f) return s
+    return s + Math.max(0, aMin(x.descanso.fin) - aMin(x.descanso.ini))
+  }, 0)
+  return minutosEfectivosDia(ivs, tipo, pausaDe) / 60
 }
 
 const redondear = (h) => Math.round(h * 10) / 10

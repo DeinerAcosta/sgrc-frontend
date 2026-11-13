@@ -317,6 +317,29 @@ export const debeDescontarAlmuerzo = (totalMin, inicioMin, finMin, tipoRecurso =
   return true
 }
 
+// Nov-2026 · Minutos efectivos de un día (paridad con backend
+// workHours.minutosEfectivosDia): el almuerzo se descuenta por BLOQUE
+// continuo, no sobre el total. 07:30–12:00 + 13:00–17:00 = 8,5 h (el hueco es
+// el almuerzo); 07:30–12:00 + 12:00–17:00 es un bloque de 9,5 h → 8,5 h.
+// `pausaDe(bloque)` = minutos de descanso marcado dentro del bloque: si hay,
+// se descuentan en lugar del almuerzo automático.
+export const minutosEfectivosDia = (intervalos, tipoRecurso = null, pausaDe = null) => {
+  const ivs = intervalos.filter(([i, f]) => f > i).sort((x, y) => x[0] - y[0])
+  const bloques = []
+  for (const [i, f] of ivs) {
+    const ult = bloques[bloques.length - 1]
+    if (ult && i <= ult[1]) ult[1] = Math.max(ult[1], f)
+    else bloques.push([i, f])
+  }
+  return bloques.reduce((acc, [i, f]) => {
+    const m = f - i
+    const pausa = pausaDe ? pausaDe(i, f) : 0
+    if (pausa > 0) return acc + Math.max(0, m - pausa)
+    const almuerzo = debeDescontarAlmuerzo(m, i, f, tipoRecurso) ? (ALMUERZO_CORTO_TIPOS.has(tipoRecurso) ? 30 : 60) : 0
+    return acc + m - almuerzo
+  }, 0)
+}
+
 export const calcularCapacidadPacientes = (horaInicio, horaFin, intervaloMinutos, tipoRecurso = null) => {
   // PROYECTOS-3255 · Los asesores de servicios NO atienden pacientes con cita
   // (hacen recepcion / gestion), por lo que el numero de pacientes no aplica.
