@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { matrizService } from '@/services/api'
@@ -35,6 +35,10 @@ const ESTADOS_MALLA = [
   ['pasa_tope', 'Pasa del tope'],
 ]
 const FILTROS_VACIOS = { buscar: '', estado: '', dia: '', nombre: '', horas: '' }
+// 13-nov · Hector: "que la tabla tenga el espacio fijo": anchos fijos por
+// columna para que al filtrar no se encojan ni se estiren los títulos.
+const ANCHO = { auxiliar: 170, horario: 104, horas: 46, asignacion: 150, total: 64 }
+const ANCHO_DIA = ANCHO.horario + ANCHO.horas + ANCHO.asignacion
 const selCls = 'rounded-lg border border-gray-200 bg-white px-2 py-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-400'
 
 export default function AssistantMatrixPage() {
@@ -165,10 +169,24 @@ export default function AssistantMatrixPage() {
         <EmptyState icon="👥" title="No hay auxiliares activas" description="Las auxiliares se crean en Configuración › Recursos." />
       ) : (
         <div className="bg-white border border-gray-200 rounded-xl overflow-auto max-h-[calc(100vh-215px)]">
-          <table className={clsx('text-[11px] border-collapse w-full', diasVisibles.length > 1 ? 'min-w-[1750px]' : 'max-w-3xl')}>
+          <table
+            className="text-[11px] border-collapse table-fixed"
+            style={{ width: ANCHO.auxiliar + diasVisibles.length * ANCHO_DIA + ANCHO.total }}
+          >
+            <colgroup>
+              <col style={{ width: ANCHO.auxiliar }} />
+              {diasVisibles.map((d) => (
+                <Fragment key={d}>
+                  <col style={{ width: ANCHO.horario }} />
+                  <col style={{ width: ANCHO.horas }} />
+                  <col style={{ width: ANCHO.asignacion }} />
+                </Fragment>
+              ))}
+              <col style={{ width: ANCHO.total }} />
+            </colgroup>
             <thead className="sticky top-0 z-20">
               <tr className="bg-brand-600 text-white">
-                <th rowSpan={2} className="sticky left-0 z-30 bg-brand-600 px-2 py-2 text-left font-semibold w-48 border-r border-white/20">
+                <th rowSpan={2} className="sticky left-0 z-30 bg-brand-600 px-2 py-2 text-left font-semibold border-r border-white/20">
                   Auxiliar
                 </th>
                 {diasVisibles.map((d) => (
@@ -177,7 +195,7 @@ export default function AssistantMatrixPage() {
                   </th>
                 ))}
                 {/* Fija a la derecha: con seis días la tabla se desplaza y el total es lo que más se mira. */}
-                <th rowSpan={2} className="sticky right-0 z-30 bg-brand-600 px-2 py-2 font-semibold w-16 border-l border-white/20">Total horas</th>
+                <th rowSpan={2} className="sticky right-0 z-30 bg-brand-600 px-2 py-2 font-semibold border-l border-white/20">Total horas</th>
               </tr>
               <tr className="bg-brand-50 text-brand-800">
                 {diasVisibles.map((d) => (
@@ -233,9 +251,9 @@ export default function AssistantMatrixPage() {
 function SubCabecera() {
   return (
     <>
-      <th className="px-2 py-1 font-semibold text-left w-24">Horario</th>
-      <th className="px-1 py-1 font-semibold w-10">Horas</th>
-      <th className="px-2 py-1 font-semibold text-left w-36 border-r border-brand-100">Asignación</th>
+      <th className="px-2 py-1 font-semibold text-left">Horario</th>
+      <th className="px-1 py-1 font-semibold">Horas</th>
+      <th className="px-2 py-1 font-semibold text-left border-r border-brand-100">Asignación</th>
     </>
   )
 }
