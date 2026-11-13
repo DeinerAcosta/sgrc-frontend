@@ -37,7 +37,7 @@ const ESTADOS_MALLA = [
 const FILTROS_VACIOS = { buscar: '', estado: '', dia: '', nombre: '', horas: '' }
 // 13-nov · Hector: "que la tabla tenga el espacio fijo": anchos fijos por
 // columna para que al filtrar no se encojan ni se estiren los títulos.
-const ANCHO = { auxiliar: 170, horario: 104, horas: 46, asignacion: 150, total: 64 }
+const ANCHO = { auxiliar: 170, horario: 140, horas: 46, asignacion: 150, total: 64 }
 const ANCHO_DIA = ANCHO.horario + ANCHO.horas + ANCHO.asignacion
 const selCls = 'rounded-lg border border-gray-200 bg-white px-2 py-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-400'
 
