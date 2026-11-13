@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { asignacionService, recursoService, semanaService, usuarioService, matrizService, sedeService } from '@/services/api'
@@ -529,6 +529,28 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
   // Qué fila se está eligiendo en la cuadrícula (índice o null).
   const [eligiendoAux, setEligiendoAux] = useState(null)
   const [eligiendoRelevo, setEligiendoRelevo] = useState(null)
+  // Nov-2026 · Hector: sin cuadrícula abierta, la semana de cada persona ocupa
+  // todo el alto; al abrir la de una auxiliar, se recoge a DOS tarjetas
+  // completas (con scroll para las demás) y la cuadrícula va debajo.
+  const tablaAbierta = eligiendoAux != null || eligiendoRelevo != null
+  const panelRef = useRef(null)
+  const [altoDosTarjetas, setAltoDosTarjetas] = useState(null)
+  useLayoutEffect(() => {
+    const el = panelRef.current
+    if (!tablaAbierta || !el) return
+    const medir = () => {
+      const tarjetas = [...el.children].slice(0, 2)
+      if (!tarjetas.length) return
+      const estilo = getComputedStyle(el)
+      const relleno = parseFloat(estilo.paddingTop) + parseFloat(estilo.paddingBottom)
+      const espacio = tarjetas.length > 1 ? tarjetas[1].offsetTop - tarjetas[0].offsetTop - tarjetas[0].offsetHeight : 0
+      setAltoDosTarjetas(Math.ceil(tarjetas.reduce((n, t) => n + t.offsetHeight, 0) + espacio + relleno))
+    }
+    medir()
+    const ro = new ResizeObserver(medir)
+    ;[...el.children].slice(0, 2).forEach((t) => ro.observe(t))
+    return () => ro.disconnect()
+  }, [tablaAbierta])
   useEffect(() => { if (!verApoyo) { setEligiendoAux(null); setEligiendoRelevo(null) } }, [verApoyo])
 
   const setAux = (i, cambios) => {
@@ -613,13 +635,14 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
         </div>
       </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto">
-        {/* Nov-2026 · Hector: arriba, mitad formulario y mitad la semana de cada
-            persona, que llega solo hasta donde llega el formulario y tiene su
-            propio scroll; abajo, a todo el ancho, la cuadrícula de auxiliares
-            para que se vean los nombres completos. */}
-        <div className="lg:flex lg:items-stretch">
-        <div className={`bg-white ${conPanel ? 'lg:w-1/2 lg:shrink-0 lg:border-r lg:border-gray-200' : 'w-full'}`}>
+        <div className={`flex-1 min-h-0 overflow-y-auto ${tablaAbierta ? '' : 'lg:overflow-hidden'}`}>
+        {/* Nov-2026 · Hector: mitad formulario y mitad la semana de cada
+            persona. Sin cuadrícula abierta, cada mitad usa todo el alto con su
+            scroll. Con la cuadrícula de una auxiliar abierta, la semana se
+            recoge a dos tarjetas completas y la cuadrícula va debajo, a todo el
+            ancho, para que se lean los nombres completos. */}
+        <div className={`lg:flex lg:items-stretch ${tablaAbierta ? '' : 'lg:h-full'}`}>
+        <div className={`bg-white ${conPanel ? 'lg:w-1/2 lg:shrink-0 lg:border-r lg:border-gray-200' : 'w-full'} ${tablaAbierta ? '' : 'lg:overflow-y-auto'}`}>
         <div className="px-4 sm:px-6 py-4 space-y-3 max-w-2xl mx-auto">
           {/* Oct-2026 · Viniendo de "Mover la agenda". Sin este aviso, el medico
               aparece puesto sin explicacion y el turno queda atado a una ausencia
@@ -1017,8 +1040,12 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
             semana de cada persona (profesional y auxiliares), con el diseño de
             siempre. No se aparta mientras se elige auxiliar. */}
         {conPanel && (
-          <div className="lg:w-1/2 lg:min-w-0 relative border-t lg:border-t-0 border-gray-100 bg-gray-50">
-          <div className="lg:absolute lg:inset-0 lg:overflow-y-auto px-4 sm:px-6 py-4 space-y-3">
+          <div className="lg:w-1/2 lg:min-w-0 border-t lg:border-t-0 border-gray-100 bg-gray-50">
+          <div
+            ref={panelRef}
+            className="lg:h-full lg:overflow-y-auto px-4 sm:px-6 py-4 space-y-3"
+            style={tablaAbierta && altoDosTarjetas ? { height: altoDosTarjetas } : undefined}
+          >
             {recursoSel && (
               <ResourceWeekLoad
                 persona={recursoSel}
