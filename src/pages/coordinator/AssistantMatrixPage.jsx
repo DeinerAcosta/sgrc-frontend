@@ -27,9 +27,11 @@ const normalizar = (t) => (t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toL
 const etiquetaTipo = (t) => TIPOS_RECURSO.find((x) => x.value === t)?.label ?? t
 
 // Hector: filtrar no solo por nombre, también por estado y lo demás.
+// 13-nov · Hector: "Asignado" y "Sin asignar" en vez de con/sin malla. Con un
+// día elegido se miden en ese día.
 const ESTADOS_MALLA = [
-  ['con_malla', 'Con malla'],
-  ['sin_malla', 'Sin malla'],
+  ['asignado', 'Asignado'],
+  ['sin_asignar', 'Sin asignar'],
   ['pasa_tope', 'Pasa del tope'],
 ]
 const FILTROS_VACIOS = { buscar: '', estado: '', dia: '', profesional: '', nombre: '', horas: '' }
@@ -68,17 +70,20 @@ export default function AssistantMatrixPage() {
 
   // Busca por auxiliar, por profesional o por la nota (ej. "LASER", "FN2").
   const q = normalizar(f.buscar.trim())
+  // 13-nov · Hector: "el filtro de día no sirve". Ahora, con un día elegido la
+  // tabla muestra solo ese día y el estado (asignado / sin asignar) es el de
+  // ese día.
   const diasFiltro = f.dia ? [f.dia] : DIAS_MATRIZ
+  const tieneMalla = (a) => diasFiltro.some((d) => celdas[a.id]?.[d])
   const filas = auxiliares
     .filter((a) => !q || normalizar(a.name).includes(q) || DIAS_MATRIZ.some((d) => {
       const c = celdas[a.id]?.[d]
       return c && (normalizar(c.note).includes(q) || c.professionals.some((p) => normalizar(p.name).includes(q)))
     }))
-    .filter((a) => !f.dia || celdas[a.id]?.[f.dia])
     .filter((a) => !f.profesional || diasFiltro.some((d) => celdas[a.id]?.[d]?.professionals.some((p) => p.id === f.profesional)))
     .filter((a) => {
-      if (f.estado === 'con_malla') return !!celdas[a.id]
-      if (f.estado === 'sin_malla') return !celdas[a.id]
+      if (f.estado === 'asignado') return tieneMalla(a)
+      if (f.estado === 'sin_asignar') return !tieneMalla(a)
       if (f.estado === 'pasa_tope') return a.max_hours_per_week != null && totalDe(a.id) > a.max_hours_per_week
       return true
     })
@@ -86,6 +91,7 @@ export default function AssistantMatrixPage() {
   if (f.nombre) filas.sort((a, b) => (f.nombre === 'asc' ? 1 : -1) * porNombre(a, b))
   else if (f.horas) filas.sort((a, b) => (f.horas === 'asc' ? 1 : -1) * (totalDe(a.id) - totalDe(b.id)) || porNombre(a, b))
   const conMalla = auxiliares.filter((a) => celdas[a.id]).length
+  const diasVisibles = diasFiltro
 
   return (
     <div className="p-3 sm:p-4">
@@ -93,7 +99,7 @@ export default function AssistantMatrixPage() {
         <div>
           <h1 className="text-base font-semibold text-gray-900">Matriz de asignaciones fijas</h1>
           <p className="text-xs text-gray-500">
-            {auxiliares.length} auxiliares · {conMalla} con malla{hayFiltros ? ` · ${filas.length} en el filtro` : ''}
+            {auxiliares.length} auxiliares · {conMalla} asignadas · {auxiliares.length - conMalla} sin asignar{hayFiltros ? ` · ${filas.length} en el filtro` : ''}
           </p>
         </div>
       </div>
@@ -141,13 +147,13 @@ export default function AssistantMatrixPage() {
         <EmptyState icon="👥" title="No hay auxiliares activas" description="Las auxiliares se crean en Configuración › Recursos." />
       ) : (
         <div className="bg-white border border-gray-200 rounded-xl overflow-auto max-h-[calc(100vh-215px)]">
-          <table className="text-[11px] border-collapse min-w-[1750px] w-full">
+          <table className={clsx('text-[11px] border-collapse w-full', diasVisibles.length > 1 ? 'min-w-[1750px]' : 'max-w-3xl')}>
             <thead className="sticky top-0 z-20">
               <tr className="bg-brand-600 text-white">
                 <th rowSpan={2} className="sticky left-0 z-30 bg-brand-600 px-2 py-2 text-left font-semibold w-48 border-r border-white/20">
                   Auxiliar
                 </th>
-                {DIAS_MATRIZ.map((d) => (
+                {diasVisibles.map((d) => (
                   <th key={d} colSpan={3} className="px-2 py-1.5 font-semibold uppercase tracking-wide border-r border-white/20">
                     {DIAS_MATRIZ_LABEL[d]}
                   </th>
@@ -156,7 +162,7 @@ export default function AssistantMatrixPage() {
                 <th rowSpan={2} className="sticky right-0 z-30 bg-brand-600 px-2 py-2 font-semibold w-16 border-l border-white/20">Total horas</th>
               </tr>
               <tr className="bg-brand-50 text-brand-800">
-                {DIAS_MATRIZ.map((d) => (
+                {diasVisibles.map((d) => (
                   <SubCabecera key={d} />
                 ))}
               </tr>
@@ -170,7 +176,7 @@ export default function AssistantMatrixPage() {
                     <td className="sticky left-0 z-10 bg-white group-hover:bg-gray-50 px-2 py-1.5 font-semibold text-gray-900 border-r border-gray-200">
                       {a.name}
                     </td>
-                    {DIAS_MATRIZ.map((d) => (
+                    {diasVisibles.map((d) => (
                       <CeldaDia key={d} celda={celdas[a.id]?.[d]} onClick={() => setEditando({ auxiliar: a, dia: d })} />
                     ))}
                     <td
@@ -186,7 +192,7 @@ export default function AssistantMatrixPage() {
                 )
               })}
               {!filas.length && (
-                <tr><td colSpan={2 + DIAS_MATRIZ.length * 3} className="text-center text-gray-400 py-8">Ninguna auxiliar coincide con el filtro.</td></tr>
+                <tr><td colSpan={2 + diasVisibles.length * 3} className="text-center text-gray-400 py-8">Ninguna auxiliar coincide con el filtro.</td></tr>
               )}
             </tbody>
           </table>
