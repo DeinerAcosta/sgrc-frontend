@@ -34,7 +34,7 @@ const ESTADOS_MALLA = [
   ['sin_asignar', 'Sin asignar'],
   ['pasa_tope', 'Pasa del tope'],
 ]
-const FILTROS_VACIOS = { buscar: '', estado: '', dia: '', profesional: '', nombre: '', horas: '' }
+const FILTROS_VACIOS = { buscar: '', estado: '', dia: '', nombre: '', horas: '' }
 const selCls = 'rounded-lg border border-gray-200 bg-white px-2 py-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-400'
 
 export default function AssistantMatrixPage() {
@@ -61,13 +61,6 @@ export default function AssistantMatrixPage() {
 
   const totalDe = (auxId) => DIAS_MATRIZ.reduce((s, d) => s + horasDelDiaMatriz(celdas[auxId]?.[d]?.ranges), 0)
 
-  // Profesionales que salen en la malla (solo esos tiene sentido filtrar).
-  const profEnMalla = useMemo(() => {
-    const m = new Map()
-    for (const c of data?.cells ?? []) for (const p of c.professionals) m.set(p.id, p.name)
-    return [...m].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, 'es'))
-  }, [data])
-
   // Busca por auxiliar, por profesional o por la nota (ej. "LASER", "FN2").
   const q = normalizar(f.buscar.trim())
   // 13-nov · Hector: "el filtro de día no sirve". Ahora, con un día elegido la
@@ -80,7 +73,6 @@ export default function AssistantMatrixPage() {
       const c = celdas[a.id]?.[d]
       return c && (normalizar(c.note).includes(q) || c.professionals.some((p) => normalizar(p.name).includes(q)))
     }))
-    .filter((a) => !f.profesional || diasFiltro.some((d) => celdas[a.id]?.[d]?.professionals.some((p) => p.id === f.profesional)))
     .filter((a) => {
       if (f.estado === 'asignado') return tieneMalla(a)
       if (f.estado === 'sin_asignar') return !tieneMalla(a)
@@ -93,14 +85,44 @@ export default function AssistantMatrixPage() {
   const conMalla = auxiliares.filter((a) => celdas[a.id]).length
   const diasVisibles = diasFiltro
 
+  // Nov-2026 · Hector: descargar en Excel y PDF "funcional con cualquier campo
+  // de filtro": va exactamente lo que se ve (estas auxiliares, en este orden,
+  // estos días) y los filtros escritos en el encabezado del archivo.
+  const [descargando, setDescargando] = useState(null)
+  const filtrosTexto = [
+    f.buscar.trim() && `Buscar: "${f.buscar.trim()}"`,
+    f.estado && `Estado: ${ESTADOS_MALLA.find(([k]) => k === f.estado)?.[1]}`,
+    f.dia && `Día: ${DIAS_MATRIZ_LABEL[f.dia]}`,
+    f.nombre && `Nombre: ${f.nombre === 'asc' ? 'A → Z' : 'Z → A'}`,
+    f.horas && `Horas: ${f.horas === 'asc' ? 'menos horas' : 'más horas'}`,
+  ].filter(Boolean).join(' · ')
+  const descargar = async (formato) => {
+    setDescargando(formato)
+    try {
+      await matrizService.descargar({ formato, auxiliarIds: filas.map((a) => a.id), dias: diasVisibles, filtrosTexto })
+    } catch (e) {
+      toast.error(e?.message ?? 'No se pudo descargar')
+    } finally {
+      setDescargando(null)
+    }
+  }
+
   return (
     <div className="p-3 sm:p-4">
-      <div className="mb-3">
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
         <div>
           <h1 className="text-base font-semibold text-gray-900">Matriz de asignaciones fijas</h1>
           <p className="text-xs text-gray-500">
             {auxiliares.length} auxiliares · {conMalla} asignadas · {auxiliares.length - conMalla} sin asignar{hayFiltros ? ` · ${filas.length} en el filtro` : ''}
           </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button type="button" className="btn text-xs" disabled={!!descargando || !filas.length} onClick={() => descargar('xlsx')}>
+            {descargando === 'xlsx' ? <Spinner size="sm" /> : '📊'} Excel
+          </button>
+          <button type="button" className="btn text-xs" disabled={!!descargando || !filas.length} onClick={() => descargar('pdf')}>
+            {descargando === 'pdf' ? <Spinner size="sm" /> : '📄'} PDF
+          </button>
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2 mb-3">
@@ -117,10 +139,6 @@ export default function AssistantMatrixPage() {
           <select className={selCls} value={f.dia} onChange={(e) => setFiltro('dia', e.target.value)} aria-label="Día">
             <option value="">Día</option>
             {DIAS_MATRIZ.map((d) => <option key={d} value={d}>{DIAS_MATRIZ_LABEL[d]}</option>)}
-          </select>
-          <select className={clsx(selCls, 'max-w-[180px]')} value={f.profesional} onChange={(e) => setFiltro('profesional', e.target.value)} aria-label="Profesional">
-            <option value="">Profesional</option>
-            {profEnMalla.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
           <select className={selCls} value={f.nombre} onChange={(e) => setF((x) => ({ ...x, nombre: e.target.value, horas: '' }))} aria-label="Orden alfabético">
             <option value="">Nombre</option>

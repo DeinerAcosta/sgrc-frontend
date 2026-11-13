@@ -1202,6 +1202,24 @@ export const matrizService = {
   guardarDia: (auxiliarId, dia, data) => api.put(`/assistant-matrix/${auxiliarId}/${dia}`, data),
   // Estado de cada auxiliar en el día y la hora de un turno + preselección.
   turno: (params) => api.get('/assistant-matrix/shift', { params }),
+  // Nov-2026 · Descarga Excel/PDF de lo que se ve (auxiliares filtradas, en su
+  // orden, y los días visibles). El interceptor ya devuelve el Blob.
+  descargar: async ({ formato, auxiliarIds, dias, filtrosTexto }) => {
+    const blob = await api.post('/assistant-matrix/export', {
+      format: formato, assistant_ids: auxiliarIds, days: dias, filters_text: filtrosTexto || null,
+    }, { responseType: 'blob' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    const fecha = new Date().toISOString().slice(0, 10)
+    link.setAttribute('download', `matriz_asignaciones_${dias.length === 1 ? dias[0] + '_' : ''}${fecha}.${formato}`)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    // Liberar el archivo un rato después: hacerlo en el acto a veces deja la
+    // descarga vacía (0 bytes) porque el navegador aún no lo terminó de leer.
+    setTimeout(() => window.URL.revokeObjectURL(url), 60_000)
+  },
 }
 
 // ============ FESTIVOS (RN-06) ============
