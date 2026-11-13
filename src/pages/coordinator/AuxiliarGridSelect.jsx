@@ -35,9 +35,11 @@ const normalizar = (t) => (t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toL
 const fmt = (h) => (h == null ? '—' : (Math.round(h * 10) / 10).toString().replace('.', ','))
 const aMin = (h) => { const [a, b] = (h ?? '').split(':').map(Number); return a * 60 + b }
 // Horas efectivas de una franja (misma regla de almuerzo que el backend).
-const horasFranja = (ini, fin) => {
+// Con descanso marcado se descuenta ese descanso en vez del almuerzo.
+const horasFranja = (ini, fin, descanso = null) => {
   const s = aMin(ini), e = aMin(fin), m = e - s
   if (!(m > 0)) return 0
+  if (descanso?.ini && descanso?.fin) return Math.max(0, m - Math.max(0, aMin(descanso.fin) - aMin(descanso.ini))) / 60
   return (m - (debeDescontarAlmuerzo(m, s, e, 'auxiliar') ? 60 : 0)) / 60
 }
 // La fila con el turno que se está armando: su horario en este turno, y las
@@ -45,7 +47,7 @@ const horasFranja = (ini, fin) => {
 function conPlan(f0, plan) {
   if (!f0 || !plan) return f0
   const guardado = f0.horario.find((h) => h.este_turno)
-  const delta = horasFranja(plan.ini, plan.fin) - (guardado ? horasFranja(guardado.ini, guardado.fin) : 0)
+  const delta = horasFranja(plan.ini, plan.fin, plan.descanso) - (guardado ? horasFranja(guardado.ini, guardado.fin, guardado.descanso) : 0)
   return {
     ...f0,
     horario: [...f0.horario.filter((h) => !h.este_turno), { ...plan, este_turno: true }].sort((a, b) => (a.ini < b.ini ? -1 : 1)),

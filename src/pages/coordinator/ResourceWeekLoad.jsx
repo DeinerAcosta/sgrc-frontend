@@ -12,7 +12,7 @@ const aMin = (hhmm) => {
 /** Horario de la persona dentro del turno: el suyo si es auxiliar con sub-horario. */
 function horarioEnTurno(a, personaId) {
   const aux = auxiliaresDeTurno(a).find((x) => x.id === personaId)
-  return aux ? [aux.ini, aux.fin] : [a.start_time, a.end_time]
+  return aux ? [aux.ini, aux.fin, aux.dIni && aux.dFin ? { ini: aux.dIni, fin: aux.dFin } : null] : [a.start_time, a.end_time, null]
 }
 
 /** Horas efectivas de un día: unión de franjas menos el almuerzo (misma regla que el backend). */
@@ -26,6 +26,10 @@ function horasDelDia(franjas, tipo) {
     else { total += cf - ci; ci = i; cf = f }
   }
   total += cf - ci
+  // Nov-2026 · Con descanso marcado se descuenta ese descanso en vez del
+  // almuerzo automático (misma regla que el backend).
+  const pausas = franjas.reduce((s, f) => s + (f.descanso ? Math.max(0, aMin(f.descanso.fin) - aMin(f.descanso.ini)) : 0), 0)
+  if (pausas > 0) return Math.max(0, total - pausas) / 60
   const ini = ivs[0][0]
   const fin = Math.max(...ivs.map(([, f]) => f))
   return (total - (debeDescontarAlmuerzo(total, ini, fin, tipo) ? 60 : 0)) / 60
@@ -35,8 +39,11 @@ const redondear = (h) => Math.round(h * 10) / 10
 
 /** En qué va la persona dentro del turno. */
 function papelEnTurno(a, personaId) {
-  const i = auxiliaresDeTurno(a).findIndex((x) => x.id === personaId)
-  return i < 0 ? 'Profesional' : `Auxiliar ${i + 1}`
+  const lista = auxiliaresDeTurno(a)
+  const yo = lista.find((x) => x.id === personaId)
+  if (!yo) return 'Profesional'
+  if (yo.cubreDe != null) return `Cubre el descanso de ${lista[yo.cubreDe]?.name ?? 'otra auxiliar'}`
+  return `Auxiliar ${lista.indexOf(yo) + 1}`
 }
 
 const conHorario = (nombre, ini, fin) => (ini && fin ? `${nombre} (${ini}–${fin})` : nombre)
@@ -62,6 +69,7 @@ function DetalleTurno({ f, rect, choca, tipo }) {
       {choca && <div className="text-red-700 font-semibold">Se cruza con este turno</div>}
       {fila('Consultorio', [d.consultorio, d.sede].filter(Boolean).join(' · '))}
       {fila('Va como', parcial ? `${d.papel} · turno de ${d.turnoIni}–${d.turnoFin}` : d.papel)}
+      {f.descanso && fila('Descanso', `${f.descanso.ini}–${f.descanso.fin}`)}
       {fila('Profesional', d.profesional)}
       {(d.auxiliares ?? []).map((x, i) => <div key={i}>{fila(`Auxiliar ${i + 1}`, x)}</div>)}
       {fila('Pacientes', d.pacientes != null && d.pacientes !== '' ? String(d.pacientes) : null)}
@@ -81,7 +89,7 @@ function DetalleTurno({ f, rect, choca, tipo }) {
  * contar el turno dos veces), turnoActual (lo que se está armando, para el
  * detalle al pasar el mouse).
  */
-export default function ResourceWeekLoad({ persona, rol, semanaId, dia, ini, fin, asignacionId, turnoActual }) {
+export default function ResourceWeekLoad({ persona, rol, semanaId, dia, ini, fin, descanso = null, asignacionId, turnoActual }) {
   const [hover, setHover] = useState(null)
   const { data: turnos = [], isLoading } = useQuery({
     // Cuelga de 'asignaciones' para que guardar/eliminar/copiar en el programador
@@ -97,9 +105,9 @@ export default function ResourceWeekLoad({ persona, rol, semanaId, dia, ini, fin
   const franjas = turnos
     .filter((a) => a.id !== asignacionId)
     .map((a) => {
-      const [i, f] = horarioEnTurno(a, persona.id)
+      const [i, f, desc] = horarioEnTurno(a, persona.id)
       return {
-        id: a.id, dia: a.weekday, ini: i, fin: f, consultorio: a.room?.name ?? '—',
+        id: a.id, dia: a.weekday, ini: i, fin: f, descanso: desc, consultorio: a.room?.name ?? '—',
         detalle: {
           consultorio: a.room?.name, sede: a.room?.site?.name,
           papel: papelEnTurno(a, persona.id), turnoIni: a.start_time, turnoFin: a.end_time,
@@ -113,7 +121,7 @@ export default function ResourceWeekLoad({ persona, rol, semanaId, dia, ini, fin
       }
     })
   const nueva = ini && fin && aMin(fin) > aMin(ini)
-    ? { id: 'nueva', dia, ini, fin, nueva: true, detalle: { ...turnoActual, papel: rol, turnoIni: turnoActual?.ini, turnoFin: turnoActual?.fin } }
+    ? { id: 'nueva', dia, ini, fin, descanso, nueva: true, detalle: { ...turnoActual, papel: rol, turnoIni: turnoActual?.ini, turnoFin: turnoActual?.fin } }
     : null
   const todas = nueva ? [...franjas, nueva] : franjas
   const choca = (f) => !f.nueva && nueva && f.dia === dia && aMin(f.ini) < aMin(nueva.fin) && aMin(nueva.ini) < aMin(f.fin)

@@ -107,6 +107,9 @@ export function auxiliaresDeTurno(a) {
   if (Array.isArray(a.assistants)) {
     return a.assistants.map((x) => ({
       id: x.resource_id, name: x.resource?.name ?? '', ini: x.start_time || ini, fin: x.end_time || fin,
+      // Nov-2026 · Descanso de esta auxiliar y, si cubre el de otra, su orden.
+      dIni: x.break_start_time ?? null, dFin: x.break_end_time ?? null,
+      cubreDe: x.covers_break_of ?? null,
     }))
   }
   return [

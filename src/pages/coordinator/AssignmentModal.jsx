@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { asignacionService, recursoService, semanaService, usuarioService, matrizService, sedeService } from '@/services/api'
 import { Spinner } from '@/components/ui'
@@ -30,19 +30,37 @@ function auxiliaresIniciales(a) {
   const ini = a.start_time ?? a.startTime
   const fin = a.end_time ?? a.endTime
   const lista = a.assistants?.length
-    ? a.assistants.map((x) => ({ id: x.resource_id ?? x.resourceId, ini: x.start_time ?? x.startTime, fin: x.end_time ?? x.endTime }))
+    ? a.assistants.map((x, k) => ({
+        id: x.resource_id ?? x.resourceId, ini: x.start_time ?? x.startTime, fin: x.end_time ?? x.endTime,
+        pos: x.position ?? k,
+        dIni: x.break_start_time ?? x.breakStartTime ?? null, dFin: x.break_end_time ?? x.breakEndTime ?? null,
+        cubreDe: x.covers_break_of ?? x.coversBreakOf ?? null,
+      }))
     : [
         { id: a.assistant_id ?? a.assistantId, ini: a.assistant_start_time ?? a.assistantStartTime, fin: a.assistant_end_time ?? a.assistantEndTime },
         { id: a.assistant2_id ?? a.assistant2Id, ini: a.assistant2_start_time ?? a.assistant2StartTime, fin: a.assistant2_end_time ?? a.assistant2EndTime },
       ]
-  return lista.filter((x) => x.id).map((x) => {
+  const validas = lista.filter((x) => x.id)
+  // Nov-2026 · Las que cubren el descanso de otra no van como auxiliar aparte:
+  // se muestran dentro de la auxiliar cubierta.
+  return validas.filter((x) => x.cubreDe == null).map((x, k) => {
     const xi = x.ini || ini, xf = x.fin || fin
-    return { id: x.id, ini: xi, fin: xf, auto: false, horaManual: true, parcial: xi !== ini || xf !== fin }
+    const relevo = validas.find((y) => y.cubreDe != null && y.cubreDe === (x.pos ?? k))
+    return {
+      id: x.id, ini: xi, fin: xf, auto: false, horaManual: true, parcial: xi !== ini || xf !== fin,
+      descanso: !!(x.dIni && x.dFin), dIni: x.dIni ?? '', dFin: x.dFin ?? '',
+      relevoId: relevo?.id ?? '', relevoAuto: false,
+    }
   })
 }
 // `parcial` = la casilla "Horario distinto al recurso principal". Sin marcar,
 // la auxiliar va con el horario del médico (como siempre ha sido).
-const AUX_VACIA = { id: '', ini: '', fin: '', auto: false, horaManual: false, parcial: false }
+// `descanso` = la casilla "Horario de descanso (almuerzo)": dIni–dFin y la
+// auxiliar que lo cubre (relevoId; relevoAuto = la puso el sistema).
+const AUX_VACIA = {
+  id: '', ini: '', fin: '', auto: false, horaManual: false, parcial: false,
+  descanso: false, dIni: '', dFin: '', relevoId: '', relevoAuto: false,
+}
 
 export default function AsignacionModal({ data, asignacion, sedeId, onClose, onSaved }) {
   const {
@@ -245,8 +263,17 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
         room_id: consultorioId,
         resource_id:     form.resource_id,
         // Nov-2026 · Todas las auxiliares, cada una con su horario.
+        // Las que cubren un descanso van al final, con el índice de la cubierta.
         assistants: verApoyo
-          ? auxsElegidas.map((x) => ({ resource_id: x.id, start_time: x.ini || form.start_time, end_time: x.fin || form.end_time }))
+          ? [
+              ...auxsElegidas.map((x) => ({
+                resource_id: x.id, start_time: x.ini || form.start_time, end_time: x.fin || form.end_time,
+                break_start_time: x.descanso ? x.dIni : null, break_end_time: x.descanso ? x.dFin : null,
+              })),
+              ...auxsElegidas.flatMap((x, i) => (x.descanso && x.relevoId
+                ? [{ resource_id: x.relevoId, start_time: x.dIni, end_time: x.dFin, covers_break_of: i }]
+                : [])),
+            ]
           : [],
         weekday:     dia,
         start_time:    form.start_time,
@@ -363,8 +390,8 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
     staleTime: 0,
     placeholderData: (prev) => prev,
   })
-  const filasAux = (() => {
-    const porId = new Map(estadoTurno.map((e) => [e.id, e]))
+  const armarFilas = (estado) => {
+    const porId = new Map(estado.map((e) => [e.id, e]))
     return auxiliares.map((a) => {
       const e = porId.get(a.id)
       const horasSemana = a.current_week_hours ?? 0
@@ -385,7 +412,57 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
         sedes: e?.sedes ?? [],
       }
     })
-  })()
+  }
+  const filasAux = armarFilas(estadoTurno)
+
+  // Nov-2026 · Hector: "Horario de descanso (almuerzo)": de qué hora a qué hora
+  // y la auxiliar que lo cubre, que sale sola. Su estado se mira en la franja
+  // del descanso, no en la del turno.
+  const descansoValido = (x) => !!x.descanso && !!x.dIni && !!x.dFin && x.dIni < x.dFin
+  const ventanasDescanso = [...new Map(form.auxs.filter((x) => x.id && descansoValido(x))
+    .map((x) => [`${x.dIni}-${x.dFin}`, { ini: x.dIni, fin: x.dFin }])).values()]
+  const consultasDescanso = useQueries({
+    queries: ventanasDescanso.map((v) => ({
+      queryKey: ['asignaciones', 'aux-turno', semanaId, dia, v.ini, v.fin, form.resource_id, asignacion?.id ?? null, tipoApoyo],
+      queryFn: () => matrizService.turno({
+        week_id: semanaId, weekday: dia, start_time: v.ini, end_time: v.fin,
+        professional_id: form.resource_id || undefined, exclude_assignment_id: asignacion?.id, type: tipoApoyo,
+      }),
+      enabled: verApoyo && !!semanaId,
+      staleTime: 0,
+    })),
+  })
+  const estadoDescanso = new Map(ventanasDescanso.map((v, k) => [`${v.ini}-${v.fin}`, consultasDescanso[k]?.data]))
+  const filasDescanso = (x) => {
+    const e = estadoDescanso.get(`${x.dIni}-${x.dFin}`)
+    return e ? armarFilas(e) : []
+  }
+  // Quién cubre: la pareja de la Matrix que esté libre en el descanso y, si
+  // no hay, la que tenga más horas disponibles. No una que ya va en el turno.
+  const firmaDescansos = JSON.stringify([...estadoDescanso.entries()].map(([k, v]) => [k, (v ?? []).length]))
+  useEffect(() => {
+    if (!verApoyo) return
+    setForm((f) => {
+      const enTurno = new Set(f.auxs.map((x) => x.id).filter(Boolean))
+      let cambio = false
+      const usadas = new Set(f.auxs.filter((x) => x.descanso && x.relevoId && !x.relevoAuto).map((x) => x.relevoId))
+      const auxs = f.auxs.map((x) => {
+        if (!x.id || !descansoValido(x) || (x.relevoId && !x.relevoAuto)) return x
+        const filas = filasDescanso(x)
+        if (!filas.length) return x
+        const c = filas
+          .filter((r) => elegible(r.estado) && !enTurno.has(r.id) && !usadas.has(r.id))
+          .sort((a, b) => (b.preseleccionada - a.preseleccionada) || ((b.disponibles ?? 0) - (a.disponibles ?? 0)))[0]
+        const id = c?.id ?? ''
+        if (id) usadas.add(id)
+        if (id === x.relevoId) return x
+        cambio = true
+        return { ...x, relevoId: id, relevoAuto: !!id }
+      })
+      return cambio ? { ...f, auxs } : f
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firmaDescansos, verApoyo])
 
   // Nov-2026 · Hector: "en el 3 aux que vuelva y venga por defecto la de la
   // Matriz… hay que ir calculando que la hora siempre vaya viniendo por
@@ -432,7 +509,8 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
 
   // Qué fila se está eligiendo en la cuadrícula (índice o null).
   const [eligiendoAux, setEligiendoAux] = useState(null)
-  useEffect(() => { if (!verApoyo) setEligiendoAux(null) }, [verApoyo])
+  const [eligiendoRelevo, setEligiendoRelevo] = useState(null)
+  useEffect(() => { if (!verApoyo) { setEligiendoAux(null); setEligiendoRelevo(null) } }, [verApoyo])
 
   const setAux = (i, cambios) => {
     setConflicto(null)
@@ -472,7 +550,12 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
   const puedeAgregarAux = verApoyo && horarioValido && huecosTurno.length > 0 && form.auxs.every((x) => x.id)
   // Cada auxiliar con un horario válido dentro del turno.
   const horasAuxOk = auxsElegidas.every((x) => x.ini && x.fin && x.ini < x.fin && x.ini >= form.start_time && x.fin <= form.end_time)
-  const valid = form.resource_id && form.start_time && form.end_time && (!requiereAuxAdicional || auxsElegidas.length > 0) && (!verApoyo || horasAuxOk) && motivoOk && autorizacionOk
+  // Descanso: dentro del horario de la auxiliar y con quien lo cubra (obligatorio).
+  const idsEnTurno = auxsElegidas.map((x) => x.id)
+  const descansosOk = auxsElegidas.every((x) => !x.descanso || (
+    descansoValido(x) && x.dIni >= x.ini && x.dFin <= x.fin && !!x.relevoId && !idsEnTurno.includes(x.relevoId)
+  ))
+  const valid = form.resource_id && form.start_time && form.end_time && (!requiereAuxAdicional || auxsElegidas.length > 0) && (!verApoyo || (horasAuxOk && descansosOk)) && motivoOk && autorizacionOk
 
   // Nov-2026 · Hector: asignar ya no es un modal sino una pantalla completa.
   // Encima del Programador (no es una ruta aparte) para no perder la semana,
@@ -652,10 +735,10 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                     <AuxiliarBar
                       fila={fila}
                       abierto={abierta}
-                      onClick={() => setEligiendoAux(abierta ? null : i)}
+                      onClick={() => { setEligiendoRelevo(null); setEligiendoAux(abierta ? null : i) }}
                       cargando={cargandoTurno && !estadoTurno.length}
                       placeholder={labelApoyoBuscar}
-                      plan={x.id && x.ini && x.fin ? { ini: x.ini, fin: x.fin, sede: nombreSede } : null}
+                      plan={x.id && x.ini && x.fin ? { ini: x.ini, fin: x.fin, sede: nombreSede, descanso: descansoValido(x) ? { ini: x.dIni, fin: x.dFin } : null } : null}
                     />
                     {abierta && (
                       // Debajo de la barra, dentro de la mitad del formulario.
@@ -665,7 +748,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                           excluir={form.auxs.filter((_, j) => j !== i).map((y) => y.id).filter(Boolean)}
                           filas={filasAux}
                           dia={diaLabel}
-                          plan={x.ini && x.fin ? { ini: x.ini, fin: x.fin, sede: nombreSede } : null}
+                          plan={x.ini && x.fin ? { ini: x.ini, fin: x.fin, sede: nombreSede, descanso: descansoValido(x) ? { ini: x.dIni, fin: x.dFin } : null } : null}
                           onChange={(id) => { setAux(i, { id, auto: false, horaManual: false }); setEligiendoAux(null) }}
                           onClose={() => setEligiendoAux(null)}
                         />
@@ -709,6 +792,71 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                         </div>
                       </div>
                     )}
+                    {/* Nov-2026 · Hector: el descanso (almuerzo) de la auxiliar,
+                        de qué hora a qué hora, y la auxiliar que lo cubre. */}
+                    {x.id && !abierta && (
+                      <label className="flex items-center gap-2 cursor-pointer mt-2">
+                        <input
+                          type="checkbox"
+                          checked={!!x.descanso}
+                          onChange={(e) => {
+                            const on = e.target.checked
+                            // 12:00–13:00 si cabe en su horario.
+                            const cabe = x.ini <= '12:00' && x.fin >= '13:00'
+                            setAux(i, on
+                              ? { descanso: true, dIni: x.dIni || (cabe ? '12:00' : ''), dFin: x.dFin || (cabe ? '13:00' : ''), relevoId: '', relevoAuto: false }
+                              : { descanso: false, dIni: '', dFin: '', relevoId: '', relevoAuto: false })
+                            if (!on) setEligiendoRelevo(null)
+                          }}
+                        />
+                        <span className="text-xs text-gray-700">Horario de descanso (almuerzo)</span>
+                      </label>
+                    )}
+                    {x.id && !abierta && x.descanso && (() => {
+                      const filasR = filasDescanso(x)
+                      const filaR = filasR.find((r) => r.id === x.relevoId)
+                      const abiertaR = eligiendoRelevo === i
+                      const fueraDeHorario = descansoValido(x) && (x.dIni < x.ini || x.dFin > x.fin)
+                      return (
+                        <div className="mt-2 space-y-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[11px] font-semibold text-gray-600">Descanso desde <span className="text-red-600">*</span></label>
+                              <input className="input" type="time" min={x.ini} max={x.fin} value={x.dIni}
+                                onChange={(e) => setAux(i, { dIni: e.target.value, relevoId: x.relevoAuto ? '' : x.relevoId })} />
+                            </div>
+                            <div>
+                              <label className="text-[11px] font-semibold text-gray-600">Descanso hasta <span className="text-red-600">*</span></label>
+                              <input className="input" type="time" min={x.ini} max={x.fin} value={x.dFin}
+                                onChange={(e) => setAux(i, { dFin: e.target.value, relevoId: x.relevoAuto ? '' : x.relevoId })} />
+                            </div>
+                          </div>
+                          {fueraDeHorario && <p className="text-xs text-red-600">El descanso debe estar dentro de {x.ini}–{x.fin}.</p>}
+                          <div>
+                            <label className="label">Auxiliar que cubre el descanso <span className="text-red-600">*</span></label>
+                            <AuxiliarBar
+                              fila={filaR}
+                              abierto={abiertaR}
+                              onClick={() => { setEligiendoAux(null); setEligiendoRelevo(abiertaR ? null : i) }}
+                              cargando={descansoValido(x) && !filasR.length}
+                              placeholder={descansoValido(x) ? labelApoyoBuscar : 'Ponga primero el horario del descanso'}
+                              plan={filaR && descansoValido(x) ? { ini: x.dIni, fin: x.dFin, sede: nombreSede } : null}
+                            />
+                            {abiertaR && descansoValido(x) && (
+                              <AuxiliarTabla
+                                value={x.relevoId}
+                                excluir={[...idsEnTurno, ...form.auxs.filter((_, j) => j !== i).map((y) => y.relevoId)].filter(Boolean)}
+                                filas={filasR}
+                                dia={diaLabel}
+                                plan={{ ini: x.dIni, fin: x.dFin, sede: nombreSede }}
+                                onChange={(id) => { setAux(i, { relevoId: id, relevoAuto: false }); setEligiendoRelevo(null) }}
+                                onClose={() => setEligiendoRelevo(null)}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })()}
                   </div>
                 )
               })}
@@ -820,6 +968,11 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                         <span className="text-gray-400">{labelApoyo} {i + 1}:</span>{' '}
                         <strong>{auxiliares.find((a) => a.id === x.id)?.name ?? '—'}</strong>
                         <span className="text-gray-500"> · {x.ini}–{x.fin}</span>
+                        {x.descanso && x.relevoId && (
+                          <div className="pl-3 text-gray-600">
+                            Descanso {x.dIni}–{x.dFin}: lo cubre <strong>{auxiliares.find((a) => a.id === x.relevoId)?.name ?? '—'}</strong>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -903,6 +1056,24 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                   dia={dia}
                   ini={x.ini || form.start_time}
                   fin={x.fin || form.end_time}
+                  descanso={descansoValido(x) ? { ini: x.dIni, fin: x.dFin } : null}
+                  asignacionId={asignacion?.id}
+                  turnoActual={turnoActual}
+                />
+              )
+            })}
+            {verApoyo && auxsElegidas.map((x) => {
+              const persona = x.descanso && descansoValido(x) && auxiliares.find((a) => a.id === x.relevoId)
+              if (!persona) return null
+              return (
+                <ResourceWeekLoad
+                  key={`relevo-${x.id}`}
+                  persona={persona}
+                  rol={`Cubre el descanso de ${auxiliares.find((a) => a.id === x.id)?.name ?? ''}`}
+                  semanaId={semanaId}
+                  dia={dia}
+                  ini={x.dIni}
+                  fin={x.dFin}
                   asignacionId={asignacion?.id}
                   turnoActual={turnoActual}
                 />
