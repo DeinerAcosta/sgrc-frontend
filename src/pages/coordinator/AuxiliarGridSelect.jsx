@@ -71,9 +71,10 @@ function EstadoPill({ estado }) {
 }
 
 /** La barra de una auxiliar en el formulario: una línea, del alto de un campo. */
-export function AuxiliarBar({ fila: fila0, abierto, onClick, cargando, placeholder, plan = null }) {
+export function AuxiliarBar({ fila: fila0, abierto, onClick, cargando, placeholder, plan = null, conHorario = true }) {
   const fila = conPlan(fila0, plan)
-  const horario = plan ? `${plan.ini}–${plan.fin}` : null
+  // Sin la hora en la barra cuando las horas van al lado, en sus campos.
+  const horario = plan && conHorario ? `${plan.ini}–${plan.fin}` : null
   return (
     <button
       type="button"

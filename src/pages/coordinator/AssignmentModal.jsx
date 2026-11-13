@@ -728,18 +728,50 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                       </label>
                       {(i > 0 || x.id) && (
                         <button type="button" className="text-xs text-gray-400 hover:text-red-600 mb-1" onClick={() => quitarAux(i)}>
-                          Quitar
+                          Eliminar
                         </button>
                       )}
                     </div>
-                    <AuxiliarBar
-                      fila={fila}
-                      abierto={abierta}
-                      onClick={() => { setEligiendoRelevo(null); setEligiendoAux(abierta ? null : i) }}
-                      cargando={cargandoTurno && !estadoTurno.length}
-                      placeholder={labelApoyoBuscar}
-                      plan={x.id && x.ini && x.fin ? { ini: x.ini, fin: x.fin, sede: nombreSede, descanso: descansoValido(x) ? { ini: x.dIni, fin: x.dFin } : null } : null}
-                    />
+                    {/* Nov-2026 · Hector: sin la casilla "Horario distinto": la
+                        auxiliar y, en la misma línea, de qué hora a qué hora.
+                        Llegan con el horario del médico; si se cambian, cubre
+                        solo esa parte. */}
+                    <div className="flex items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <AuxiliarBar
+                          fila={fila}
+                          abierto={abierta}
+                          onClick={() => { setEligiendoRelevo(null); setEligiendoAux(abierta ? null : i) }}
+                          cargando={cargandoTurno && !estadoTurno.length}
+                          placeholder={labelApoyoBuscar}
+                          conHorario={false}
+                          plan={x.id && x.ini && x.fin ? { ini: x.ini, fin: x.fin, sede: nombreSede, descanso: descansoValido(x) ? { ini: x.dIni, fin: x.dFin } : null } : null}
+                        />
+                      </div>
+                      {x.id && (
+                        <>
+                          <input
+                            className="input !w-[136px] shrink-0 !px-2 tabular-nums"
+                            type="time"
+                            aria-label="Desde"
+                            min={form.start_time}
+                            max={form.end_time}
+                            value={x.ini}
+                            onChange={(e) => setAux(i, { ini: e.target.value, horaManual: true, parcial: true, auto: false })}
+                          />
+                          <span className="text-xs text-gray-400">a</span>
+                          <input
+                            className="input !w-[136px] shrink-0 !px-2 tabular-nums"
+                            type="time"
+                            aria-label="Hasta"
+                            min={form.start_time}
+                            max={form.end_time}
+                            value={x.fin}
+                            onChange={(e) => setAux(i, { fin: e.target.value, horaManual: true, parcial: true, auto: false })}
+                          />
+                        </>
+                      )}
+                    </div>
                     {abierta && (
                       // Debajo de la barra, dentro de la mitad del formulario.
                       <div>
@@ -752,44 +784,6 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                           onChange={(id) => { setAux(i, { id, auto: false, horaManual: false }); setEligiendoAux(null) }}
                           onClose={() => setEligiendoAux(null)}
                         />
-                      </div>
-                    )}
-                    {/* Hector: "como ha estado siempre": la casilla y, solo si se
-                        marca, Desde / Hasta. */}
-                    {x.id && !abierta && (
-                      <label className="flex items-center gap-2 cursor-pointer mt-2">
-                        <input
-                          type="checkbox"
-                          checked={!!x.parcial}
-                          onChange={(e) => setAux(i, { parcial: e.target.checked, horaManual: false })}
-                        />
-                        <span className="text-xs text-gray-700">Horario distinto al recurso principal (esta aux cubre solo parte del turno)</span>
-                      </label>
-                    )}
-                    {x.id && !abierta && x.parcial && (
-                      <div className="grid grid-cols-2 gap-2 mt-2">
-                        <div>
-                          <label className="text-[11px] font-semibold text-gray-600">Desde</label>
-                          <input
-                            className="input"
-                            type="time"
-                            min={form.start_time}
-                            max={form.end_time}
-                            value={x.ini}
-                            onChange={(e) => setAux(i, { ini: e.target.value, horaManual: true })}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[11px] font-semibold text-gray-600">Hasta</label>
-                          <input
-                            className="input"
-                            type="time"
-                            min={form.start_time}
-                            max={form.end_time}
-                            value={x.fin}
-                            onChange={(e) => setAux(i, { fin: e.target.value, horaManual: true })}
-                          />
-                        </div>
                       </div>
                     )}
                     {/* Nov-2026 · Hector: el descanso (almuerzo) de la auxiliar,
@@ -818,30 +812,28 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                       const abiertaR = eligiendoRelevo === i
                       const fueraDeHorario = descansoValido(x) && (x.dIni < x.ini || x.dFin > x.fin)
                       return (
-                        <div className="mt-2 space-y-2">
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="text-[11px] font-semibold text-gray-600">Descanso desde <span className="text-red-600">*</span></label>
-                              <input className="input" type="time" min={x.ini} max={x.fin} value={x.dIni}
-                                onChange={(e) => setAux(i, { dIni: e.target.value, relevoId: x.relevoAuto ? '' : x.relevoId })} />
+                        <div className="mt-2">
+                          <label className="label">Auxiliar que cubre el descanso <span className="text-red-600">*</span></label>
+                          <div className="flex items-center gap-2">
+                            <div className="min-w-0 flex-1">
+                              <AuxiliarBar
+                                fila={filaR}
+                                abierto={abiertaR}
+                                onClick={() => { setEligiendoAux(null); setEligiendoRelevo(abiertaR ? null : i) }}
+                                cargando={descansoValido(x) && !filasR.length}
+                                placeholder={descansoValido(x) ? labelApoyoBuscar : 'Ponga el horario del descanso'}
+                                conHorario={false}
+                                plan={filaR && descansoValido(x) ? { ini: x.dIni, fin: x.dFin, sede: nombreSede } : null}
+                              />
                             </div>
-                            <div>
-                              <label className="text-[11px] font-semibold text-gray-600">Descanso hasta <span className="text-red-600">*</span></label>
-                              <input className="input" type="time" min={x.ini} max={x.fin} value={x.dFin}
-                                onChange={(e) => setAux(i, { dFin: e.target.value, relevoId: x.relevoAuto ? '' : x.relevoId })} />
-                            </div>
+                            <input className="input !w-[136px] shrink-0 !px-2 tabular-nums" type="time" aria-label="Descanso desde" min={x.ini} max={x.fin} value={x.dIni}
+                              onChange={(e) => setAux(i, { dIni: e.target.value, relevoId: x.relevoAuto ? '' : x.relevoId })} />
+                            <span className="text-xs text-gray-400">a</span>
+                            <input className="input !w-[136px] shrink-0 !px-2 tabular-nums" type="time" aria-label="Descanso hasta" min={x.ini} max={x.fin} value={x.dFin}
+                              onChange={(e) => setAux(i, { dFin: e.target.value, relevoId: x.relevoAuto ? '' : x.relevoId })} />
                           </div>
-                          {fueraDeHorario && <p className="text-xs text-red-600">El descanso debe estar dentro de {x.ini}–{x.fin}.</p>}
+                          {fueraDeHorario && <p className="text-xs text-red-600 mt-1">El descanso debe estar dentro de {x.ini}–{x.fin}.</p>}
                           <div>
-                            <label className="label">Auxiliar que cubre el descanso <span className="text-red-600">*</span></label>
-                            <AuxiliarBar
-                              fila={filaR}
-                              abierto={abiertaR}
-                              onClick={() => { setEligiendoAux(null); setEligiendoRelevo(abiertaR ? null : i) }}
-                              cargando={descansoValido(x) && !filasR.length}
-                              placeholder={descansoValido(x) ? labelApoyoBuscar : 'Ponga primero el horario del descanso'}
-                              plan={filaR && descansoValido(x) ? { ini: x.dIni, fin: x.dFin, sede: nombreSede } : null}
-                            />
                             {abiertaR && descansoValido(x) && (
                               <AuxiliarTabla
                                 value={x.relevoId}
