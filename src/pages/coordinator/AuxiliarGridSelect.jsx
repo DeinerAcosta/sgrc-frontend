@@ -92,10 +92,6 @@ export function AuxiliarBar({ fila: fila0, abierto, onClick, cargando, placehold
           <span className="min-w-0 flex-1 truncate">
             <span className="font-medium text-gray-900">{fila.name}</span>
             {horario && <span className="ml-1.5 text-xs font-semibold text-brand-700 tabular-nums">{horario}</span>}
-            <span className="text-xs text-gray-400">
-              {' · '}{fila.disponibles != null ? `le quedan ${fmt(fila.disponibles)}h` : `${fmt(fila.horasSemana)}h`}
-              {fila.preseleccionada ? ' · Matrix' : ''}
-            </span>
           </span>
           <EstadoPill estado={fila.estado} />
         </>

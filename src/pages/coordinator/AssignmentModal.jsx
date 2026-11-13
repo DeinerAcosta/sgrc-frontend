@@ -751,7 +751,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                       {x.id && (
                         <>
                           <input
-                            className="input !w-[136px] shrink-0 !px-2 tabular-nums"
+                            className="input !w-[140px] shrink-0 !px-2 tabular-nums"
                             type="time"
                             aria-label="Desde"
                             min={form.start_time}
@@ -761,7 +761,7 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                           />
                           <span className="text-xs text-gray-400">a</span>
                           <input
-                            className="input !w-[136px] shrink-0 !px-2 tabular-nums"
+                            className="input !w-[140px] shrink-0 !px-2 tabular-nums"
                             type="time"
                             aria-label="Hasta"
                             min={form.start_time}
@@ -826,10 +826,10 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                                 plan={filaR && descansoValido(x) ? { ini: x.dIni, fin: x.dFin, sede: nombreSede } : null}
                               />
                             </div>
-                            <input className="input !w-[136px] shrink-0 !px-2 tabular-nums" type="time" aria-label="Descanso desde" min={x.ini} max={x.fin} value={x.dIni}
+                            <input className="input !w-[140px] shrink-0 !px-2 tabular-nums" type="time" aria-label="Descanso desde" min={x.ini} max={x.fin} value={x.dIni}
                               onChange={(e) => setAux(i, { dIni: e.target.value, relevoId: x.relevoAuto ? '' : x.relevoId })} />
                             <span className="text-xs text-gray-400">a</span>
-                            <input className="input !w-[136px] shrink-0 !px-2 tabular-nums" type="time" aria-label="Descanso hasta" min={x.ini} max={x.fin} value={x.dFin}
+                            <input className="input !w-[140px] shrink-0 !px-2 tabular-nums" type="time" aria-label="Descanso hasta" min={x.ini} max={x.fin} value={x.dFin}
                               onChange={(e) => setAux(i, { dFin: e.target.value, relevoId: x.relevoAuto ? '' : x.relevoId })} />
                           </div>
                           {fueraDeHorario && <p className="text-xs text-red-600 mt-1">El descanso debe estar dentro de {x.ini}–{x.fin}.</p>}
