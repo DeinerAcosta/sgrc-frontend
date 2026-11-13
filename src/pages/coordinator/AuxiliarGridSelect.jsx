@@ -254,7 +254,7 @@ export function AuxiliarTabla({ value, onChange, onClose, filas, excluir, dia = 
                       </span>
                       <span className="min-w-0">
                         <span className={clsx('block truncate text-[13px] font-medium leading-tight', puede ? 'text-gray-900' : 'text-gray-400')} title={f.name}>{f.name}</span>
-                        {f.preseleccionada && <span className="block text-[10px] font-semibold leading-tight text-brand-600">Pareja en la Matrix</span>}
+                        {f.preseleccionada && <span className="block text-[10px] font-semibold leading-tight text-brand-600">Pareja en la Matriz</span>}
                       </span>
                     </span>
                   </td>
