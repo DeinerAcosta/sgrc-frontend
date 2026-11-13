@@ -565,8 +565,12 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
     })
   }
   const agregarAux = () => {
-    // La que se agrega es para cubrir lo que falta: entra con horario distinto.
-    setForm((f) => ({ ...f, auxs: recalcularAuxs([...f.auxs, { ...AUX_VACIA, parcial: true }]) }))
+    // Si falta cubrir parte del turno, la nueva entra a cubrir eso; si no, es
+    // una segunda auxiliar con el horario del médico (como siempre ha sido).
+    setForm((f) => {
+      const faltan = huecosSinCubrir(form.start_time, form.end_time, f.auxs.filter((x) => x.id)).length > 0
+      return { ...f, auxs: recalcularAuxs([...f.auxs, { ...AUX_VACIA, parcial: faltan }]) }
+    })
   }
   // "Hasta que se acabe el horario del médico": se agregan mientras quede algo sin cubrir.
   // Lo que se está armando, para el detalle de "Este turno" en la semana de cada persona.
@@ -588,7 +592,9 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
   // Sale en cuanto hay alguien elegido y NO se aparta al elegir auxiliar.
   const conPanel = !!recursoSel || (verApoyo && auxsElegidas.length > 0)
   const huecosTurno = huecosSinCubrir(form.start_time, form.end_time, auxsElegidas)
-  const puedeAgregarAux = verApoyo && horarioValido && huecosTurno.length > 0 && form.auxs.every((x) => x.id)
+  // Nov-2026 · Hector: "sí o sí la opción de tener 2 aux como siempre ha
+  // estado": se puede agregar otra aunque el turno ya esté cubierto.
+  const puedeAgregarAux = verApoyo && horarioValido && form.auxs.every((x) => x.id) && form.auxs.length < auxiliares.length
   // Cada auxiliar con un horario válido dentro del turno.
   const horasAuxOk = auxsElegidas.every((x) => x.ini && x.fin && x.ini < x.fin && x.ini >= form.start_time && x.fin <= form.end_time)
   // Descanso: dentro del horario de la auxiliar y con quien lo cubra (obligatorio).
@@ -869,11 +875,13 @@ export default function AsignacionModal({ data, asignacion, sedeId, onClose, onS
                   </div>
                 )
               })}
-              {huecosTurno.length > 0 && auxsElegidas.length > 0 && (
+              {auxsElegidas.length > 0 && (huecosTurno.length > 0 || puedeAgregarAux) && (
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-xs text-amber-700">
-                    Sin cubrir: {huecosTurno.map((h) => `${h.ini}–${h.fin}`).join(', ')}
-                  </span>
+                  {huecosTurno.length > 0 ? (
+                    <span className="text-xs text-amber-700">
+                      Sin cubrir: {huecosTurno.map((h) => `${h.ini}–${h.fin}`).join(', ')}
+                    </span>
+                  ) : <span />}
                   {puedeAgregarAux && (
                     <button type="button" className="text-xs font-medium text-brand-600 hover:underline" onClick={agregarAux}>
                       + Agregar {esDiagnostico ? 'técnico de apoyo' : 'auxiliar'}
