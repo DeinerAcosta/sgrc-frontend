@@ -582,14 +582,15 @@ export const asignacionService = {
   },
   /** Descarga el horario semanal de la sede en PDF o Excel. Dispara la descarga en el navegador. */
   // `dia` (lunes…domingo) descarga solo ese día; sin él, la semana completa.
-  descargarSemana: async ({ semanaId, sedeId, formato = 'pdf', nombreSede = 'sede', dia = null, sufijo = '' }) => {
+  descargarSemana: async ({ semanaId, sedeId, formato = 'pdf', nombreSede = 'sede', dia = null, sufijo = '', areas = [] }) => {
     if (DEMO_MODE) return ok({ ok: true })
     // OJO: el interceptor devuelve res.data directamente, así que `blob` YA es
     // el Blob binario del PDF/XLSX (no un objeto response con .data). Envolver
     // en `new Blob([blob])` sin usar .data preserva los bytes; hacerlo con
     // blob.data (undefined) genera un archivo vacío que Acrobat rechaza.
     const blob = await api.get('/assignments/export', {
-      params: { week_id: semanaId, site_id: sedeId, format: formato, ...(dia ? { day: dia } : {}) },
+      // Nov-2026 · `areas` = el filtro de área del Programador: se descarga lo que se ve.
+      params: { week_id: semanaId, site_id: sedeId, format: formato, ...(dia ? { day: dia } : {}), ...(areas.length ? { areas: areas.join(',') } : {}) },
       responseType: 'blob',
     })
     const url = window.URL.createObjectURL(blob)

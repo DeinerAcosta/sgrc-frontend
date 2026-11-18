@@ -1040,6 +1040,7 @@ export default function ProgramadorPage() {
                             await asignacionService.descargarSemana({
                               semanaId: semanaActual.id, sedeId, formato: opt.fmt, nombreSede,
                               dia: diaDescarga || null,
+                              areas: especialidadFilter,
                               sufijo: iDia >= 0 ? format(diasFecha[iDia], 'yyyy-MM-dd') : format(semanaBase, 'yyyy-MM-dd'),
                             })
                             toast.success(`Horario descargado (${opt.ext.toUpperCase()})`)
